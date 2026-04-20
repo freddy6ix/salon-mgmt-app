@@ -1,85 +1,113 @@
-# ADR-004: Frontend Approach — API-First with React Admin UI
+# ADR-004: Frontend Approach — Two Distinct Clients
 
 **Date:** 2026-04-20
-**Status:** Accepted
+**Status:** Accepted (mobile platform decision deferred)
 **Deciders:** Frederick Ferguson
 
 ---
 
 ## Context
 
-Phase 1 requires a staff-facing UI for:
-- Appointment book (the central feature — visual calendar grid, multi-provider columns)
-- Client management
-- Booking request queue (review and convert incoming requests)
-- Provider schedule management
+The system serves two distinct user groups with fundamentally different needs:
 
-The owner is a solo developer with Python/backend experience, less familiar with the frontend side of this repo. The UI must be functional and usable for real salon operations, but does not need to be polished for a general SaaS audience in Phase 1.
+**Reception / Owner (desktop):**
+- Full appointment book — multi-provider columns, drag-and-drop scheduling
+- Converting booking requests across channels (form, email, phone, walk-in)
+- Administrative functions: reporting, inventory, payroll, schedule management
 
-Options considered:
-1. **Headless API only** — no UI in Phase 1; staff continue using Milano until Phase 2
-2. **Server-rendered HTML** — FastAPI + Jinja2 templates + HTMX
-3. **React SPA** — decoupled frontend calling the FastAPI backend
-4. **Low-code admin tool** — e.g., Retool, AdminJS, or FastAPI's auto-admin
+**Individual staff (mobile):**
+- Their own schedule for today
+- Current client: notes, services booked, colour formula
+- Check in a client when they arrive
+- Check out a client and accept payment
+
+These are different enough in scope, interaction model, and device constraints that they warrant separate client applications, not a single responsive UI. A mobile-optimised appointment book showing all 8 provider columns is not a viable UX on a phone screen.
 
 ---
 
 ## Decision
 
-**React SPA (TypeScript) calling the FastAPI backend, with a component library to minimise custom CSS.**
+**Two separate frontend clients sharing one FastAPI backend:**
 
-Recommended stack: **Vite + React + TypeScript + Tailwind CSS + shadcn/ui components.**
+1. **Desktop web app** — React + TypeScript + Vite + Tailwind CSS + shadcn/ui. Served as a static build from Cloud Storage + CDN.
 
-The appointment book calendar grid is the one component that requires custom work regardless of stack — no off-the-shelf admin component handles multi-provider time columns well enough. Everything else (client list, request queue, schedule management) can be assembled from standard table/form components.
+2. **Staff mobile app** — native iOS/Android. **Platform decision (React Native vs. Flutter vs. native Swift/Kotlin) is deferred.** The FastAPI backend is designed from day one to serve both clients — no mobile-specific API changes will be needed later.
+
+The mobile app is **Phase 2**. Phase 1 delivers the desktop web app only. Staff use desktop during Phase 1.
 
 ---
 
-## Rationale
+## Desktop Web App
+
+### Why React SPA over other options
 
 | Option | Pro | Con |
 |--------|-----|-----|
-| Headless only | No frontend work | Salon cannot switch off Milano; no Phase 1 value |
-| Jinja2 + HTMX | Single codebase, Python-native | Poor fit for the appointment book's interactive grid; limited component ecosystem |
-| React SPA | Full control over calendar grid; large ecosystem; Claude Code can generate components effectively | Context switch for backend-focused developer; build tooling overhead |
+| Headless only | No frontend work | Cannot replace Milano; no Phase 1 value |
+| Jinja2 + HTMX | Single codebase, Python-native | Poor fit for the appointment book's interactive grid |
+| React SPA | Full control over calendar grid; large ecosystem | Context switch for backend-focused developer |
 | Low-code admin | Fast for CRUD screens | Cannot implement the appointment book grid; vendor lock-in |
 
-The appointment book is the core of the system. It requires:
-- A time-ruler grid with provider columns (similar to Google Calendar's day view, but multi-column)
+The appointment book requires:
+- A time-ruler grid with one column per provider (similar to Google Calendar day view, multi-column)
 - Drag-and-drop appointment item placement
-- Visual representation of processing time windows
-- Real-time updates when other staff book simultaneously (Phase 2)
+- Visual representation of processing time windows (provider-free windows shown differently from booked time)
+- Real-time updates when multiple staff book simultaneously (Phase 2 WebSocket)
 
-This level of interactivity is only practical in a modern frontend framework. React has the largest ecosystem of calendar/scheduler primitives to build on.
+This level of interactivity is only practical in a modern frontend framework.
 
-**Component library choice — shadcn/ui:** Unstyled-by-default components with Tailwind. Avoids fighting an opinionated design system; easy to customise for the appointment book aesthetic.
+**shadcn/ui** — unstyled-by-default components with Tailwind. Avoids fighting an opinionated design system while providing accessible, composable primitives for forms, tables, and modals.
 
-**Third-party calendar consideration:** Libraries like `react-big-calendar` or `@fullcalendar/react` can accelerate the appointment book grid. Evaluate at implementation time — if a library handles multi-resource day view well, use it; otherwise build a custom grid.
+**Third-party calendar:** Libraries like `@fullcalendar/react` (resource timeline view) may handle the multi-provider grid. Evaluate at implementation — if a library handles multi-resource day view well enough, use it; otherwise build a custom grid component.
+
+---
+
+## Mobile App (Deferred to Phase 2)
+
+### Use cases
+
+| Action | Notes |
+|--------|-------|
+| View today's personal schedule | Own appointments only — not the full book |
+| Client check-in | Mark client as arrived |
+| View client notes + service details | Special instructions, colour formula, service sequence |
+| Client check-out | Accept payment (card via terminal integration, or cash) |
+
+### Deferred platform decision
+
+Native iOS/Android is preferred over a PWA or responsive web for the mobile experience (better camera access for client photos, push notifications for schedule changes, smoother payment terminal integration). The specific framework — React Native, Flutter, or native — is deferred until Phase 2 planning.
+
+**API design implication (not deferred):** The FastAPI backend must expose mobile-friendly endpoints from Phase 1:
+- `GET /providers/{id}/schedule/today` — single provider's day view
+- `GET /appointments/{id}` — full appointment detail including client notes and service sequence
+- `POST /appointments/{id}/checkin` — mark arrived
+- `POST /appointments/{id}/checkout` — initiate payment
+
+These endpoints should be designed and implemented in Phase 1 even though the mobile app consuming them is built in Phase 2. This avoids retrofitting the API later.
 
 ---
 
 ## Consequences
 
-- **Positive:** Clean API/UI separation; the FastAPI backend can serve future mobile clients or third-party integrations without changes.
-- **Positive:** TypeScript + Pydantic schemas = type safety end-to-end; OpenAPI-generated TypeScript client keeps API contract in sync automatically.
-- **Positive:** React's component model is well-suited to the appointment book's column-per-provider layout.
-- **Negative:** Two build systems to maintain (Python backend + Node frontend). Mitigated by keeping them in the same repo under `frontend/`.
-- **Negative:** Solo developer must context-switch between Python and TypeScript. Mitigated by Claude Code handling most frontend scaffolding.
-- **Neutral:** Frontend served as static build from object storage (GCS or Azure Blob) behind a CDN in staging/production. FastAPI serves only the API, not static assets.
+- **Positive:** Desktop and mobile UX are each optimised for their context — no compromises from a single responsive design.
+- **Positive:** Clean API separation means the mobile app can be built in Phase 2 against an already-stable backend contract.
+- **Positive:** TypeScript + Pydantic/OpenAPI = type-safe API contract shared between backend and both frontends.
+- **Negative:** Two separate frontend codebases to maintain eventually. Mitigated by deferred mobile build.
+- **Negative:** Solo developer must context-switch between Python and TypeScript for the desktop app. Mitigated by Claude Code handling frontend scaffolding.
+- **Neutral:** Desktop frontend served as static build from Cloud Storage + CDN (ADR-001). FastAPI serves only the API, not static assets.
 
 ---
 
-## Phase 1 UI Scope
-
-Minimum viable screens for Phase 1 launch:
+## Phase 1 Desktop UI Scope
 
 | Screen | Priority |
 |--------|---------|
 | Login | P0 |
-| Appointment book (day/week view, multi-provider columns) | P0 |
+| Appointment book — day view, multi-provider columns | P0 |
 | Booking request queue | P0 |
 | Client list + client detail | P0 |
-| New appointment (create from request or direct) | P0 |
+| New appointment (from request or direct) | P0 |
 | Provider schedule management | P1 |
-| Service list (read-only in Phase 1) | P1 |
+| Service list (read-only) | P1 |
 
-POS, reporting, and CRM screens are Phase 2.
+POS, reporting, inventory, and CRM screens are Phase 2 desktop. Mobile app is Phase 2.
