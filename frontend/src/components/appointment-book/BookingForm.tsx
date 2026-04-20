@@ -1,0 +1,346 @@
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { format, addMinutes } from 'date-fns'
+import { searchClients, type Client } from '@/api/clients'
+import { listServices, type Service } from '@/api/services'
+import { type Provider } from '@/api/providers'
+import { api } from '@/api/client'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+
+interface Props {
+  open: boolean
+  date: string           // YYYY-MM-DD
+  initialTime?: string   // HH:MM
+  initialProviderId?: string
+  providers: Provider[]
+  onClose: () => void
+  onSaved: () => void
+}
+
+interface ItemDraft {
+  service: Service
+  provider: Provider
+  startTime: string   // HH:MM
+  price: number
+}
+
+export default function BookingForm({
+  open, date, initialTime, initialProviderId, providers, onClose, onSaved,
+}: Props) {
+  const qc = useQueryClient()
+
+  // ── Step: 'client' | 'items' | 'confirm'
+  const [step, setStep] = useState<'client' | 'items' | 'confirm'>('client')
+
+  // ── Client search
+  const [clientQuery, setClientQuery] = useState('')
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  useEffect(() => {
+    if (searchRef.current) clearTimeout(searchRef.current)
+    searchRef.current = setTimeout(() => setDebouncedQuery(clientQuery), 250)
+  }, [clientQuery])
+
+  const { data: clientResults = [] } = useQuery({
+    queryKey: ['clients', debouncedQuery],
+    queryFn: () => searchClients(debouncedQuery),
+    enabled: debouncedQuery.length >= 1,
+  })
+
+  // ── Services
+  const { data: services = [] } = useQuery({
+    queryKey: ['services'],
+    queryFn: listServices,
+  })
+
+  // ── Items draft
+  const [items, setItems] = useState<ItemDraft[]>([])
+  const [serviceId, setServiceId] = useState('')
+  const [providerId, setProviderId] = useState(initialProviderId ?? '')
+  const [startTime, setStartTime] = useState(initialTime ?? '09:00')
+  const [price, setPrice] = useState('')
+  const [notes, setNotes] = useState('')
+
+  // Reset when re-opened
+  useEffect(() => {
+    if (open) {
+      setStep('client')
+      setClientQuery('')
+      setSelectedClient(null)
+      setItems([])
+      setServiceId('')
+      setProviderId(initialProviderId ?? '')
+      setStartTime(initialTime ?? '09:00')
+      setPrice('')
+      setNotes('')
+    }
+  }, [open, initialProviderId, initialTime])
+
+  const selectedService = services.find((s) => s.id === serviceId)
+  const selectedProvider = providers.find((p) => p.id === providerId)
+
+  function addItem() {
+    if (!selectedService || !selectedProvider) return
+    setItems((prev) => [
+      ...prev,
+      {
+        service: selectedService,
+        provider: selectedProvider,
+        startTime,
+        price: price ? parseFloat(price) : (selectedService.default_price ?? 0),
+      },
+    ])
+    // Advance start time for next item
+    const [h, m] = startTime.split(':').map(Number)
+    const next = addMinutes(new Date(2000, 0, 1, h, m), selectedService.duration_minutes)
+    setStartTime(format(next, 'HH:mm'))
+    setServiceId('')
+    setPrice('')
+  }
+
+  function removeItem(idx: number) {
+    setItems((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  // ── Save
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.post('/appointments', {
+        client_id: selectedClient!.id,
+        appointment_date: date,
+        source: 'staff_entered',
+        notes: notes || null,
+        items: items.map((item, idx) => {
+          const [h, m] = item.startTime.split(':').map(Number)
+          const localISO = `${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+          return {
+            service_id: item.service.id,
+            provider_id: item.provider.id,
+            sequence: idx + 1,
+            start_time: localISO,
+            duration_minutes: item.service.duration_minutes,
+            price: item.price,
+          }
+        }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments', date] })
+      onSaved()
+    },
+  })
+
+  const canSave = selectedClient && items.length > 0 && !mutation.isPending
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New Appointment — {format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</DialogTitle>
+        </DialogHeader>
+
+        {/* ── Step 1: Client ───────────────────────── */}
+        {step === 'client' && (
+          <div className="space-y-3">
+            <input
+              autoFocus
+              placeholder="Search by name, phone, or email…"
+              value={clientQuery}
+              onChange={(e) => setClientQuery(e.target.value)}
+              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+            />
+
+            {selectedClient ? (
+              <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-muted/40">
+                <span className="text-sm font-medium">
+                  {selectedClient.first_name} {selectedClient.last_name}
+                  {selectedClient.cell_phone && (
+                    <span className="text-muted-foreground font-normal ml-2">{selectedClient.cell_phone}</span>
+                  )}
+                </span>
+                <button onClick={() => setSelectedClient(null)} className="text-xs text-muted-foreground hover:text-foreground">change</button>
+              </div>
+            ) : (
+              clientResults.length > 0 && (
+                <ul className="border rounded-md divide-y max-h-52 overflow-auto">
+                  {clientResults.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/40"
+                        onClick={() => { setSelectedClient(c); setClientQuery('') }}
+                      >
+                        <span className="font-medium">{c.first_name} {c.last_name}</span>
+                        {c.cell_phone && <span className="text-muted-foreground ml-2">{c.cell_phone}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+
+            <div className="flex justify-end">
+              <Button disabled={!selectedClient} onClick={() => setStep('items')}>
+                Next →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Services ─────────────────────── */}
+        {step === 'items' && (
+          <div className="space-y-4">
+            <p className="text-sm font-medium">
+              {selectedClient!.first_name} {selectedClient!.last_name}
+            </p>
+
+            {/* Added items */}
+            {items.length > 0 && (
+              <ul className="space-y-1">
+                {items.map((item, idx) => (
+                  <li key={idx} className="flex items-center justify-between text-sm border rounded-md px-3 py-1.5">
+                    <span>
+                      <span className="font-medium">{item.startTime}</span>
+                      <span className="mx-1 text-muted-foreground">·</span>
+                      {item.service.name}
+                      <span className="mx-1 text-muted-foreground">·</span>
+                      {item.provider.display_name}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground">${item.price.toFixed(2)}</span>
+                      <button onClick={() => removeItem(idx)} className="text-destructive text-xs">✕</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Add item form */}
+            <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Service</label>
+                  <select
+                    value={serviceId}
+                    onChange={(e) => {
+                      setServiceId(e.target.value)
+                      const svc = services.find((s) => s.id === e.target.value)
+                      if (svc?.default_price) setPrice(String(svc.default_price))
+                    }}
+                    className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                  >
+                    <option value="">— select —</option>
+                    {['Styling', 'Colouring', 'Extensions'].map((cat) => (
+                      <optgroup key={cat} label={cat}>
+                        {services.filter((s) => s.category_name === cat).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes}m)</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Provider</label>
+                  <select
+                    value={providerId}
+                    onChange={(e) => setProviderId(e.target.value)}
+                    className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                  >
+                    <option value="">— select —</option>
+                    {providers.filter((p) => p.has_appointments).map((p) => (
+                      <option key={p.id} value={p.id}>{p.display_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Start time</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder={selectedService?.default_price?.toFixed(2) ?? '0.00'}
+                    className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!serviceId || !providerId}
+                onClick={addItem}
+                className="w-full"
+              >
+                + Add service
+              </Button>
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground">Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="Optional notes…"
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background mt-0.5 resize-none"
+              />
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="ghost" onClick={() => setStep('client')}>← Back</Button>
+              <Button disabled={items.length === 0} onClick={() => setStep('confirm')}>
+                Review →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Confirm ──────────────────────── */}
+        {step === 'confirm' && (
+          <div className="space-y-4">
+            <div className="rounded-md border p-3 space-y-1">
+              <p className="font-medium text-sm">
+                {selectedClient!.first_name} {selectedClient!.last_name}
+              </p>
+              {items.map((item, idx) => (
+                <p key={idx} className="text-sm text-muted-foreground">
+                  {item.startTime} · {item.service.name} · {item.provider.display_name} · <span className="text-foreground">${item.price.toFixed(2)}</span>
+                </p>
+              ))}
+              {notes && <p className="text-xs text-muted-foreground italic mt-1">{notes}</p>}
+            </div>
+
+            {mutation.isError && (
+              <p className="text-sm text-destructive">
+                {mutation.error instanceof Error ? mutation.error.message : 'Save failed'}
+              </p>
+            )}
+
+            <div className="flex justify-between">
+              <Button variant="ghost" onClick={() => setStep('items')}>← Back</Button>
+              <Button disabled={!canSave} onClick={() => mutation.mutate()}>
+                {mutation.isPending ? 'Saving…' : 'Confirm appointment'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
