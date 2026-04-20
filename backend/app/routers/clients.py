@@ -84,3 +84,52 @@ async def get_client(
         email=row.email,
         special_instructions=row.special_instructions,
     )
+
+
+class ClientCreate(BaseModel):
+    first_name: str
+    last_name: str
+    cell_phone: str | None = None
+    email: str | None = None
+    special_instructions: str | None = None
+
+
+@router.post("", response_model=ClientOut, status_code=status.HTTP_201_CREATED)
+async def create_client(
+    body: ClientCreate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClientOut:
+    tid = current_user.tenant_id
+    # Generate a simple sequential-style code
+    count = (await db.execute(
+        select(Client).where(Client.tenant_id == tid)
+    )).scalars()
+    client_code = f"C{str(uuid.uuid4())[:8].upper()}"
+
+    client = Client(
+        tenant_id=tid,
+        client_code=client_code,
+        first_name=body.first_name.strip(),
+        last_name=body.last_name.strip(),
+        cell_phone=body.cell_phone,
+        email=body.email,
+        special_instructions=body.special_instructions,
+        country="CA",
+        is_vip=False,
+        is_active=True,
+        no_show_count=0,
+        late_cancellation_count=0,
+        account_balance=0,
+    )
+    db.add(client)
+    await db.commit()
+    await db.refresh(client)
+    return ClientOut(
+        id=str(client.id),
+        first_name=client.first_name,
+        last_name=client.last_name,
+        cell_phone=client.cell_phone,
+        email=client.email,
+        special_instructions=client.special_instructions,
+    )

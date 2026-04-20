@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { format, addDays, subDays, parseISO } from 'date-fns'
 import { listAppointments, type Appointment, type AppointmentItem } from '@/api/appointments'
 import { listProviders, type Provider } from '@/api/providers'
-import TimeGrid from '@/components/appointment-book/TimeGrid'
+import TimeGrid, { SLOT_OPTIONS, type SlotMinutes } from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ export default function AppointmentBookPage() {
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
+  const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(15)
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],
@@ -50,6 +51,16 @@ export default function AppointmentBookPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <select
+            value={slotMinutes}
+            onChange={(e) => setSlotMinutes(Number(e.target.value) as SlotMinutes)}
+            className="border border-input rounded-md px-2 py-1 text-xs bg-background"
+            title="Grid granularity"
+          >
+            {SLOT_OPTIONS.map((m) => (
+              <option key={m} value={m}>{m} min</option>
+            ))}
+          </select>
           <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
           <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
         </div>
@@ -65,6 +76,8 @@ export default function AppointmentBookPage() {
           <TimeGrid
             providers={activeProviders}
             appointments={appointments}
+            date={date}
+            slotMinutes={slotMinutes}
             onItemClick={(item, appt) => setSelected({ item, appt })}
             onSlotClick={(time, providerId) => setBooking({ time, providerId })}
           />

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, addMinutes } from 'date-fns'
-import { searchClients, type Client } from '@/api/clients'
+import { searchClients, createClient, type Client } from '@/api/clients'
 import { listServices, type Service } from '@/api/services'
 import { type Provider } from '@/api/providers'
 import { api } from '@/api/client'
@@ -41,6 +41,12 @@ export default function BookingForm({
   // ── Client search
   const [clientQuery, setClientQuery] = useState('')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newFirst, setNewFirst] = useState('')
+  const [newLast, setNewLast] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [creatingClient, setCreatingClient] = useState(false)
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
@@ -64,7 +70,7 @@ export default function BookingForm({
   // ── Items draft
   const [items, setItems] = useState<ItemDraft[]>([])
   const [serviceId, setServiceId] = useState('')
-  const [providerId, setProviderId] = useState(initialProviderId ?? '')
+  const [providerId, setProviderId] = useState(initialProviderId ?? providers[0]?.id ?? '')
   const [startTime, setStartTime] = useState(initialTime ?? '09:00')
   const [price, setPrice] = useState('')
   const [notes, setNotes] = useState('')
@@ -75,9 +81,11 @@ export default function BookingForm({
       setStep('client')
       setClientQuery('')
       setSelectedClient(null)
+      setShowNewClient(false)
+      setNewFirst(''); setNewLast(''); setNewPhone(''); setNewEmail('')
       setItems([])
       setServiceId('')
-      setProviderId(initialProviderId ?? '')
+      setProviderId(initialProviderId ?? providers[0]?.id ?? '')
       setStartTime(initialTime ?? '09:00')
       setPrice('')
       setNotes('')
@@ -167,8 +175,47 @@ export default function BookingForm({
                 </span>
                 <button onClick={() => setSelectedClient(null)} className="text-xs text-muted-foreground hover:text-foreground">change</button>
               </div>
+            ) : showNewClient ? (
+              <div className="border rounded-md p-3 space-y-2 bg-muted/20">
+                <p className="text-xs font-medium text-muted-foreground">New client</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="First name *" value={newFirst} onChange={(e) => setNewFirst(e.target.value)}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
+                  <input placeholder="Last name *" value={newLast} onChange={(e) => setNewLast(e.target.value)}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
+                  <input placeholder="Cell phone" value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
+                  <input placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => setShowNewClient(false)} className="flex-1">Cancel</Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    disabled={!newFirst.trim() || !newLast.trim() || creatingClient}
+                    onClick={async () => {
+                      setCreatingClient(true)
+                      try {
+                        const client = await createClient({
+                          first_name: newFirst.trim(),
+                          last_name: newLast.trim(),
+                          cell_phone: newPhone.trim() || undefined,
+                          email: newEmail.trim() || undefined,
+                        })
+                        setSelectedClient(client)
+                        setShowNewClient(false)
+                      } finally {
+                        setCreatingClient(false)
+                      }
+                    }}
+                  >
+                    {creatingClient ? 'Saving…' : 'Create client'}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              clientResults.length > 0 && (
+              debouncedQuery.length >= 1 && (
                 <ul className="border rounded-md divide-y max-h-52 overflow-auto">
                   {clientResults.map((c) => (
                     <li key={c.id}>
@@ -181,6 +228,14 @@ export default function BookingForm({
                       </button>
                     </li>
                   ))}
+                  <li>
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-muted/40"
+                      onClick={() => { setShowNewClient(true); setNewFirst(clientQuery); setClientQuery('') }}
+                    >
+                      + New client "{clientQuery}"
+                    </button>
+                  </li>
                 </ul>
               )
             )}

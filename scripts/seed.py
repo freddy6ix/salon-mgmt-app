@@ -171,6 +171,8 @@ async def seed():
             dict(category="Styling", service_code="MLB", name="Milbon Treatment", duration_minutes=60, default_price=100),
             dict(category="Styling", service_code="MLBA", name="Milbon Treatment (add-on)", duration_minutes=30, default_price=65, is_addon=True),
             # Colouring
+            dict(category="Colouring", service_code="CCAMO", name="Camo Colour", duration_minutes=50, default_price=50,
+                 processing_offset_minutes=20, processing_duration_minutes=30),
             dict(category="Colouring", service_code="RTO", name="Root Touch-Up", duration_minutes=90, default_price=90,
                  processing_offset_minutes=15, processing_duration_minutes=35),
             dict(category="Colouring", service_code="RTOB", name="Root Touch-Up (bleach/high lift)", duration_minutes=105, default_price=100,

@@ -332,6 +332,72 @@ async def create_appointment(
     return await _load_appointment_out(appt, db)
 
 
+# ── Item update (drag-to-move / resize) ──────────────────────────────────────
+
+class AppointmentItemPatch(BaseModel):
+    start_time: datetime | None = None
+    provider_id: str | None = None
+    duration_override_minutes: int | None = None
+
+
+@router.patch("/{appointment_id}/items/{item_id}", response_model=AppointmentOut)
+async def patch_appointment_item(
+    appointment_id: str,
+    item_id: str,
+    body: AppointmentItemPatch,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentOut:
+    appt = (
+        await db.execute(
+            select(Appointment).where(
+                Appointment.id == uuid.UUID(appointment_id),
+                Appointment.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if appt is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    if appt.status in (AppointmentStatus.completed, AppointmentStatus.cancelled):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot modify a completed or cancelled appointment",
+        )
+
+    item = (
+        await db.execute(
+            select(AppointmentItem).where(
+                AppointmentItem.id == uuid.UUID(item_id),
+                AppointmentItem.appointment_id == appt.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    if body.start_time is not None:
+        item.start_time = body.start_time
+    if body.provider_id is not None:
+        provider = (
+            await db.execute(
+                select(Provider).where(
+                    Provider.id == uuid.UUID(body.provider_id),
+                    Provider.tenant_id == current_user.tenant_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if provider is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+        item.provider_id = provider.id
+    if body.duration_override_minutes is not None:
+        item.duration_override_minutes = body.duration_override_minutes
+
+    await db.commit()
+    await db.refresh(appt)
+    return await _load_appointment_out(appt, db)
+
+
 # ── Status transitions ────────────────────────────────────────────────────────
 
 VALID_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {

@@ -61,3 +61,11 @@ export function updateAppointmentStatus(
 ): Promise<Appointment> {
   return api.patch<Appointment>(`/appointments/${id}/status`, { status })
 }
+
+export function patchAppointmentItem(
+  appointmentId: string,
+  itemId: string,
+  patch: { start_time?: string; provider_id?: string; duration_override_minutes?: number },
+): Promise<Appointment> {
+  return api.patch<Appointment>(`/appointments/${appointmentId}/items/${itemId}`, patch)
+}

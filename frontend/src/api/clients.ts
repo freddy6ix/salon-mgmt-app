@@ -12,3 +12,12 @@ export interface Client {
 export function searchClients(q: string): Promise<Client[]> {
   return api.get<Client[]>(`/clients?q=${encodeURIComponent(q)}&limit=20`)
 }
+
+export function createClient(data: {
+  first_name: string
+  last_name: string
+  cell_phone?: string
+  email?: string
+}): Promise<Client> {
+  return api.post<Client>('/clients', data)
+}
