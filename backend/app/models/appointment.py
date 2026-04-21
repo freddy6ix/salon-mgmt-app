@@ -144,7 +144,7 @@ class AppointmentItem(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("stations.id"), nullable=True
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, index=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_override_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)

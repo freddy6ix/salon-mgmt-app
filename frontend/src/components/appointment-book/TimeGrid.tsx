@@ -16,8 +16,11 @@ export const SLOT_OPTIONS = [10, 15, 20, 30] as const
 export type SlotMinutes = typeof SLOT_OPTIONS[number]
 
 function minutesFromGridStart(isoTime: string): number {
-  const d = new Date(isoTime)
-  return (d.getHours() - START_HOUR) * 60 + d.getMinutes()
+  // Parse HH:MM directly from the ISO string to avoid browser UTC→local conversion.
+  // start_time is stored as wall-clock time with no timezone offset.
+  const timePart = isoTime.split('T')[1] ?? isoTime
+  const [h, m] = timePart.split(':').map(Number)
+  return (h - START_HOUR) * 60 + m
 }
 
 const APPT_STATUS_COLOR: Record<string, string> = {
