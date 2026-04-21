@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.database import get_db
-from app.deps import CurrentUser
+from app.deps import CurrentUser, StaffUser
 from app.models.appointment import (
     Appointment,
     AppointmentItem,
@@ -240,7 +240,7 @@ async def get_appointment(
 @router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
 async def create_appointment(
     body: AppointmentIn,
-    current_user: CurrentUser,
+    current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AppointmentOut:
     tid = current_user.tenant_id
@@ -345,7 +345,7 @@ async def patch_appointment_item(
     appointment_id: str,
     item_id: str,
     body: AppointmentItemPatch,
-    current_user: CurrentUser,
+    current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AppointmentOut:
     appt = (
@@ -423,7 +423,7 @@ class StatusUpdate(BaseModel):
 async def update_appointment_status(
     appointment_id: str,
     body: StatusUpdate,
-    current_user: CurrentUser,
+    current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AppointmentOut:
     appt = (

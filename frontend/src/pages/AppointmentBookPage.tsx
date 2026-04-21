@@ -77,6 +77,7 @@ export default function AppointmentBookPage() {
             ))}
           </select>
           <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/requests')}>Requests</Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/staff')}>Staff</Button>
           <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
         </div>

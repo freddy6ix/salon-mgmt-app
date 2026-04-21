@@ -1,0 +1,224 @@
+import uuid
+from datetime import datetime, timezone
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.deps import CurrentUser, StaffUser
+from app.models.appointment import (
+    AppointmentRequest,
+    AppointmentRequestItem,
+    AppointmentRequestStatus,
+    AppointmentSource,
+)
+from app.models.client import Client
+from app.models.user import UserRole
+
+router = APIRouter(prefix="/appointment-requests", tags=["appointment-requests"])
+
+
+# ── Schemas ──────────────────────────────────────────────────────────────────
+
+
+class RequestItemIn(BaseModel):
+    service_name: str
+    preferred_provider_name: str
+    sequence: int = 1
+
+
+class AppointmentRequestIn(BaseModel):
+    desired_date: str  # YYYY-MM-DD
+    desired_time_note: str | None = None
+    special_note: str | None = None
+    items: list[RequestItemIn]
+
+
+class RequestItemOut(BaseModel):
+    id: str
+    sequence: int
+    service_name: str
+    preferred_provider_name: str
+
+
+class AppointmentRequestOut(BaseModel):
+    id: str
+    status: str
+    desired_date: str
+    desired_time_note: str | None
+    special_note: str | None
+    submitted_at: str
+    staff_notes: str | None
+    items: list[RequestItemOut]
+    first_name: str
+    last_name: str
+    email: str
+
+
+class RequestReview(BaseModel):
+    status: AppointmentRequestStatus
+    staff_notes: str | None = None
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+
+async def _load_request_out(req: AppointmentRequest, db: AsyncSession) -> AppointmentRequestOut:
+    items = (
+        await db.execute(
+            select(AppointmentRequestItem)
+            .where(AppointmentRequestItem.request_id == req.id)
+            .order_by(AppointmentRequestItem.sequence)
+        )
+    ).scalars().all()
+
+    return AppointmentRequestOut(
+        id=str(req.id),
+        status=req.status.value,
+        desired_date=req.desired_date.strftime("%Y-%m-%d"),
+        desired_time_note=req.desired_time_note,
+        special_note=req.special_note,
+        submitted_at=req.submitted_at.isoformat(),
+        staff_notes=req.staff_notes,
+        first_name=req.first_name,
+        last_name=req.last_name,
+        email=req.email,
+        items=[
+            RequestItemOut(
+                id=str(i.id),
+                sequence=i.sequence,
+                service_name=i.service_name,
+                preferred_provider_name=i.preferred_provider_name,
+            )
+            for i in items
+        ],
+    )
+
+
+async def _get_guest_client(user_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Client:
+    client = (
+        await db.execute(
+            select(Client).where(
+                Client.user_id == user_id,
+                Client.tenant_id == tenant_id,
+                Client.is_active == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No client profile found for this account")
+    return client
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
+
+@router.post("", response_model=AppointmentRequestOut, status_code=status.HTTP_201_CREATED)
+async def create_request(
+    body: AppointmentRequestIn,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentRequestOut:
+    if current_user.role not in (UserRole.guest,):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only guest accounts can submit appointment requests",
+        )
+
+    if not body.items:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="At least one service required")
+
+    client = await _get_guest_client(current_user.id, current_user.tenant_id, db)
+
+    desired_date = datetime.strptime(body.desired_date, "%Y-%m-%d")
+
+    req = AppointmentRequest(
+        tenant_id=current_user.tenant_id,
+        submitted_by_user_id=current_user.id,
+        first_name=client.first_name,
+        last_name=client.last_name,
+        email=client.email or current_user.email,
+        phone=client.cell_phone or "",
+        desired_date=desired_date,
+        desired_time_note=body.desired_time_note,
+        source=AppointmentSource.online_form,
+        special_note=body.special_note,
+        waiver_acknowledged=False,
+        cancellation_policy_acknowledged=False,
+        status=AppointmentRequestStatus.new,
+        submitted_at=datetime.now(timezone.utc),
+    )
+    db.add(req)
+    await db.flush()
+
+    for item_in in body.items:
+        db.add(AppointmentRequestItem(
+            tenant_id=current_user.tenant_id,
+            request_id=req.id,
+            sequence=item_in.sequence,
+            service_name=item_in.service_name,
+            preferred_provider_name=item_in.preferred_provider_name,
+        ))
+
+    await db.commit()
+    await db.refresh(req)
+    return await _load_request_out(req, db)
+
+
+@router.get("", response_model=list[AppointmentRequestOut])
+async def list_requests(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request_status: str | None = Query(None, alias="status"),
+) -> list[AppointmentRequestOut]:
+    q = select(AppointmentRequest).where(
+        AppointmentRequest.tenant_id == current_user.tenant_id
+    )
+
+    if current_user.role == UserRole.guest:
+        # Guests only see their own requests
+        q = q.where(AppointmentRequest.submitted_by_user_id == current_user.id)
+    elif current_user.role not in (UserRole.staff, UserRole.tenant_admin, UserRole.super_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+
+    if request_status:
+        try:
+            q = q.where(AppointmentRequest.status == AppointmentRequestStatus(request_status))
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid status: {request_status}")
+
+    q = q.order_by(AppointmentRequest.submitted_at.desc())
+    requests = (await db.execute(q)).scalars().all()
+    return [await _load_request_out(r, db) for r in requests]
+
+
+@router.patch("/{request_id}", response_model=AppointmentRequestOut)
+async def review_request(
+    request_id: str,
+    body: RequestReview,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentRequestOut:
+    req = (
+        await db.execute(
+            select(AppointmentRequest).where(
+                AppointmentRequest.id == uuid.UUID(request_id),
+                AppointmentRequest.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    req.status = body.status
+    if body.staff_notes is not None:
+        req.staff_notes = body.staff_notes
+    req.reviewed_by_user_id = current_user.id
+    req.reviewed_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(req)
+    return await _load_request_out(req, db)

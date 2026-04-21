@@ -55,6 +55,9 @@ class ReminderStatus(str, enum.Enum):
 class AppointmentRequest(TenantScopedBase):
     __tablename__ = "appointment_requests"
 
+    submitted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

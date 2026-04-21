@@ -1,3 +1,4 @@
+import random
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -5,10 +6,13 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_access_token, verify_password
+from app.auth import create_access_token, hash_password, verify_password
+from app.config import settings
 from app.database import get_db
 from app.deps import CurrentUser
-from app.models.user import User
+from app.models.client import Client
+from app.models.tenant import Tenant
+from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,6 +51,68 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    token = create_access_token(
+        subject=str(user.id),
+        role=user.role.value,
+        tenant_id=str(user.tenant_id),
+    )
+    return TokenResponse(access_token=token)
+
+
+class RegisterRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    phone: str
+    password: str
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    body: RegisterRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenResponse:
+    tenant = (
+        await db.execute(
+            select(Tenant).where(
+                Tenant.slug == settings.default_tenant_slug,
+                Tenant.is_active == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Registration unavailable")
+
+    existing = (
+        await db.execute(
+            select(User).where(User.tenant_id == tenant.id, User.email == body.email)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    user = User(
+        tenant_id=tenant.id,
+        email=body.email,
+        password_hash=hash_password(body.password),
+        role=UserRole.guest,
+    )
+    db.add(user)
+    await db.flush()
+
+    client_code = f"G{random.randint(10000, 99999)}"
+    client = Client(
+        tenant_id=tenant.id,
+        user_id=user.id,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        email=body.email,
+        cell_phone=body.phone,
+        client_code=client_code,
+    )
+    db.add(client)
+    await db.commit()
 
     token = create_access_token(
         subject=str(user.id),

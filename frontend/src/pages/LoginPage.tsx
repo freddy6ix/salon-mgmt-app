@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { login } from '@/api/auth'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password)
       setUser(user)
-      navigate('/')
+      navigate(user.role === 'guest' ? '/my-requests' : '/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -56,6 +56,12 @@ export default function LoginPage() {
             <Button type="submit" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              New client?{' '}
+              <Link to="/register" className="text-primary hover:underline">
+                Create an account
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

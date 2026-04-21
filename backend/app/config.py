@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480  # 8 hours — full working day
 
+    # Guest registration — slug of the tenant guests register under
+    default_tenant_slug: str = "salon-lyol"
+
     # App
     environment: str = "development"
     debug: bool = False

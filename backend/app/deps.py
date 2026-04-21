@@ -51,3 +51,4 @@ def require_role(*roles: UserRole):
 # Convenience aliases
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_role(UserRole.tenant_admin, UserRole.super_admin))]
+StaffUser = Annotated[User, Depends(require_role(UserRole.staff, UserRole.tenant_admin, UserRole.super_admin))]

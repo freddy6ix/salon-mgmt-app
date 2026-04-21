@@ -26,6 +26,9 @@ class ClientHousehold(TenantScopedBase):
 class Client(TenantScopedBase):
     __tablename__ = "clients"
 
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
     household_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("client_households.id"), nullable=True, index=True
     )

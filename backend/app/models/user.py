@@ -10,6 +10,7 @@ class UserRole(str, enum.Enum):
     super_admin = "super_admin"
     tenant_admin = "tenant_admin"
     staff = "staff"
+    guest = "guest"
 
 
 class User(TenantScopedBase):
