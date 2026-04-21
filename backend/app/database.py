@@ -4,14 +4,14 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 if settings.cloud_sql_instance:
-    from google.cloud.sql.connector import AsyncConnector
+    from google.cloud.sql.connector import create_async_connector
 
-    _connector: AsyncConnector | None = None
+    _connector = None
 
     async def _getconn():
         global _connector
         if _connector is None:
-            _connector = AsyncConnector()
+            _connector = await create_async_connector()
         return await _connector.connect(
             settings.cloud_sql_instance,
             "asyncpg",

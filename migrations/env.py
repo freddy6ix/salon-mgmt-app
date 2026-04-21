@@ -46,9 +46,9 @@ def do_run_migrations(connection):
 
 async def run_migrations_online() -> None:
     if settings.cloud_sql_instance:
-        from google.cloud.sql.connector import AsyncConnector
+        from google.cloud.sql.connector import create_async_connector
 
-        connector = AsyncConnector()
+        connector = await create_async_connector()
 
         async def getconn():
             return await connector.connect(
