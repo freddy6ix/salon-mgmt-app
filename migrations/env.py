@@ -48,28 +48,36 @@ async def run_migrations_online() -> None:
     if settings.cloud_sql_instance:
         from google.cloud.sql.connector import create_async_connector
 
+        print(f"[migration] Creating Cloud SQL connector for {settings.cloud_sql_instance}", flush=True)
         connector = await create_async_connector()
+        print("[migration] Connector created, defining getconn", flush=True)
 
         async def getconn():
-            return await connector.connect(
+            print("[migration] getconn() called — connecting via connector", flush=True)
+            conn = await connector.connect(
                 settings.cloud_sql_instance,
                 "asyncpg",
                 user=settings.db_user,
                 password=settings.db_password,
                 db=settings.db_name,
             )
+            print("[migration] connector.connect() succeeded", flush=True)
+            return conn
 
         connectable = create_async_engine("postgresql+asyncpg://", async_creator=getconn)
     else:
         connectable = create_async_engine(settings.database_url)
 
+    print("[migration] Acquiring DB connection...", flush=True)
     async with connectable.connect() as connection:
+        print("[migration] Connected — running migrations", flush=True)
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()
 
     if settings.cloud_sql_instance:
         await connector.close()
+    print("[migration] Done", flush=True)
 
 
 if context.is_offline_mode():
