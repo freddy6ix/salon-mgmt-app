@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars (gitignored) and fill in your values.
+#
+# Setup steps:
+#   1. Create a GCP project and enable billing
+#   2. Install Terraform >= 1.9 and run: terraform init
+#   3. Fill in values below, save as terraform.tfvars
+#   4. Run: terraform apply
+#   5. Note the outputs — add them as GitHub Actions variables (not secrets):
+#        GCP_PROJECT_ID, GCP_REGION, GCP_WORKLOAD_IDENTITY_PROVIDER,
+#        GCP_SERVICE_ACCOUNT, API_URL
+#   6. Push to main to trigger the first deployment
+#   7. After first deploy, set CORS_ORIGINS on the API service:
+#        gcloud run services update salon-api \
+#          --region northamerica-northeast2 \
+#          --update-env-vars CORS_ORIGINS=<frontend_url>
+#      Then add it to cloud_run.tf permanently.
+
+project_id  = "your-gcp-project-id"
+region      = "northamerica-northeast2"
+github_repo = "your-github-username/salon-mgmt-app"
+
+# Sensitive — keep secret, never commit
+db_password = "change-me-strong-password"
+secret_key  = "run: openssl rand -hex 32"

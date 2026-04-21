@@ -1,0 +1,85 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/salon-mgmt
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      # ── API image ──────────────────────────────────────────────────────────
+      - name: Build API image
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/salon-api:latest \
+            .
+
+      - name: Push API image
+        run: |
+          docker push ${{ env.REGISTRY }}/salon-api:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/salon-api:latest
+
+      # ── Frontend image ─────────────────────────────────────────────────────
+      - name: Build frontend image
+        run: |
+          docker build \
+            -f frontend/Dockerfile \
+            --build-arg VITE_API_URL=${{ vars.API_URL }} \
+            -t ${{ env.REGISTRY }}/salon-frontend:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/salon-frontend:latest \
+            ./frontend
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ env.REGISTRY }}/salon-frontend:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/salon-frontend:latest
+
+      # ── Deploy ─────────────────────────────────────────────────────────────
+      # The API container runs `alembic upgrade head` on startup (docker-entrypoint.sh)
+      # before uvicorn starts, so migrations run automatically on every deploy.
+      - name: Deploy API to Cloud Run
+        run: |
+          gcloud run deploy salon-api \
+            --image ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --quiet
+
+      - name: Deploy frontend to Cloud Run
+        run: |
+          gcloud run deploy salon-frontend \
+            --image ${{ env.REGISTRY }}/salon-frontend:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --quiet
+
+      - name: Print deployed URLs
+        run: |
+          echo "API: $(gcloud run services describe salon-api --region ${{ env.GCP_REGION }} --format='value(status.url)')"
+          echo "Frontend: $(gcloud run services describe salon-frontend --region ${{ env.GCP_REGION }} --format='value(status.url)')"

@@ -5,15 +5,24 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Install dependencies (cached layer)
-COPY pyproject.toml .
+# Install dependencies (cached layer — only re-runs if pyproject.toml changes)
+COPY backend/pyproject.toml .
 RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
 
-# Copy application code
-COPY app/ app/
+# Application code, migrations, and Alembic config
+COPY backend/app/ app/
+COPY migrations/ migrations/
+COPY alembic.ini .
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# PORT is set by Cloud Run to match the declared container port (8000).
+# Locally it defaults to 8000 as well.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
