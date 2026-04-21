@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSchedule, setWorkingStatus } from '@/api/schedules'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -31,10 +31,8 @@ export default function WhoIsWorking({ date }: Props) {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
-          Staff ({workingCount}/{statuses.length})
-        </Button>
+      <PopoverTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+        Staff ({workingCount}/{statuses.length})
       </PopoverTrigger>
       <PopoverContent className="w-52 p-2" align="end">
         <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Who's working today</p>
