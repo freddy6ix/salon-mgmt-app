@@ -1,30 +1,23 @@
+from urllib.parse import quote_plus
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
 if settings.cloud_sql_instance:
-    from google.cloud.sql.connector import create_async_connector
-
-    _connector = None
-
-    async def _getconn():
-        global _connector
-        if _connector is None:
-            _connector = await create_async_connector()
-        return await _connector.connect(
-            settings.cloud_sql_instance,
-            "asyncpg",
-            user=settings.db_user,
-            password=settings.db_password,
-            db=settings.db_name,
-        )
-
+    # Cloud Run: connect via Unix socket mounted at /cloudsql/{instance}
+    # gcloud run deploy --set-cloudsql-instances adds this mount automatically.
+    _socket_dir = f"/cloudsql/{settings.cloud_sql_instance}"
+    _url = (
+        f"postgresql+asyncpg://{settings.db_user}:{quote_plus(settings.db_password)}"
+        f"@/{settings.db_name}"
+    )
     engine = create_async_engine(
-        "postgresql+asyncpg://",
-        async_creator=_getconn,
+        _url,
         echo=settings.debug,
         pool_pre_ping=True,
+        connect_args={"host": _socket_dir},
     )
 else:
     engine = create_async_engine(

@@ -70,6 +70,7 @@ jobs:
           gcloud run deploy salon-api \
             --image ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
+            --set-cloudsql-instances ${{ vars.CLOUD_SQL_INSTANCE }} \
             --quiet
 
       - name: Deploy frontend to Cloud Run
