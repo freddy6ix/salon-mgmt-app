@@ -5,9 +5,9 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Install dependencies (cached layer — only re-runs if pyproject.toml changes)
-COPY backend/pyproject.toml .
-RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+# Install dependencies (cached layer — only re-runs if pyproject.toml/uv.lock changes)
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --no-dev --frozen
 
 # Application code, migrations, and Alembic config
 COPY backend/app/ app/
