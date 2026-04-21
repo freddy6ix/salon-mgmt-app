@@ -114,7 +114,7 @@ function ReviewDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="reviewed">Under review</SelectItem>
-                  <SelectItem value="converted">Confirmed (book manually on schedule)</SelectItem>
+                  <SelectItem value="converted">Confirmed — book on schedule</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
