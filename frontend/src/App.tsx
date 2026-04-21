@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/store/auth'
 import LoginPage from '@/pages/LoginPage'
 import AppointmentBookPage from '@/pages/AppointmentBookPage'
+import StaffSchedulePage from '@/pages/StaffSchedulePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -19,6 +20,14 @@ export default function App() {
         element={
           <RequireAuth>
             <AppointmentBookPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings/staff"
+        element={
+          <RequireAuth>
+            <StaffSchedulePage />
           </RequireAuth>
         }
       />

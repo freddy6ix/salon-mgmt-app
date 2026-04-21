@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, addDays, subDays, parseISO } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import { listAppointments, type Appointment, type AppointmentItem } from '@/api/appointments'
 import { listProviders, type Provider } from '@/api/providers'
+import { getSchedule } from '@/api/schedules'
 import TimeGrid, { SLOT_OPTIONS, type SlotMinutes } from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
@@ -12,6 +14,7 @@ import { useAuth } from '@/store/auth'
 
 export default function AppointmentBookPage() {
   const { logout } = useAuth()
+  const navigate = useNavigate()
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
@@ -27,7 +30,19 @@ export default function AppointmentBookPage() {
     queryFn: () => listAppointments(date),
   })
 
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['schedules', date],
+    queryFn: () => getSchedule(date),
+  })
+
   const activeProviders = providers.filter((p) => p.has_appointments)
+  const workingProviderIds = new Set(
+    schedules.filter((s) => s.is_working).map((s) => s.provider_id)
+  )
+  // Show working providers only; if no schedule data yet, show all (schedules default to working)
+  const visibleProviders = schedules.length === 0
+    ? activeProviders
+    : activeProviders.filter((p) => workingProviderIds.has(p.id))
   const displayDate = parseISO(date + 'T12:00:00')
 
   function prev() { setDate(format(subDays(displayDate, 1), 'yyyy-MM-dd')) }
@@ -62,6 +77,7 @@ export default function AppointmentBookPage() {
             ))}
           </select>
           <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/staff')}>Staff</Button>
           <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
         </div>
       </header>
@@ -74,10 +90,11 @@ export default function AppointmentBookPage() {
           </div>
         ) : (
           <TimeGrid
-            providers={activeProviders}
+            providers={visibleProviders}
             appointments={appointments}
             date={date}
             slotMinutes={slotMinutes}
+            providerHours={schedules}
             onItemClick={(item, appt) => setSelected({ item, appt })}
             onSlotClick={(time, providerId) => setBooking({ time, providerId })}
           />
@@ -96,7 +113,7 @@ export default function AppointmentBookPage() {
         date={date}
         initialTime={booking?.time}
         initialProviderId={booking?.providerId}
-        providers={activeProviders}
+        providers={visibleProviders}
         onClose={() => setBooking(null)}
         onSaved={() => setBooking(null)}
       />

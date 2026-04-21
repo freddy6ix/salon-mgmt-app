@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Appointment, AppointmentItem } from '@/api/appointments'
 import { patchAppointmentItem } from '@/api/appointments'
 import type { Provider } from '@/api/providers'
+import type { ProviderWorkStatus } from '@/api/schedules'
 
 // Grid config
 const START_HOUR = 8
@@ -53,11 +54,12 @@ interface Props {
   appointments: Appointment[]
   date: string
   slotMinutes: SlotMinutes
+  providerHours?: ProviderWorkStatus[]
   onItemClick?: (item: AppointmentItem, appointment: Appointment) => void
   onSlotClick?: (time: string, providerId: string) => void
 }
 
-export default function TimeGrid({ providers, appointments, date, slotMinutes, onItemClick, onSlotClick }: Props) {
+export default function TimeGrid({ providers, appointments, date, slotMinutes, providerHours = [], onItemClick, onSlotClick }: Props) {
   const qc = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -120,6 +122,22 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, o
   }, [SLOT_MINUTES, TOTAL_SLOTS])
 
   const hourLines = useMemo(() => timeLabels.map((l) => l.topPx), [timeLabels])
+
+  const hoursMap = useMemo(() => {
+    const m = new Map<string, { startPx: number; endPx: number }>()
+    for (const s of providerHours) {
+      if (!s.start_time || !s.end_time) continue
+      const [sh, sm] = s.start_time.split(':').map(Number)
+      const [eh, em] = s.end_time.split(':').map(Number)
+      const startMins = (sh - START_HOUR) * 60 + sm
+      const endMins = (eh - START_HOUR) * 60 + em
+      m.set(s.provider_id, {
+        startPx: (startMins / SLOT_MINUTES) * SLOT_HEIGHT,
+        endPx: (endMins / SLOT_MINUTES) * SLOT_HEIGHT,
+      })
+    }
+    return m
+  }, [providerHours, SLOT_MINUTES])
 
   // ── Column width helper ──────────────────────────────────────────────────
   function getColumnRects(): DOMRect[] {
@@ -278,6 +296,14 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, o
   }, [activeProviders, date, qc])
 
   // ── Render ───────────────────────────────────────────────────────────────
+  if (activeProviders.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 border rounded-lg bg-white text-muted-foreground text-sm">
+        Salon closed — no providers scheduled for this day.
+      </div>
+    )
+  }
+
   return (
     <div
       ref={scrollRef}
@@ -286,7 +312,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, o
     >
       {/* Time gutter */}
       <div className="sticky left-0 z-20 bg-white border-r w-14 flex-shrink-0">
-        <div style={{ height: HEADER_HEIGHT }} className="border-b" />
+        <div style={{ height: HEADER_HEIGHT }} />
         <div className="relative" style={{ height: TOTAL_HEIGHT }}>
           {timeLabels.map(({ label, topPx }) => (
             <span
@@ -301,7 +327,17 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, o
       </div>
 
       {/* Provider columns */}
-      <div ref={gridRef} className="flex flex-1 min-w-0">
+      <div ref={gridRef} className="flex flex-1 min-w-0 relative">
+        {/* Current time indicator — single overlay spanning all columns */}
+        {nowPx !== null && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+            style={{ top: nowPx + HEADER_HEIGHT }}
+          >
+            <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 flex-shrink-0" />
+            <div className="flex-1 h-px bg-red-500" />
+          </div>
+        )}
         {activeProviders.map((provider, providerIdx) => (
           <div
             key={provider.id}
@@ -330,20 +366,19 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, o
                 onSlotClick(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, provider.id)
               }}
             >
+              {/* Off-hours shading */}
+              {((_h) => _h && (
+                <>
+                  {_h.startPx > 0 && <div className="absolute inset-x-0 top-0 bg-gray-100 pointer-events-none z-[1]" style={{ height: _h.startPx }} />}
+                  {_h.endPx < TOTAL_HEIGHT && <div className="absolute inset-x-0 bg-gray-100 pointer-events-none z-[1]" style={{ top: _h.endPx, bottom: 0 }} />}
+                </>
+              ))(hoursMap.get(provider.id))}
+
               {/* Hour lines — skip the very first one (top: 0) to avoid bleeding into gutter border */}
               {hourLines.filter((topPx) => topPx > 0).map((topPx) => (
                 <div key={topPx} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: topPx }} />
               ))}
 
-              {/* Current time indicator */}
-              {nowPx !== null && (
-                <div className="absolute left-0 right-0 z-10 pointer-events-none flex items-center" style={{ top: nowPx }}>
-                  {providerIdx === 0 && (
-                    <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 flex-shrink-0" />
-                  )}
-                  <div className="flex-1 h-px bg-red-500" />
-                </div>
-              )}
 
               {/* Drag ghost in this column */}
               {drag && drag.type === 'move' && drag.currentProviderIdx === providerIdx && (

@@ -8,7 +8,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
-from datetime import date
+from datetime import date, time as dtime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -20,7 +20,7 @@ from app.models.department import Department
 from app.models.provider import Provider, ProviderType, OnlineBookingVisibility
 from app.models.service import ServiceCategory, Service, PricingType
 from app.models.provider_service_price import ProviderServicePrice
-from app.models.schedule import TenantOperatingHours
+from app.models.schedule import TenantOperatingHours, ProviderSchedule
 
 engine = create_async_engine(settings.database_url)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -232,7 +232,6 @@ async def seed():
             dict(day_of_week=5, is_open=True, open_time="09:00", close_time="17:00"),  # Saturday
             dict(day_of_week=6, is_open=False),                                    # Sunday
         ]
-        from datetime import time as dtime
         for h in hours_data:
             existing = await db.execute(
                 select(TenantOperatingHours).where(
@@ -252,6 +251,45 @@ async def seed():
                 )
                 db.add(rec)
         print("Operating hours seeded")
+
+        # ── Provider Weekly Schedules ────────────────────────────────────────
+        # Default: all providers follow salon hours. Closed Mon(0) and Sun(6).
+        EPOCH = date(2000, 1, 1)
+        salon_hours = {
+            # day_of_week: (open, close) or None if closed
+            0: None,                        # Monday — closed
+            1: (dtime(9, 0), dtime(18, 0)), # Tuesday
+            2: (dtime(9, 0), dtime(20, 0)), # Wednesday
+            3: (dtime(9, 0), dtime(20, 0)), # Thursday
+            4: (dtime(9, 0), dtime(18, 0)), # Friday
+            5: (dtime(9, 0), dtime(17, 0)), # Saturday
+            6: None,                        # Sunday — closed
+        }
+        all_providers = list(providers.values())
+        for p in all_providers:
+            for dow in range(7):
+                existing_sched = await db.execute(
+                    select(ProviderSchedule).where(
+                        ProviderSchedule.tenant_id == tid,
+                        ProviderSchedule.provider_id == p.id,
+                        ProviderSchedule.day_of_week == dow,
+                        ProviderSchedule.effective_from == EPOCH,
+                    )
+                )
+                if existing_sched.scalar_one_or_none() is None:
+                    hours = salon_hours[dow]
+                    db.add(ProviderSchedule(
+                        tenant_id=tid,
+                        provider_id=p.id,
+                        day_of_week=dow,
+                        block=1,
+                        is_working=hours is not None,
+                        start_time=hours[0] if hours else None,
+                        end_time=hours[1] if hours else None,
+                        effective_from=EPOCH,
+                        effective_to=None,
+                    ))
+        print("Provider weekly schedules seeded")
 
         await db.commit()
         print("\nSeed complete.")
