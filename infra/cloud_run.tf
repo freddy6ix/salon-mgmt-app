@@ -65,6 +65,10 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+      env {
+        name  = "CORS_ORIGINS"
+        value = "https://salon-frontend-qc33oa7roq-pd.a.run.app"
+      }
     }
   }
 
@@ -115,14 +119,21 @@ resource "google_cloud_run_v2_service" "frontend" {
   depends_on = [google_project_service.apis]
 }
 
-# Public access is blocked by your Google Workspace org policy.
-# After terraform apply, run these two commands to allow unauthenticated access:
-#
-#   gcloud run services add-iam-policy-binding salon-api \
-#     --region northamerica-northeast2 --member="allUsers" --role="roles/run.invoker"
-#
-#   gcloud run services add-iam-policy-binding salon-frontend \
-#     --region northamerica-northeast2 --member="allUsers" --role="roles/run.invoker"
-#
-# If that also fails, go to GCP Console → IAM & Admin → Organization Policies
-# → search "Domain restricted sharing" → add "allUsers" to allowed values.
+# Public access — org policy was overridden at the project level via:
+#   gcloud resource-manager org-policies set-policy ... allValues: ALLOW
+# These bindings are safe to re-apply after terraform apply.
+resource "google_cloud_run_v2_service_iam_member" "api_public" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.api.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.frontend.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
