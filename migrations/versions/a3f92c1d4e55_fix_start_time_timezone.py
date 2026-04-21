@@ -19,13 +19,13 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "ALTER TABLE appointment_item "
+        "ALTER TABLE appointment_items "
         "ALTER COLUMN start_time TYPE TIMESTAMP WITHOUT TIME ZONE"
     )
 
 
 def downgrade() -> None:
     op.execute(
-        "ALTER TABLE appointment_item "
+        "ALTER TABLE appointment_items "
         "ALTER COLUMN start_time TYPE TIMESTAMP WITH TIME ZONE"
     )
