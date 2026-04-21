@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusCircle, LogOut, Scissors } from 'lucide-react'
 import { useAuth } from '@/store/auth'
@@ -177,7 +177,7 @@ function RequestForm({
                   <Label htmlFor={`service-${idx}`}>Service</Label>
                   <Select
                     value={item.service_name}
-                    onValueChange={v => updateItem(idx, 'service_name', v)}
+                    onValueChange={v => updateItem(idx, 'service_name', v ?? '')}
                   >
                     <SelectTrigger id={`service-${idx}`}>
                       <SelectValue placeholder="Select service…" />
@@ -194,7 +194,7 @@ function RequestForm({
                   <Label htmlFor={`provider-${idx}`}>Preferred stylist / colourist</Label>
                   <Select
                     value={item.preferred_provider_name}
-                    onValueChange={v => updateItem(idx, 'preferred_provider_name', v)}
+                    onValueChange={v => updateItem(idx, 'preferred_provider_name', v ?? '')}
                   >
                     <SelectTrigger id={`provider-${idx}`}>
                       <SelectValue placeholder="Select preference…" />

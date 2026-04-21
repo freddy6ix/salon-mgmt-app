@@ -7,13 +7,6 @@ import StaffSchedulePage from '@/pages/StaffSchedulePage'
 import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-muted/30" />
-  if (!user) return <Navigate to="/login" replace />
-  return <>{children}</>
-}
-
 function RequireStaff({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen bg-muted/30" />

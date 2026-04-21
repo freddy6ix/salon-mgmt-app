@@ -107,7 +107,7 @@ function ReviewDialog({
               <Label>Update status</Label>
               <Select
                 value={newStatus}
-                onValueChange={v => setNewStatus(v as AppointmentRequest['status'])}
+                onValueChange={v => v && setNewStatus(v as AppointmentRequest['status'])}
               >
                 <SelectTrigger>
                   <SelectValue />
