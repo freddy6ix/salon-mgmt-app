@@ -10,6 +10,7 @@ import StaffSchedulePage from '@/pages/StaffSchedulePage'
 import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
+import ClientsPage from '@/pages/ClientsPage'
 
 function StaffShell() {
   const { user, loading } = useAuth()
@@ -59,7 +60,7 @@ export default function App() {
         <Route path="/appointments" element={<AppointmentBookPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/staff" element={<StaffSchedulePage />} />
-        <Route path="/clients" element={<Placeholder title="Clients" />} />
+        <Route path="/clients" element={<ClientsPage />} />
         <Route path="/reports" element={<Placeholder title="Reports" />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
