@@ -89,7 +89,7 @@ export default function AppointmentBookPage() {
 
       <AppointmentDetail
         item={selected?.item ?? null}
-        appointment={selected?.appt ?? null}
+        appointment={selected ? (appointments.find(a => a.id === selected.appt.id) ?? selected.appt) : null}
         date={date}
         onClose={() => setSelected(null)}
       />
