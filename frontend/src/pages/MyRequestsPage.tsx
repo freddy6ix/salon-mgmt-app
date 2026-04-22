@@ -267,7 +267,7 @@ export default function MyRequestsPage() {
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background px-6 py-4 flex items-center justify-between">
-        <img src="/salon-lyol-logo.png" className="h-8 w-auto" alt="Salon Lyol" />
+        <img src="/salon-lyol-logo.png" className="h-32 w-auto" alt="Salon Lyol" />
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{user?.email}</span>
           <Button variant="ghost" size="sm" onClick={logout}>
