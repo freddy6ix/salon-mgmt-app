@@ -1,25 +1,24 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, addDays, subDays, parseISO } from 'date-fns'
-import { useNavigate } from 'react-router-dom'
 import { listAppointments, type Appointment, type AppointmentItem } from '@/api/appointments'
 import { listProviders, type Provider } from '@/api/providers'
 import { getSchedule } from '@/api/schedules'
-import TimeGrid, { SLOT_OPTIONS, type SlotMinutes } from '@/components/appointment-book/TimeGrid'
+import TimeGrid, { type SlotMinutes } from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
 import ClientCard from '@/components/ClientCard'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAuth } from '@/store/auth'
 
 export default function AppointmentBookPage() {
-  const { logout } = useAuth()
-  const navigate = useNavigate()
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
-  const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(15)
+  const [slotMinutes] = useState<SlotMinutes>(() => {
+    const saved = localStorage.getItem('slotMinutes')
+    return (saved ? Number(saved) : 10) as SlotMinutes
+  })
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
@@ -54,10 +53,8 @@ export default function AppointmentBookPage() {
   const isLoading = providersLoading || apptLoading
 
   return (
-    <div className="flex flex-col h-screen bg-muted/30">
+    <div className="flex flex-col h-full bg-muted/30">
       <header className="flex items-center justify-between px-4 py-2 bg-white border-b gap-4 flex-shrink-0">
-        <span className="font-semibold text-base">Salon Lyol</span>
-
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={prev}>‹</Button>
           <Button variant="outline" size="sm" onClick={today}>Today</Button>
@@ -67,22 +64,7 @@ export default function AppointmentBookPage() {
           <Button variant="outline" size="sm" onClick={next}>›</Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={slotMinutes}
-            onChange={(e) => setSlotMinutes(Number(e.target.value) as SlotMinutes)}
-            className="border border-input rounded-md px-2 py-1 text-xs bg-background"
-            title="Grid granularity"
-          >
-            {SLOT_OPTIONS.map((m) => (
-              <option key={m} value={m}>{m} min</option>
-            ))}
-          </select>
-          <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/requests')}>Requests</Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/settings/staff')}>Staff</Button>
-          <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>
-        </div>
+        <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
       </header>
 
       <main className="flex-1 overflow-hidden p-4">

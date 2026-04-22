@@ -6,6 +6,29 @@
 
 ## Phase 1 — Core Appointment Book
 
+### P1-0 · App shell and home dashboard
+
+Replace the current pattern (login → straight to appointment book) with a proper app shell that persists across all staff pages.
+
+**Shell layout:**
+- Collapsible left sidebar (or persistent top nav on mobile) with nav links
+- Nav items: Appointment Book · Clients · Requests · Staff · Reports · Settings
+- Active route highlighted; salon name / logo in header
+- "Sign out" moved into the shell (removed from individual pages)
+
+**Home dashboard (`/home` or `/`):**
+After login, staff land on a simple dashboard showing:
+- Today's appointment count (per provider)
+- Pending booking requests (count + quick link)
+- Quick-action buttons: "+ New Appointment", "View today's book"
+
+**What changes:**
+- New `AppShell` layout component wrapping all staff routes
+- New `DashboardPage` as the post-login landing
+- `App.tsx`: staff root redirects to `/home` (dashboard); appointment book moves to `/appointments`; requests to `/requests`; staff settings to `/settings/staff`
+- Remove the header + sign-out button from `AppointmentBookPage` (shell handles it)
+- `RequireStaff` wraps the shell, not individual routes
+
 ### P1-1 · Convert request → appointment
 Staff review an incoming booking request and convert it into a confirmed appointment, mapping each requested service/provider to real catalog entries and setting the confirmed time slot.
 

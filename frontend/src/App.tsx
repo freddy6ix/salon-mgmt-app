@@ -1,18 +1,20 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/store/auth'
+import AppShell from '@/components/AppShell'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
+import DashboardPage from '@/pages/DashboardPage'
 import AppointmentBookPage from '@/pages/AppointmentBookPage'
 import StaffSchedulePage from '@/pages/StaffSchedulePage'
 import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 
-function RequireStaff({ children }: { children: React.ReactNode }) {
+function StaffShell() {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen bg-muted/30" />
   if (!user) return <Navigate to="/login" replace />
   if (user.role === 'guest') return <Navigate to="/my-requests" replace />
-  return <>{children}</>
+  return <AppShell />
 }
 
 function RequireGuest({ children }: { children: React.ReactNode }) {
@@ -23,12 +25,13 @@ function RequireGuest({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function RootRedirect() {
-  const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-muted/30" />
-  if (!user) return <Navigate to="/login" replace />
-  if (user.role === 'guest') return <Navigate to="/my-requests" replace />
-  return <AppointmentBookPage />
+function Placeholder({ title }: { title: string }) {
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-semibold mb-2">{title}</h1>
+      <p className="text-muted-foreground">Coming soon.</p>
+    </div>
+  )
 }
 
 export default function App() {
@@ -36,8 +39,6 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-
-      <Route path="/" element={<RootRedirect />} />
 
       <Route
         path="/my-requests"
@@ -48,23 +49,16 @@ export default function App() {
         }
       />
 
-      <Route
-        path="/requests"
-        element={
-          <RequireStaff>
-            <RequestsPage />
-          </RequireStaff>
-        }
-      />
-
-      <Route
-        path="/settings/staff"
-        element={
-          <RequireStaff>
-            <StaffSchedulePage />
-          </RequireStaff>
-        }
-      />
+      {/* Staff shell — all staff routes nested here */}
+      <Route element={<StaffShell />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="/appointments" element={<AppointmentBookPage />} />
+        <Route path="/requests" element={<RequestsPage />} />
+        <Route path="/staff" element={<StaffSchedulePage />} />
+        <Route path="/clients" element={<Placeholder title="Clients" />} />
+        <Route path="/reports" element={<Placeholder title="Reports" />} />
+        <Route path="/settings" element={<Placeholder title="Settings" />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
