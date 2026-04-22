@@ -4,13 +4,21 @@ export interface Client {
   id: string
   first_name: string
   last_name: string
+  pronouns: string | null
   cell_phone: string | null
   email: string | null
   special_instructions: string | null
+  no_show_count: number
+  late_cancellation_count: number
+  is_vip: boolean
 }
 
 export function searchClients(q: string): Promise<Client[]> {
   return api.get<Client[]>(`/clients?q=${encodeURIComponent(q)}&limit=20`)
+}
+
+export function getClient(id: string): Promise<Client> {
+  return api.get<Client>(`/clients/${id}`)
 }
 
 export function createClient(data: {

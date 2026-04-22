@@ -20,11 +20,30 @@ class ClientOut(BaseModel):
     id: str
     first_name: str
     last_name: str
+    pronouns: str | None
     cell_phone: str | None
     email: str | None
     special_instructions: str | None
+    no_show_count: int
+    late_cancellation_count: int
+    is_vip: bool
 
     model_config = {"from_attributes": True}
+
+
+def _client_out(c: Client) -> "ClientOut":
+    return ClientOut(
+        id=str(c.id),
+        first_name=c.first_name,
+        last_name=c.last_name,
+        pronouns=c.pronouns,
+        cell_phone=c.cell_phone,
+        email=c.email,
+        special_instructions=c.special_instructions,
+        no_show_count=c.no_show_count,
+        late_cancellation_count=c.late_cancellation_count,
+        is_vip=c.is_vip,
+    )
 
 
 @router.get("", response_model=list[ClientOut])
@@ -50,17 +69,7 @@ async def search_clients(
         )
     stmt = stmt.order_by(Client.last_name, Client.first_name).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
-    return [
-        ClientOut(
-            id=str(c.id),
-            first_name=c.first_name,
-            last_name=c.last_name,
-            cell_phone=c.cell_phone,
-            email=c.email,
-            special_instructions=c.special_instructions,
-        )
-        for c in rows
-    ]
+    return [_client_out(c) for c in rows]
 
 
 @router.get("/{client_id}", response_model=ClientOut)
@@ -79,14 +88,7 @@ async def get_client(
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
-    return ClientOut(
-        id=str(row.id),
-        first_name=row.first_name,
-        last_name=row.last_name,
-        cell_phone=row.cell_phone,
-        email=row.email,
-        special_instructions=row.special_instructions,
-    )
+    return _client_out(row)
 
 
 class ClientCreate(BaseModel):
@@ -128,14 +130,7 @@ async def create_client(
     db.add(client)
     await db.commit()
     await db.refresh(client)
-    return ClientOut(
-        id=str(client.id),
-        first_name=client.first_name,
-        last_name=client.last_name,
-        cell_phone=client.cell_phone,
-        email=client.email,
-        special_instructions=client.special_instructions,
-    )
+    return _client_out(client)
 
 
 class ClientNotesUpdate(BaseModel):
@@ -162,14 +157,7 @@ async def update_client_notes(
     row.special_instructions = body.special_instructions
     await db.commit()
     await db.refresh(row)
-    return ClientOut(
-        id=str(row.id),
-        first_name=row.first_name,
-        last_name=row.last_name,
-        cell_phone=row.cell_phone,
-        email=row.email,
-        special_instructions=row.special_instructions,
-    )
+    return _client_out(row)
 
 
 class VisitItem(BaseModel):
@@ -190,7 +178,6 @@ async def client_history(
     client_id: str,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    limit: int = Query(20, le=50),
 ) -> list[VisitOut]:
     client = (
         await db.execute(
@@ -209,10 +196,8 @@ async def client_history(
             .where(
                 Appointment.client_id == client.id,
                 Appointment.tenant_id == current_user.tenant_id,
-                Appointment.status != AppointmentStatus.no_show,
             )
             .order_by(desc(Appointment.appointment_date))
-            .limit(limit)
         )
     ).scalars().all()
 

@@ -60,9 +60,10 @@ interface Props {
   providerHours?: ProviderWorkStatus[]
   onItemClick?: (item: AppointmentItem, appointment: Appointment) => void
   onSlotClick?: (time: string, providerId: string) => void
+  onClientClick?: (clientId: string) => void
 }
 
-export default function TimeGrid({ providers, appointments, date, slotMinutes, providerHours = [], onItemClick, onSlotClick }: Props) {
+export default function TimeGrid({ providers, appointments, date, slotMinutes, providerHours = [], onItemClick, onSlotClick, onClientClick }: Props) {
   const qc = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -420,7 +421,13 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
                       onPointerDown={(e) => onMovePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
                     >
                       <p className="text-xs font-medium truncate leading-tight">
-                        {appointment.client.first_name} {appointment.client.last_name}
+                        <span
+                          onPointerDown={e => e.stopPropagation()}
+                          onClick={e => { e.stopPropagation(); if (!didDragRef.current) onClientClick?.(appointment.client.id) }}
+                          className={onClientClick ? 'hover:underline cursor-pointer' : ''}
+                        >
+                          {appointment.client.first_name} {appointment.client.last_name}
+                        </span>
                       </p>
                       {heightPx >= 36 && (
                         <p className="text-xs truncate leading-tight opacity-75">{item.service.name}</p>

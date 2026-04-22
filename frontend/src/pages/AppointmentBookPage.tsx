@@ -8,6 +8,7 @@ import { getSchedule } from '@/api/schedules'
 import TimeGrid, { SLOT_OPTIONS, type SlotMinutes } from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
+import ClientCard from '@/components/ClientCard'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/store/auth'
@@ -19,6 +20,7 @@ export default function AppointmentBookPage() {
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
   const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(15)
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],
@@ -98,6 +100,7 @@ export default function AppointmentBookPage() {
             providerHours={schedules}
             onItemClick={(item, appt) => setSelected({ item, appt })}
             onSlotClick={(time, providerId) => setBooking({ time, providerId })}
+            onClientClick={setSelectedClientId}
           />
         )}
       </main>
@@ -117,6 +120,11 @@ export default function AppointmentBookPage() {
         providers={visibleProviders}
         onClose={() => setBooking(null)}
         onSaved={() => setBooking(null)}
+      />
+
+      <ClientCard
+        clientId={selectedClientId}
+        onClose={() => setSelectedClientId(null)}
       />
     </div>
   )

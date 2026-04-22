@@ -12,7 +12,31 @@ Staff review an incoming booking request and convert it into a confirmed appoint
 - Backend: `POST /appointment-requests/{id}/convert` — creates `Client` (or links existing), creates `Appointment` + `AppointmentItem`(s), marks request as `converted`
 - Frontend: "Convert to appointment" action in `RequestsPage` — dialog to map items to real services/providers and pick a time; navigates to appointment book on success
 
-### P1-2 · Client card
+### P1-2 · Provider schedule versioning and historical locking
+
+Default weekly schedules already exist in the data model, but the current implementation overwrites history when a schedule changes. This item makes the schedule system behave correctly.
+
+**Desired behaviour:**
+- Each provider has a default schedule per weekday (working/off, start time, end time)
+- Changing the default schedule applies from a specified future date (default: today) forward — past dates are unaffected
+- Staff can still override any individual future date via a per-date exception (already implemented via `ProviderScheduleException`)
+- Past schedules and past exceptions are read-only — no editing historical records
+
+**What needs to change:**
+
+Backend:
+- `PUT /schedules/weekly/{provider_id}`: accept an optional `effective_from` date (default: today). Instead of deleting and reinserting EPOCH rows, close the current active schedule rows (`effective_to = effective_from - 1 day`) and insert new rows with the given `effective_from`. Historical EPOCH rows are preserved.
+- `POST /schedules` (per-date exception): reject requests where `exception_date` is in the past
+
+Frontend (`StaffSchedulePage`):
+- Add an "Effective from" date picker (default: today) that travels with the Save button
+- Show a note: "Changes apply from [date] · historical schedules are locked"
+- The per-date override on the appointment book grid already blocks past dates (the WhoIsWorking toggle) — add the same guard
+
+No schema migration required — `ProviderSchedule.effective_from` and `effective_to` already exist.
+
+### P1-3 · Client card
+
 View a client's full profile directly from the appointment book — without leaving the grid.
 
 - Contact information (name, email, phone, pronouns)
@@ -24,16 +48,16 @@ View a client's full profile directly from the appointment book — without leav
 
 Accessible by clicking the client name on any appointment block on the grid. Opens as a slide-over panel (not a full page navigation).
 
-### P1-3 · Add / remove services on an appointment
+### P1-4 · Add / remove services on an appointment
 From the appointment book, staff can add new `AppointmentItem`(s) to an existing appointment, or remove items that are no longer happening — without having to delete and recreate the whole appointment.
 
 - Add: opens the booking form pre-scoped to the existing appointment's client and date
 - Remove: confirmation prompt then soft-delete (status → `cancelled`) on the item
 
-### P1-4 · Creative login / landing page
+### P1-5 · Creative login / landing page
 Replace the plain login page with a branded, visually engaging entry point appropriate for a premium Toronto salon. Should work well as the public-facing first impression for guests arriving to submit a booking request.
 
-### P1-5 · Branding configuration
+### P1-6 · Branding configuration
 Salon owners can upload a logo and set basic brand colours. Logo appears in the app header, on the login/landing page, and in outbound emails.
 
 - `TenantSettings` entity (or extend `Tenant`): `logo_url`, `primary_colour`, `salon_name_display`
