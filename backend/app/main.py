@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import appointment_requests, appointments, auth, clients, providers, schedules, services
+from app.routers import appointment_requests, appointments, auth, clients, providers, schedules, services, settings
 
 app = FastAPI(
     title="Salon Lyol Management API",
@@ -26,6 +26,7 @@ app.include_router(providers.router)
 app.include_router(clients.router)
 app.include_router(services.router)
 app.include_router(schedules.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
@@ -5,6 +6,8 @@ import {
   Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
+import { getBranding } from '@/api/settings'
+import { applyBranding } from '@/lib/branding'
 
 export default function AppShell() {
   const { logout } = useAuth()
@@ -15,6 +18,16 @@ export default function AppShell() {
     refetchInterval: 60_000,
   })
   const pendingCount = pendingRequests.length
+
+  const { data: branding } = useQuery({
+    queryKey: ['branding'],
+    queryFn: getBranding,
+    staleTime: Infinity,
+  })
+
+  useEffect(() => {
+    if (branding) applyBranding(branding)
+  }, [branding])
 
   const NAV = [
     { to: '/dashboard',    icon: Home,           label: 'Home',             badge: 0 },
@@ -30,8 +43,15 @@ export default function AppShell() {
     <div className="flex h-screen bg-muted/30">
       <nav className="w-56 flex-shrink-0 bg-white border-r flex flex-col">
         <div className="flex flex-col items-center py-5 border-b gap-2">
-          <img src="/salon-lyol-icon.png" alt="Salon Lyol" className="h-10 w-auto" />
-          <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Salon Lyol</span>
+          <img
+            src={branding?.logo_url ?? '/salon-lyol-icon.png'}
+            alt={branding?.salon_name ?? 'Salon Lyol'}
+            className="h-10 w-auto object-contain"
+            onError={e => { e.currentTarget.src = '/salon-lyol-icon.png' }}
+          />
+          <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
+            {branding?.salon_name ?? 'Salon Lyol'}
+          </span>
         </div>
 
         <div className="flex-1 py-2 overflow-auto">
