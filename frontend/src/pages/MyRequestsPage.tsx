@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { PlusCircle, LogOut, Scissors } from 'lucide-react'
+import { PlusCircle, LogOut } from 'lucide-react'
 import { useAuth } from '@/store/auth'
 import {
   type AppointmentRequest,
@@ -267,10 +267,7 @@ export default function MyRequestsPage() {
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Scissors className="h-5 w-5" />
-          <span className="font-semibold">Salon Lyol</span>
-        </div>
+        <img src="/salon-lyol-logo.png" className="h-8 w-auto" alt="Salon Lyol" />
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{user?.email}</span>
           <Button variant="ghost" size="sm" onClick={logout}>
