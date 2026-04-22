@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Visit,
@@ -372,7 +373,8 @@ function ClientDetail({ clientId }: { clientId: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ClientsPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'))
 
   return (
     <div className="flex h-full overflow-hidden bg-muted/30">

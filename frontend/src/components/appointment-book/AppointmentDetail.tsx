@@ -1,7 +1,8 @@
 import { format, parseISO } from 'date-fns'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { X, ExternalLink } from 'lucide-react'
 import type { Appointment, AppointmentItem } from '@/api/appointments'
 import { updateAppointmentStatus, addAppointmentItem, removeAppointmentItem } from '@/api/appointments'
 import { getClientHistory, updateClientNotes } from '@/api/clients'
@@ -50,6 +51,7 @@ interface AddItemForm {
 
 export default function AppointmentDetail({ item, appointment, date, onClose }: Props) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('appointment')
   const [notesValue, setNotesValue] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -173,8 +175,15 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
     <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
             {client.first_name} {client.last_name}
+            <button
+              onClick={() => { onClose(); navigate(`/clients?id=${client.id}`) }}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Open client profile"
+            >
+              <ExternalLink size={14} />
+            </button>
           </DialogTitle>
         </DialogHeader>
 
