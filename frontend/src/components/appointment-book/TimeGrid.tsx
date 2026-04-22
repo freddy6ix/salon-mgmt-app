@@ -350,7 +350,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* Time gutter */}
-      <div className="sticky left-0 z-20 bg-white border-r w-14 flex-shrink-0">
+      <div className="sticky left-0 z-20 bg-white border-r border-gray-300 w-14 flex-shrink-0">
         <div style={{ height: HEADER_HEIGHT }} />
         <div className="relative" style={{ height: TOTAL_HEIGHT }}>
           {timeLabels.map(({ label, topPx }) => (
