@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'
 import { type AppointmentRequest, listAllRequests } from '@/api/appointmentRequests'
