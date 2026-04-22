@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { format, parseISO, isToday, isFuture } from 'date-fns'
+import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getClient, getClientHistory, updateClientNotes } from '@/api/clients'
 import { Button } from '@/components/ui/button'
@@ -56,10 +56,8 @@ export default function ClientCard({ clientId, onClose }: Props) {
   })
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const upcoming = visits.filter(v =>
-    (v.status === 'confirmed' || v.status === 'in_progress') && v.date >= todayStr
-  ).reverse()
-  const past = visits.filter(v => v.date < todayStr || v.status === 'completed' || v.status === 'cancelled' || v.status === 'no_show')
+  const upcoming = visits.filter(v => v.date >= todayStr).reverse()
+  const past = visits.filter(v => v.date < todayStr)
 
   const currentNotes = notesValue !== null ? notesValue : (client?.special_instructions ?? '')
 
