@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from datetime import date, time as dtime
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.auth import hash_password
@@ -87,6 +87,16 @@ async def seed():
                  user_id=jj_user.id, department_code="STYLING"),
             dict(first_name="Antonella", last_name="Cumbo", display_name="Antonella", milano_code="ANTONELLA",
                  provider_type=ProviderType.stylist, booking_order=2,
+                 has_appointments=True, makes_appointments=True,
+                 online_booking_visibility=OnlineBookingVisibility.available_to_all,
+                 department_code="STYLING"),
+            dict(first_name="Ryan", last_name="", display_name="Ryan", milano_code="RYAN",
+                 provider_type=ProviderType.stylist, booking_order=9,
+                 has_appointments=True, makes_appointments=True,
+                 online_booking_visibility=OnlineBookingVisibility.available_to_all,
+                 department_code="STYLING"),
+            dict(first_name="Gumi", last_name="", display_name="Gumi", milano_code="GUMI",
+                 provider_type=ProviderType.stylist, booking_order=10,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
@@ -224,13 +234,13 @@ async def seed():
 
         # ── Operating Hours ──────────────────────────────────────────────────
         hours_data = [
-            dict(day_of_week=0, is_open=False),                                    # Monday
-            dict(day_of_week=1, is_open=True, open_time="09:00", close_time="18:00"),  # Tuesday
+            dict(day_of_week=0, is_open=False),                                     # Monday   — closed
+            dict(day_of_week=1, is_open=True, open_time="09:00", close_time="17:00"),  # Tuesday
             dict(day_of_week=2, is_open=True, open_time="09:00", close_time="20:00"),  # Wednesday
             dict(day_of_week=3, is_open=True, open_time="09:00", close_time="20:00"),  # Thursday
-            dict(day_of_week=4, is_open=True, open_time="09:00", close_time="18:00"),  # Friday
+            dict(day_of_week=4, is_open=True, open_time="09:00", close_time="20:00"),  # Friday (Joanne until 19:00)
             dict(day_of_week=5, is_open=True, open_time="09:00", close_time="17:00"),  # Saturday
-            dict(day_of_week=6, is_open=False),                                    # Sunday
+            dict(day_of_week=6, is_open=False),                                     # Sunday   — closed
         ]
         for h in hours_data:
             existing = await db.execute(
@@ -239,56 +249,67 @@ async def seed():
                     TenantOperatingHours.day_of_week == h["day_of_week"]
                 )
             )
-            if existing.scalar_one_or_none() is None:
-                ot = h.get("open_time")
-                ct = h.get("close_time")
-                rec = TenantOperatingHours(
-                    tenant_id=tid,
-                    day_of_week=h["day_of_week"],
-                    is_open=h["is_open"],
-                    open_time=dtime.fromisoformat(ot) if ot else None,
-                    close_time=dtime.fromisoformat(ct) if ct else None,
-                )
+            ot = h.get("open_time")
+            ct = h.get("close_time")
+            rec = existing.scalar_one_or_none()
+            if rec is None:
+                rec = TenantOperatingHours(tenant_id=tid, day_of_week=h["day_of_week"])
                 db.add(rec)
+            rec.is_open = h["is_open"]
+            rec.open_time = dtime.fromisoformat(ot) if ot else None
+            rec.close_time = dtime.fromisoformat(ct) if ct else None
         print("Operating hours seeded")
 
         # ── Provider Weekly Schedules ────────────────────────────────────────
-        # Default: all providers follow salon hours. Closed Mon(0) and Sun(6).
+        # day_of_week: 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun (ISO)
+        # Values: list of (start, end) tuples per block, or [] for day off.
+        # Source: docs/seed-data/provider-schedules.md
         EPOCH = date(2000, 1, 1)
-        salon_hours = {
-            # day_of_week: (open, close) or None if closed
-            0: None,                        # Monday — closed
-            1: (dtime(9, 0), dtime(18, 0)), # Tuesday
-            2: (dtime(9, 0), dtime(20, 0)), # Wednesday
-            3: (dtime(9, 0), dtime(20, 0)), # Thursday
-            4: (dtime(9, 0), dtime(18, 0)), # Friday
-            5: (dtime(9, 0), dtime(17, 0)), # Saturday
-            6: None,                        # Sunday — closed
+        T = dtime  # shorthand
+
+        OFF = []
+        PROVIDER_SCHEDULES: dict[str, dict[int, list]] = {
+            #            Mon   Tue                        Wed                        Thu                         Fri                        Sat                        Sun
+            "ASAMI":   {0: OFF, 1: [(T(9,0), T(17,0))], 2: [(T(9,0), T(11,0))],  3: OFF,                      4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "GUMI":    {0: OFF, 1: [(T(10,0),T(17,0))], 2: [(T(9,0), T(17,0))],  3: OFF,                      4: [(T(10,0),T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "JJ":      {0: OFF, 1: OFF,                  2: OFF,                   3: [(T(9,0), T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "JOANNE":  {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(11,0),T(19,0))],     4: [(T(9,0), T(19,0))],   5: OFF,                    6: OFF},
+            "MAYUMI":  {0: OFF, 1: OFF,                  2: [(T(10,0),T(17,0))],  3: [(T(10,0),T(17,0))],     4: [(T(10,0),T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "OLGA":    {0: OFF, 1: OFF,                  2: [(T(9,0), T(17,0))],  3: [(T(10,0),T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "RYAN":    {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(9,0), T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            "SARAH":   {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(9,0), T(11,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            # Maternity leave — all days off
+            "ANTONELLA": {dow: OFF for dow in range(7)},
+            "BECKY":     {dow: OFF for dow in range(7)},
         }
-        all_providers = list(providers.values())
-        for p in all_providers:
-            for dow in range(7):
-                existing_sched = await db.execute(
-                    select(ProviderSchedule).where(
-                        ProviderSchedule.tenant_id == tid,
-                        ProviderSchedule.provider_id == p.id,
-                        ProviderSchedule.day_of_week == dow,
-                        ProviderSchedule.effective_from == EPOCH,
-                    )
+
+        for milano_code, schedule in PROVIDER_SCHEDULES.items():
+            provider = providers.get(milano_code)
+            if provider is None:
+                continue
+            # Delete and recreate so re-runs apply updated schedules
+            await db.execute(
+                delete(ProviderSchedule).where(
+                    ProviderSchedule.tenant_id == tid,
+                    ProviderSchedule.provider_id == provider.id,
                 )
-                if existing_sched.scalar_one_or_none() is None:
-                    hours = salon_hours[dow]
+            )
+            for dow, blocks in schedule.items():
+                if not blocks:
                     db.add(ProviderSchedule(
-                        tenant_id=tid,
-                        provider_id=p.id,
-                        day_of_week=dow,
-                        block=1,
-                        is_working=hours is not None,
-                        start_time=hours[0] if hours else None,
-                        end_time=hours[1] if hours else None,
-                        effective_from=EPOCH,
-                        effective_to=None,
+                        tenant_id=tid, provider_id=provider.id,
+                        day_of_week=dow, block=1, is_working=False,
+                        start_time=None, end_time=None,
+                        effective_from=EPOCH, effective_to=None,
                     ))
+                else:
+                    for block_num, (start, end) in enumerate(blocks, 1):
+                        db.add(ProviderSchedule(
+                            tenant_id=tid, provider_id=provider.id,
+                            day_of_week=dow, block=block_num, is_working=True,
+                            start_time=start, end_time=end,
+                            effective_from=EPOCH, effective_to=None,
+                        ))
         print("Provider weekly schedules seeded")
 
         await db.commit()
