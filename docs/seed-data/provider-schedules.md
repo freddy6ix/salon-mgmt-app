@@ -45,12 +45,12 @@ In the app database, `day_of_week` uses ISO numbering: **0 = Monday … 6 = Sund
 | Sunday | OFF | |
 | Monday | OFF | |
 | Tuesday | 09:00–17:00 | |
-| Wednesday | 09:00–11:00 * | Short block — approximate |
-| Thursday | OFF | |
+| Wednesday | OFF | |
+| Thursday | 09:00–18:00 | |
 | Friday | 09:00–17:00 | |
 | Saturday | 09:00–17:00 | |
 
-### GUMI
+### GUMI — dualist (colouring + styling)
 
 | Day | Hours | Notes |
 |-----|-------|-------|
@@ -110,7 +110,7 @@ In the app database, `day_of_week` uses ISO numbering: **0 = Monday … 6 = Sund
 | Friday | 09:00–17:00 | |
 | Saturday | 09:00–17:00 | |
 
-### RYAN
+### RYAN — dualist (colouring + styling)
 
 | Day | Hours | Notes |
 |-----|-------|-------|
@@ -130,7 +130,7 @@ In the app database, `day_of_week` uses ISO numbering: **0 = Monday … 6 = Sund
 | Monday | OFF | |
 | Tuesday | 09:00–17:00 | |
 | Wednesday | OFF | |
-| Thursday | 09:00–11:00 * | Short block — approximate |
+| Thursday | 11:00–19:00 | Same pattern as Joanne |
 | Friday | 09:00–17:00 | |
 | Saturday | 09:00–17:00 | |
 
@@ -144,6 +144,4 @@ All days OFF. Retain in system; schedule shows no working hours.
 
 ## Notes & Open Questions
 
-- **ASAMI Wednesday**: Screen shows a short blue block ending around 11:00. Seeded as 09:00–11:00 — confirm with ASAMI.
-- **SARAH Thursday**: Short blue block visible. Seeded as 09:00–11:00 — confirm with Sarah.
-- **RYAN and GUMI provider type**: Added as `stylist` / STYLING department by default. Confirm actual types and update if needed.
+- **RYAN and GUMI department**: Listed as STYLING in the DB for now. Both are dualists confirmed via salonlyol.ca. Department assignment can be adjusted if needed.
