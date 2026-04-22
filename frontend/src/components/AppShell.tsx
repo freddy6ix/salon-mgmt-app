@@ -18,8 +18,9 @@ export default function AppShell() {
   return (
     <div className="flex h-screen bg-muted/30">
       <nav className="w-56 flex-shrink-0 bg-white border-r flex flex-col">
-        <div className="flex items-center justify-center py-5 border-b">
+        <div className="flex flex-col items-center py-5 border-b gap-2">
           <img src="/salon-lyol-icon.png" alt="Salon Lyol" className="h-10 w-auto" />
+          <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Salon Lyol</span>
         </div>
 
         <div className="flex-1 py-2 overflow-auto">
