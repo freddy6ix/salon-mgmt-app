@@ -81,12 +81,12 @@ async def seed():
         # ── Providers ────────────────────────────────────────────────────────
         provider_data = [
             dict(first_name="Jini", last_name="Jung", display_name="JJ", milano_code="JJ",
-                 provider_type=ProviderType.stylist, is_owner=True, booking_order=1,
+                 provider_type=ProviderType.dualist, is_owner=True, booking_order=1,
                  has_appointments=True, makes_appointments=True, can_be_cashier=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  user_id=jj_user.id, department_code="STYLING"),
             dict(first_name="Antonella", last_name="Cumbo", display_name="Antonella", milano_code="ANTONELLA",
-                 provider_type=ProviderType.stylist, booking_order=2,
+                 provider_type=ProviderType.dualist, booking_order=2,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
@@ -101,7 +101,7 @@ async def seed():
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
             dict(first_name="Sarah", last_name="", display_name="Sarah", milano_code="SARAH",
-                 provider_type=ProviderType.colourist, booking_order=3,
+                 provider_type=ProviderType.dualist, booking_order=3,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="COLOUR"),
@@ -146,6 +146,8 @@ async def seed():
                 )
                 db.add(provider)
                 await db.flush()
+            else:
+                provider.provider_type = p["provider_type"]
             providers[p["milano_code"]] = provider
         print(f"Providers: {list(providers.keys())}")
 
@@ -235,10 +237,10 @@ async def seed():
         # ── Operating Hours ──────────────────────────────────────────────────
         hours_data = [
             dict(day_of_week=0, is_open=False),                                     # Monday   — closed
-            dict(day_of_week=1, is_open=True, open_time="09:00", close_time="17:00"),  # Tuesday
-            dict(day_of_week=2, is_open=True, open_time="09:00", close_time="20:00"),  # Wednesday
-            dict(day_of_week=3, is_open=True, open_time="09:00", close_time="20:00"),  # Thursday
-            dict(day_of_week=4, is_open=True, open_time="09:00", close_time="20:00"),  # Friday (Joanne until 19:00)
+            dict(day_of_week=1, is_open=True, open_time="09:00", close_time="18:00"),  # Tuesday  (last out 18:00)
+            dict(day_of_week=2, is_open=True, open_time="09:00", close_time="20:00"),  # Wednesday (last out 20:00)
+            dict(day_of_week=3, is_open=True, open_time="09:00", close_time="20:00"),  # Thursday  (last out 20:00)
+            dict(day_of_week=4, is_open=True, open_time="09:00", close_time="18:00"),  # Friday   (last out 18:00)
             dict(day_of_week=5, is_open=True, open_time="09:00", close_time="17:00"),  # Saturday
             dict(day_of_week=6, is_open=False),                                     # Sunday   — closed
         ]
@@ -269,15 +271,15 @@ async def seed():
 
         OFF = []
         PROVIDER_SCHEDULES: dict[str, dict[int, list]] = {
-            #            Mon   Tue                        Wed                        Thu                         Fri                        Sat                        Sun
-            "ASAMI":   {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(9,0), T(18,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "GUMI":    {0: OFF, 1: [(T(10,0),T(17,0))], 2: [(T(9,0), T(17,0))],  3: OFF,                      4: [(T(10,0),T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "JJ":      {0: OFF, 1: OFF,                  2: OFF,                   3: [(T(9,0), T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "JOANNE":  {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(11,0),T(19,0))],     4: [(T(9,0), T(19,0))],   5: OFF,                    6: OFF},
-            "MAYUMI":  {0: OFF, 1: OFF,                  2: [(T(10,0),T(17,0))],  3: [(T(10,0),T(17,0))],     4: [(T(10,0),T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "OLGA":    {0: OFF, 1: OFF,                  2: [(T(9,0), T(17,0))],  3: [(T(10,0),T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "RYAN":    {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(9,0), T(17,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
-            "SARAH":   {0: OFF, 1: [(T(9,0), T(17,0))], 2: OFF,                   3: [(T(11,0),T(19,0))],     4: [(T(9,0), T(17,0))],   5: [(T(9,0), T(17,0))],   6: OFF},
+            #            Mon   Tue                           Wed                          Thu                          Fri                          Sat                        Sun
+            "ASAMI":   {0: OFF, 1: [(T(9,0),  T(18,0))],  2: [(T(11,0),T(20,0))],    3: [(T(9,0),  T(18,0))],    4: OFF,                      5: [(T(9,0), T(17,0))],   6: OFF},
+            "GUMI":    {0: OFF, 1: [(T(9,0),  T(18,0))],  2: [(T(11,0),T(20,0))],    3: [(T(9,0),  T(18,0))],    4: [(T(9,0),  T(18,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "JJ":      {0: OFF, 1: [(T(9,0),  T(18,0))],  2: [(T(9,0), T(20,0))],    3: [(T(9,0),  T(20,0))],    4: [(T(9,0),  T(18,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "JOANNE":  {0: OFF, 1: [(T(9,0),  T(17,0))],  2: [(T(9,0), T(16,0))],    3: [(T(11,0), T(19,0))],    4: [(T(9,0),  T(17,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "MAYUMI":  {0: OFF, 1: [(T(10,0), T(18,0))],  2: OFF,                     3: [(T(10,0), T(20,0))],    4: [(T(10,0), T(18,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "OLGA":    {0: OFF, 1: [(T(9,0),  T(17,0))],  2: [(T(11,0),T(20,0))],    3: OFF,                      4: [(T(10,0), T(18,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "RYAN":    {0: OFF, 1: [(T(9,0),  T(18,0))],  2: [(T(11,0),T(20,0))],    3: OFF,                      4: [(T(9,0),  T(18,0))],    5: [(T(9,0), T(17,0))],   6: OFF},
+            "SARAH":   {0: OFF, 1: [(T(9,0),  T(16,30))], 2: [(T(9,0), T(16,30))],   3: [(T(11,0), T(19,0))],    4: OFF,                      5: [(T(9,0), T(17,0))],   6: OFF},
             # Maternity leave — all days off
             "ANTONELLA": {dow: OFF for dow in range(7)},
             "BECKY":     {dow: OFF for dow in range(7)},
