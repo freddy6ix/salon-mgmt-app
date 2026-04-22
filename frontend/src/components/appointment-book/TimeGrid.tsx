@@ -366,7 +366,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
       </div>
 
       {/* Provider columns */}
-      <div ref={gridRef} className="flex flex-1 min-w-0 relative">
+      <div ref={gridRef} className="flex flex-1 min-w-0 relative divide-x divide-gray-200">
         {/* Current time indicator — single overlay spanning all columns */}
         {nowPx !== null && (
           <div
@@ -381,7 +381,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
           <div
             key={provider.id}
             data-provider-col={provider.id}
-            className="flex-1 min-w-32 border-r last:border-r-0"
+            className="flex-1 min-w-32"
           >
             {/* Header */}
             <div
