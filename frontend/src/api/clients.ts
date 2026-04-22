@@ -37,6 +37,7 @@ export function updateClientNotes(clientId: string, notes: string | null): Promi
 export interface VisitItem {
   service_name: string
   provider_name: string
+  start_time: string
   price: number
 }
 

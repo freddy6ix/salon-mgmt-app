@@ -164,6 +164,7 @@ async def update_client_notes(
 class VisitItem(BaseModel):
     service_name: str
     provider_name: str
+    start_time: str  # ISO datetime string
     price: float
 
 
@@ -222,6 +223,7 @@ async def client_history(
                 VisitItem(
                     service_name=svc.name,
                     provider_name=prov.display_name,
+                    start_time=item.start_time.isoformat(),
                     price=float(item.price),
                 )
                 for item, svc, prov in items_rows

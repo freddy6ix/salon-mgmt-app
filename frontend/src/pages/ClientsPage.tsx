@@ -214,7 +214,12 @@ function VisitHistory({ clientId }: { clientId: string }) {
           <ul className="space-y-0.5">
             {v.items.map((item, i) => (
               <li key={i} className="text-muted-foreground text-xs">
-                {item.service_name} — {item.provider_name}
+                <span className="tabular-nums text-foreground">
+                  {new Date(item.start_time).toLocaleTimeString('en-CA', {
+                    hour: 'numeric', minute: '2-digit', hour12: true,
+                  })}
+                </span>
+                {' · '}{item.service_name} — {item.provider_name}
                 {' · '}${item.price.toFixed(2)}
               </li>
             ))}
