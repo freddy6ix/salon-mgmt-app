@@ -58,12 +58,26 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
   useEffect(() => {
     if (!request) return
-    setClientMode('new')
+
+    if (request.client_id) {
+      setClientMode('existing')
+      setSelectedClient({
+        id: request.client_id,
+        first_name: request.first_name,
+        last_name: request.last_name,
+        email: request.email,
+        cell_phone: request.phone ?? null,
+        special_instructions: null,
+      })
+    } else {
+      setClientMode('new')
+      setSelectedClient(null)
+    }
+
     setNewFirst(request.first_name)
     setNewLast(request.last_name)
     setNewEmail(request.email)
-    setNewPhone('')
-    setSelectedClient(null)
+    setNewPhone(request.phone ?? '')
     setClientQuery('')
     setAppointmentDate(request.desired_date)
     setApptNotes('')
@@ -244,17 +258,20 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                 <div className="space-y-1 pt-1">
                   {selectedClient ? (
                     <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-muted/40">
-                      <span className="text-sm font-medium">
-                        {selectedClient.first_name} {selectedClient.last_name}
+                      <div className="text-sm">
+                        <span className="font-medium">
+                          {selectedClient.first_name} {selectedClient.last_name}
+                        </span>
                         {selectedClient.cell_phone && (
-                          <span className="text-muted-foreground font-normal ml-2">
-                            {selectedClient.cell_phone}
-                          </span>
+                          <span className="text-muted-foreground ml-2">{selectedClient.cell_phone}</span>
                         )}
-                      </span>
+                        {selectedClient.email && (
+                          <span className="text-muted-foreground ml-2">{selectedClient.email}</span>
+                        )}
+                      </div>
                       <button
                         onClick={() => setSelectedClient(null)}
-                        className="text-xs text-muted-foreground hover:text-foreground"
+                        className="text-xs text-muted-foreground hover:text-foreground ml-3 shrink-0"
                       >
                         change
                       </button>
@@ -281,6 +298,9 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                                   <span className="font-medium">{c.first_name} {c.last_name}</span>
                                   {c.cell_phone && (
                                     <span className="text-muted-foreground ml-2">{c.cell_phone}</span>
+                                  )}
+                                  {c.email && (
+                                    <span className="text-muted-foreground ml-2">{c.email}</span>
                                   )}
                                 </button>
                               </li>

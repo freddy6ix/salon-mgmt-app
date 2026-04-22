@@ -18,6 +18,8 @@ export interface AppointmentRequest {
   first_name: string
   last_name: string
   email: string
+  phone: string | null
+  client_id: string | null
   items: RequestItem[]
 }
 

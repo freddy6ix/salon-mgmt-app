@@ -62,6 +62,8 @@ class AppointmentRequestOut(BaseModel):
     first_name: str
     last_name: str
     email: str
+    phone: str | None
+    client_id: str | None
 
 
 class RequestReview(BaseModel):
@@ -81,6 +83,20 @@ async def _load_request_out(req: AppointmentRequest, db: AsyncSession) -> Appoin
         )
     ).scalars().all()
 
+    client_id: str | None = None
+    if req.submitted_by_user_id:
+        linked_client = (
+            await db.execute(
+                select(Client).where(
+                    Client.user_id == req.submitted_by_user_id,
+                    Client.tenant_id == req.tenant_id,
+                    Client.is_active == True,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if linked_client:
+            client_id = str(linked_client.id)
+
     return AppointmentRequestOut(
         id=str(req.id),
         status=req.status.value,
@@ -92,6 +108,8 @@ async def _load_request_out(req: AppointmentRequest, db: AsyncSession) -> Appoin
         first_name=req.first_name,
         last_name=req.last_name,
         email=req.email,
+        phone=req.phone or None,
+        client_id=client_id,
         items=[
             RequestItemOut(
                 id=str(i.id),
