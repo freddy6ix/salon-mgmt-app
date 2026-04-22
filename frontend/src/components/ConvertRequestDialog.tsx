@@ -70,6 +70,10 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
         email: request.email,
         cell_phone: request.phone ?? null,
         special_instructions: null,
+        pronouns: null,
+        no_show_count: 0,
+        late_cancellation_count: 0,
+        is_vip: false,
       })
     } else {
       setClientMode('new')
