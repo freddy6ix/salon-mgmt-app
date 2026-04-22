@@ -116,7 +116,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b flex-shrink-0 px-5">
-          {(['profile', 'appointments', 'notes'] as Tab[]).map(t => (
+          {(['profile', 'appointments', 'colour', 'notes'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
