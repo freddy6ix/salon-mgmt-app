@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/store/auth'
 import AppShell from '@/components/AppShell'
+import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -37,6 +38,8 @@ function Placeholder({ title }: { title: string }) {
 export default function App() {
   return (
     <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -51,7 +54,7 @@ export default function App() {
 
       {/* Staff shell — all staff routes nested here */}
       <Route element={<StaffShell />}>
-        <Route index element={<DashboardPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/appointments" element={<AppointmentBookPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/staff" element={<StaffSchedulePage />} />

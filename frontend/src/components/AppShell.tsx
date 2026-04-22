@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
 import {
-  CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut,
+  Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 
@@ -17,7 +17,8 @@ export default function AppShell() {
   const pendingCount = pendingRequests.length
 
   const NAV = [
-    { to: '/appointments', icon: CalendarDays,  label: 'Appointment Book', badge: 0 },
+    { to: '/dashboard',    icon: Home,           label: 'Home',             badge: 0 },
+    { to: '/appointments', icon: CalendarDays,   label: 'Appointment Book', badge: 0 },
     { to: '/clients',      icon: Users,          label: 'Clients',          badge: 0 },
     { to: '/requests',     icon: ClipboardList,  label: 'Requests',         badge: pendingCount },
     { to: '/staff',        icon: UserCog,        label: 'Staff',            badge: 0 },

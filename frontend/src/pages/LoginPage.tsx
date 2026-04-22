@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password)
       setUser(user)
-      navigate(user.role === 'guest' ? '/my-requests' : '/')
+      navigate(user.role === 'guest' ? '/my-requests' : '/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
