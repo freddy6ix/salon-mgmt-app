@@ -50,3 +50,18 @@ export interface Visit {
 export function getClientHistory(clientId: string): Promise<Visit[]> {
   return api.get<Visit[]>(`/clients/${clientId}/history`)
 }
+
+export interface ColourNote {
+  id: string
+  note_date: string   // YYYY-MM-DD
+  note_text: string
+  created_at: string
+}
+
+export function listColourNotes(clientId: string): Promise<ColourNote[]> {
+  return api.get<ColourNote[]>(`/clients/${clientId}/colour-notes`)
+}
+
+export function createColourNote(clientId: string, note_date: string, note_text: string): Promise<ColourNote> {
+  return api.post<ColourNote>(`/clients/${clientId}/colour-notes`, { note_date, note_text })
+}

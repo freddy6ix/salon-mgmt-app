@@ -1,8 +1,8 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Integer, Numeric, String, Text, ForeignKey
+from sqlalchemy import Boolean, Date, DateTime, Enum, Integer, Numeric, String, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -68,3 +68,16 @@ class Client(TenantScopedBase):
         DateTime(timezone=True), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ClientColourNote(TenantScopedBase):
+    __tablename__ = "client_colour_notes"
+
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False, index=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    note_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note_text: Mapped[str] = mapped_column(Text, nullable=False)

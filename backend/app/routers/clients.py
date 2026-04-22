@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -8,7 +9,7 @@ from typing import Annotated
 
 from app.database import get_db
 from app.deps import CurrentUser
-from app.models.client import Client
+from app.models.client import Client, ClientColourNote
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
 from app.models.provider import Provider
 from app.models.service import Service
@@ -227,3 +228,87 @@ async def client_history(
             ],
         ))
     return visits
+
+
+# ── Colour notes ──────────────────────────────────────────────────────────────
+
+class ColourNoteOut(BaseModel):
+    id: str
+    note_date: str
+    note_text: str
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class ColourNoteCreate(BaseModel):
+    note_date: date
+    note_text: str
+
+
+async def _get_client_or_404(client_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> Client:
+    client = (
+        await db.execute(
+            select(Client).where(
+                Client.id == uuid.UUID(client_id),
+                Client.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    return client
+
+
+@router.get("/{client_id}/colour-notes", response_model=list[ColourNoteOut])
+async def list_colour_notes(
+    client_id: str,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ColourNoteOut]:
+    await _get_client_or_404(client_id, current_user.tenant_id, db)
+    rows = (
+        await db.execute(
+            select(ClientColourNote)
+            .where(
+                ClientColourNote.client_id == uuid.UUID(client_id),
+                ClientColourNote.tenant_id == current_user.tenant_id,
+            )
+            .order_by(desc(ClientColourNote.note_date), desc(ClientColourNote.created_at))
+        )
+    ).scalars().all()
+    return [
+        ColourNoteOut(
+            id=str(r.id),
+            note_date=r.note_date.strftime("%Y-%m-%d"),
+            note_text=r.note_text,
+            created_at=r.created_at.isoformat(),
+        )
+        for r in rows
+    ]
+
+
+@router.post("/{client_id}/colour-notes", response_model=ColourNoteOut, status_code=status.HTTP_201_CREATED)
+async def create_colour_note(
+    client_id: str,
+    body: ColourNoteCreate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ColourNoteOut:
+    await _get_client_or_404(client_id, current_user.tenant_id, db)
+    note = ClientColourNote(
+        tenant_id=current_user.tenant_id,
+        client_id=uuid.UUID(client_id),
+        created_by_user_id=current_user.id,
+        note_date=body.note_date,
+        note_text=body.note_text.strip(),
+    )
+    db.add(note)
+    await db.commit()
+    await db.refresh(note)
+    return ColourNoteOut(
+        id=str(note.id),
+        note_date=note.note_date.strftime("%Y-%m-%d"),
+        note_text=note.note_text,
+        created_at=note.created_at.isoformat(),
+    )

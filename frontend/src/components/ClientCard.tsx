@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getClient, getClientHistory, updateClientNotes } from '@/api/clients'
+import { getClient, getClientHistory, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 
-type Tab = 'profile' | 'appointments' | 'notes'
+type Tab = 'profile' | 'appointments' | 'colour' | 'notes'
 
 interface Props {
   clientId: string | null
@@ -33,6 +33,8 @@ export default function ClientCard({ clientId, onClose }: Props) {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('profile')
   const [notesValue, setNotesValue] = useState<string | null>(null)
+  const [newNoteText, setNewNoteText] = useState('')
+  const [newNoteDate, setNewNoteDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -52,6 +54,21 @@ export default function ClientCard({ clientId, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ['client', clientId] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
       setNotesValue(null)
+    },
+  })
+
+  const { data: colourNotes = [], isLoading: colourLoading } = useQuery({
+    queryKey: ['client-colour-notes', clientId],
+    queryFn: () => listColourNotes(clientId!),
+    enabled: !!clientId && tab === 'colour',
+  })
+
+  const addColourNote = useMutation({
+    mutationFn: () => createColourNote(clientId!, newNoteDate, newNoteText),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client-colour-notes', clientId] })
+      setNewNoteText('')
+      setNewNoteDate(format(new Date(), 'yyyy-MM-dd'))
     },
   })
 
@@ -109,7 +126,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'notes' ? 'Notes' : t === 'appointments' ? 'Appointments' : 'Profile'}
+              {t === 'profile' ? 'Profile' : t === 'appointments' ? 'Appointments' : t === 'colour' ? 'Colour' : 'Notes'}
             </button>
           ))}
         </div>
@@ -215,6 +232,60 @@ export default function ClientCard({ clientId, onClose }: Props) {
                     <p className="text-sm text-muted-foreground text-center py-8">No appointments on record</p>
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ── Colour tab ── */}
+          {tab === 'colour' && (
+            <div className="p-5 space-y-4">
+              {/* Add new note */}
+              <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+                <p className="text-xs font-medium text-muted-foreground">New formula / service note</p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newNoteDate}
+                    onChange={e => setNewNoteDate(e.target.value)}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+                  />
+                </div>
+                <textarea
+                  rows={4}
+                  value={newNoteText}
+                  onChange={e => setNewNoteText(e.target.value)}
+                  placeholder="e.g. 7N + 20vol, foils, 35min..."
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
+                />
+                {addColourNote.isError && (
+                  <p className="text-xs text-destructive">Save failed</p>
+                )}
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={!newNoteText.trim() || addColourNote.isPending}
+                  onClick={() => addColourNote.mutate()}
+                >
+                  {addColourNote.isPending ? 'Saving…' : 'Save formula'}
+                </Button>
+              </div>
+
+              {/* Existing notes */}
+              {colourLoading ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Loading…</p>
+              ) : colourNotes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No colour notes yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {colourNotes.map(note => (
+                    <div key={note.id} className="border rounded-md px-3 py-2 space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        {format(parseISO(note.note_date + 'T12:00:00'), 'MMM d, yyyy')}
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{note.note_text}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
