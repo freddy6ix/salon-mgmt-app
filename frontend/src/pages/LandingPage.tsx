@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
 
 export default function LandingPage() {
   return (
@@ -20,12 +19,18 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
-          <Button asChild size="lg" className="flex-1 text-base">
-            <Link to="/register">Request an appointment</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="flex-1 text-base">
-            <Link to="/login">Sign in</Link>
-          </Button>
+          <Link
+            to="/register"
+            className="flex-1 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground text-base font-medium px-6 py-3 hover:bg-primary/90 transition-colors"
+          >
+            Request an appointment
+          </Link>
+          <Link
+            to="/login"
+            className="flex-1 inline-flex items-center justify-center rounded-md border border-input bg-background text-base font-medium px-6 py-3 hover:bg-muted transition-colors"
+          >
+            Sign in
+          </Link>
         </div>
       </main>
 
