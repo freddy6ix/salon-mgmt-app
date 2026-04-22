@@ -61,6 +61,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
     price: '',
   })
   const [addError, setAddError] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
 
   const clientId = appointment?.client.id ?? null
 
@@ -102,10 +103,12 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   const removeMutation = useMutation({
     mutationFn: (itemId: string) => removeAppointmentItem(appointment!.id, itemId),
     onSuccess: (updated) => {
+      setRemoveError(null)
       qc.setQueryData(['appointments', date], (old: Appointment[] | undefined) =>
         old?.map(a => a.id === updated.id ? updated : a)
       )
     },
+    onError: (e) => setRemoveError(e instanceof Error ? e.message : 'Failed to remove service'),
   })
 
   const addMutation = useMutation({
@@ -254,6 +257,10 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 )
               })}
             </div>
+
+            {removeError && (
+              <p className="text-xs text-destructive">{removeError}</p>
+            )}
 
             {/* Add service form */}
             {canEdit && (
