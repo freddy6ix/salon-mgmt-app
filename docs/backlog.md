@@ -80,6 +80,14 @@ From the appointment book, staff can add new `AppointmentItem`(s) to an existing
 ### P1-5 · Creative login / landing page
 Replace the plain login page with a branded, visually engaging entry point appropriate for a premium Toronto salon. Should work well as the public-facing first impression for guests arriving to submit a booking request.
 
+### P1-7 · Delete client
+
+Staff can soft-delete (deactivate) a client record from the Clients page. A deleted client's history is preserved for reporting but they no longer appear in search results or the client list.
+
+- Backend: `DELETE /clients/{id}` — sets `is_active = False` on the `Client` record (soft delete); returns 204
+- Frontend: "Delete client" action in the client detail panel; confirmation dialog before proceeding; removes client from the list on success
+- Guard: prevent deletion if the client has any upcoming (confirmed / in-progress) appointments — return a 409 with a clear message
+
 ### P1-6 · Branding configuration
 Salon owners can upload a logo and set basic brand colours. Logo appears in the app header, on the login/landing page, and in outbound emails.
 
