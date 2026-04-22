@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { login } from '@/api/auth'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -31,10 +31,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">Salon Lyol</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-8">
+          <div className="flex justify-center mb-8">
+            <img src="/salon-lyol-logo.png" alt="Salon Lyol" className="h-56 w-auto" />
+          </div>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <input
               type="email"
