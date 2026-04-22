@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  type Client,
   type Visit,
   type ColourNote,
   searchClients,
