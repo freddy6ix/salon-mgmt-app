@@ -4,6 +4,7 @@ import { format, addMinutes } from 'date-fns'
 import { searchClients, createClient, type Client } from '@/api/clients'
 import { listServices, type Service } from '@/api/services'
 import { type Provider } from '@/api/providers'
+import { type ProviderWorkStatus } from '@/api/schedules'
 import { api } from '@/api/client'
 import {
   Dialog,
@@ -19,6 +20,7 @@ interface Props {
   initialTime?: string   // HH:MM
   initialProviderId?: string
   providers: Provider[]
+  providerHours?: ProviderWorkStatus[]
   onClose: () => void
   onSaved: () => void
 }
@@ -30,8 +32,18 @@ interface ItemDraft {
   price: number
 }
 
+function isItemOutsideHours(startHHMM: string, durationMins: number, hours: ProviderWorkStatus): boolean {
+  if (!hours.start_time || !hours.end_time) return false
+  const [sh, sm] = startHHMM.split(':').map(Number)
+  const startMins = sh * 60 + sm
+  const endMins = startMins + durationMins
+  const [wsh, wsm] = hours.start_time.split(':').map(Number)
+  const [weh, wem] = hours.end_time.split(':').map(Number)
+  return startMins < wsh * 60 + wsm || endMins > weh * 60 + wem
+}
+
 export default function BookingForm({
-  open, date, initialTime, initialProviderId, providers, onClose, onSaved,
+  open, date, initialTime, initialProviderId, providers, providerHours = [], onClose, onSaved,
 }: Props) {
   const qc = useQueryClient()
 
@@ -380,6 +392,23 @@ export default function BookingForm({
               ))}
               {notes && <p className="text-xs text-muted-foreground italic mt-1">{notes}</p>}
             </div>
+
+            {(() => {
+              const conflicts = items.filter((item) => {
+                const ph = providerHours.find((h) => h.provider_id === item.provider.id)
+                return ph ? isItemOutsideHours(item.startTime, item.service.duration_minutes, ph) : false
+              })
+              return conflicts.length > 0 ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <p className="font-medium mb-0.5">Outside scheduled hours</p>
+                  {conflicts.map((item, i) => (
+                    <p key={i} className="text-xs">
+                      {item.provider.display_name} · {item.startTime} · {item.service.name}
+                    </p>
+                  ))}
+                </div>
+              ) : null
+            })()}
 
             {mutation.isError && (
               <p className="text-sm text-destructive">

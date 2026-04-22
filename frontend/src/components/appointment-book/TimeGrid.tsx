@@ -5,6 +5,14 @@ import type { Appointment, AppointmentItem } from '@/api/appointments'
 import { patchAppointmentItem } from '@/api/appointments'
 import type { Provider } from '@/api/providers'
 import type { ProviderWorkStatus } from '@/api/schedules'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 // Grid config
 const START_HOUR = 8
@@ -71,6 +79,14 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
   const didDragRef = useRef(false)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [nowPx, setNowPx] = useState<number | null>(null)
+
+  type PendingPatch = {
+    appointmentId: string
+    itemId: string
+    patch: Parameters<typeof patchAppointmentItem>[2]
+    providerName: string
+  }
+  const [pendingPatch, setPendingPatch] = useState<PendingPatch | null>(null)
 
   const SLOT_MINUTES = slotMinutes
   const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MINUTES
@@ -273,7 +289,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
 
       if (!moved) return
 
-      const patch: Record<string, unknown> = {}
+      const patch: Parameters<typeof patchAppointmentItem>[2] = {}
       if (d.type === 'move') {
         patch.start_time = pxToLocalTime(d.currentTop)
         if (d.currentProviderIdx !== d.originalProviderIdx) {
@@ -283,8 +299,26 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
         patch.duration_override_minutes = pxToDuration(d.currentHeight)
       }
 
+      const targetProviderIdx = d.type === 'move' ? d.currentProviderIdx : d.originalProviderIdx
+      const targetProvider = activeProviders[targetProviderIdx]
+      const hours = targetProvider ? hoursMap.get(targetProvider.id) : undefined
+
+      let outsideHours = false
+      if (hours) {
+        const startPx = d.type === 'move' ? d.currentTop : d.originalTop
+        const endPx = d.type === 'move'
+          ? d.currentTop + d.originalHeight
+          : d.originalTop + d.currentHeight
+        outsideHours = startPx < hours.startPx || endPx > hours.endPx
+      }
+
+      if (outsideHours && targetProvider) {
+        setPendingPatch({ appointmentId: d.appointmentId, itemId: d.itemId, patch, providerName: targetProvider.display_name })
+        return
+      }
+
       try {
-        await patchAppointmentItem(d.appointmentId, d.itemId, patch as Parameters<typeof patchAppointmentItem>[2])
+        await patchAppointmentItem(d.appointmentId, d.itemId, patch)
         qc.invalidateQueries({ queryKey: ['appointments', date] })
       } catch (err) {
         console.error('Patch failed', err)
@@ -297,7 +331,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
     }
-  }, [activeProviders, date, qc])
+  }, [activeProviders, date, qc, hoursMap])
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (activeProviders.length === 0) {
@@ -309,6 +343,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
   }
 
   return (
+    <>
     <div
       ref={scrollRef}
       className="flex overflow-auto border rounded-lg bg-white select-none"
@@ -407,7 +442,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
                 return (
                   <div
                     key={item.id}
-                    className={`absolute left-1 right-1 rounded border text-left overflow-hidden flex flex-col
+                    className={`absolute left-1 right-1 rounded border text-left overflow-hidden flex flex-col z-[2]
                       ${colorClass}
                       ${isDragging ? 'opacity-30' : 'hover:opacity-90'}
                       ${appointment.status === 'completed' || appointment.status === 'cancelled' ? '' : 'cursor-grab active:cursor-grabbing'}
@@ -452,5 +487,36 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
         ))}
       </div>
     </div>
+
+    {/* Outside-hours confirmation dialog */}
+    <Dialog open={pendingPatch !== null} onOpenChange={(open) => { if (!open) setPendingPatch(null) }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Outside scheduled hours</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          This appointment falls outside {pendingPatch?.providerName}'s scheduled working hours. Book anyway?
+        </p>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setPendingPatch(null)}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!pendingPatch) return
+              const { appointmentId, itemId, patch } = pendingPatch
+              setPendingPatch(null)
+              try {
+                await patchAppointmentItem(appointmentId, itemId, patch)
+                qc.invalidateQueries({ queryKey: ['appointments', date] })
+              } catch (err) {
+                console.error('Patch failed', err)
+              }
+            }}
+          >
+            Book anyway
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

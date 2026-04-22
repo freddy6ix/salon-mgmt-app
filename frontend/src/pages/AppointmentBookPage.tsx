@@ -118,6 +118,7 @@ export default function AppointmentBookPage() {
         initialTime={booking?.time}
         initialProviderId={booking?.providerId}
         providers={visibleProviders}
+        providerHours={schedules}
         onClose={() => setBooking(null)}
         onSaved={() => setBooking(null)}
       />
