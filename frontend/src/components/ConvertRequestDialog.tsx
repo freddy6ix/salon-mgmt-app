@@ -88,15 +88,21 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
     setAppointmentDate(request.desired_date)
     setApptNotes('')
     setError(null)
-    setItems(request.items.map(ri => ({
-      requestItemId: ri.id,
-      serviceId: '',
-      providerId: '',
-      startTime: '09:00',
-      durationMinutes: 60,
-      price: '',
-      notes: '',
-    })))
+    setItems(request.items.map((ri, idx) => {
+      const offsetMinutes = idx * 60
+      const h = Math.floor(offsetMinutes / 60) + 9
+      const m = offsetMinutes % 60
+      const startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      return {
+        requestItemId: ri.id,
+        serviceId: '',
+        providerId: '',
+        startTime,
+        durationMinutes: 60,
+        price: '',
+        notes: '',
+      }
+    }))
   }, [request?.id])
 
   useEffect(() => {
@@ -110,10 +116,24 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
   function handleServiceChange(idx: number, serviceId: string) {
     const svc = services.find(s => s.id === serviceId)
-    updateItem(idx, {
-      serviceId,
-      durationMinutes: svc?.duration_minutes ?? 60,
-      price: svc?.default_price != null ? String(svc.default_price) : '',
+    const newDuration = svc?.duration_minutes ?? 60
+    setItems(prev => {
+      const next = prev.map((it, i) => i === idx ? {
+        ...it,
+        serviceId,
+        durationMinutes: newDuration,
+        price: svc?.default_price != null ? String(svc.default_price) : it.price,
+      } : it)
+      // Cascade start times for items after idx
+      for (let i = idx + 1; i < next.length; i++) {
+        const prev_item = next[i - 1]
+        const [ph, pm] = prev_item.startTime.split(':').map(Number)
+        const nextStart = ph * 60 + pm + prev_item.durationMinutes
+        const nh = Math.floor(nextStart / 60)
+        const nm = nextStart % 60
+        next[i] = { ...next[i], startTime: `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}` }
+      }
+      return next
     })
   }
 
