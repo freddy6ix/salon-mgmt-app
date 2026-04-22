@@ -1,20 +1,30 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
 import {
   CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut,
 } from 'lucide-react'
-
-const NAV = [
-  { to: '/appointments', icon: CalendarDays, label: 'Appointment Book' },
-  { to: '/clients',      icon: Users,          label: 'Clients' },
-  { to: '/requests',     icon: ClipboardList,  label: 'Requests' },
-  { to: '/staff',        icon: UserCog,         label: 'Staff' },
-  { to: '/reports',      icon: BarChart2,       label: 'Reports' },
-  { to: '/settings',     icon: Settings,        label: 'Settings' },
-]
+import { listAllRequests } from '@/api/appointmentRequests'
 
 export default function AppShell() {
   const { logout } = useAuth()
+
+  const { data: pendingRequests = [] } = useQuery({
+    queryKey: ['requests', 'new'],
+    queryFn: () => listAllRequests('new'),
+    refetchInterval: 60_000,
+  })
+  const pendingCount = pendingRequests.length
+
+  const NAV = [
+    { to: '/appointments', icon: CalendarDays,  label: 'Appointment Book', badge: 0 },
+    { to: '/clients',      icon: Users,          label: 'Clients',          badge: 0 },
+    { to: '/requests',     icon: ClipboardList,  label: 'Requests',         badge: pendingCount },
+    { to: '/staff',        icon: UserCog,        label: 'Staff',            badge: 0 },
+    { to: '/reports',      icon: BarChart2,      label: 'Reports',          badge: 0 },
+    { to: '/settings',     icon: Settings,       label: 'Settings',         badge: 0 },
+  ]
+
   return (
     <div className="flex h-screen bg-muted/30">
       <nav className="w-56 flex-shrink-0 bg-white border-r flex flex-col">
@@ -24,7 +34,7 @@ export default function AppShell() {
         </div>
 
         <div className="flex-1 py-2 overflow-auto">
-          {NAV.map(({ to, icon: Icon, label }) => (
+          {NAV.map(({ to, icon: Icon, label, badge }) => (
             <NavLink
               key={to}
               to={to}
@@ -37,7 +47,12 @@ export default function AppShell() {
               }
             >
               <Icon size={16} className="flex-shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {badge > 0 && (
+                <span className="ml-auto bg-amber-500 text-white text-xs font-medium rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center leading-none">
+                  {badge}
+                </span>
+              )}
             </NavLink>
           ))}
         </div>
