@@ -7,6 +7,7 @@ import {
   listAllRequests,
   reviewRequest,
 } from '@/api/appointmentRequests'
+import ConvertRequestDialog from '@/components/ConvertRequestDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -114,7 +115,6 @@ function ReviewDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="reviewed">Under review</SelectItem>
-                  <SelectItem value="converted">Confirmed — book on schedule</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
@@ -163,6 +163,7 @@ export default function RequestsPage() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
   const [reviewing, setReviewing] = useState<AppointmentRequest | null>(null)
+  const [converting, setConverting] = useState<AppointmentRequest | null>(null)
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['all-requests', filter],
@@ -210,8 +211,7 @@ export default function RequestsPage() {
         ) : (
           <div className="space-y-3">
             {requests.map(req => (
-              <Card key={req.id} className="cursor-pointer hover:border-foreground/30 transition-colors"
-                onClick={() => setReviewing(req)}>
+              <Card key={req.id}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">
@@ -230,13 +230,32 @@ export default function RequestsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <ul className="text-sm space-y-0.5">
+                  <ul className="text-sm space-y-0.5 mb-3">
                     {req.items.map(item => (
                       <li key={item.id} className="text-muted-foreground">
                         • {item.service_name} — {item.preferred_provider_name}
                       </li>
                     ))}
                   </ul>
+                  <div className="flex gap-2">
+                    {(req.status === 'new' || req.status === 'reviewed') && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => setConverting(req)}
+                        >
+                          Convert to appointment
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setReviewing(req)}
+                        >
+                          Review
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -248,6 +267,15 @@ export default function RequestsPage() {
         request={reviewing}
         onClose={() => setReviewing(null)}
         onSave={handleSave}
+      />
+
+      <ConvertRequestDialog
+        request={converting}
+        onClose={() => setConverting(null)}
+        onConverted={() => {
+          setConverting(null)
+          navigate('/')
+        }}
       />
     </div>
   )

@@ -53,3 +53,31 @@ export function reviewRequest(
 ): Promise<AppointmentRequest> {
   return api.patch<AppointmentRequest>(`/appointment-requests/${id}`, body)
 }
+
+export interface ConvertItemIn {
+  request_item_id: string
+  service_id: string
+  provider_id: string
+  second_provider_id?: string
+  sequence: number
+  start_time: string
+  duration_minutes: number
+  price: number
+  notes?: string
+}
+
+export interface ConvertRequestIn {
+  client_id?: string
+  appointment_date: string
+  notes?: string
+  items: ConvertItemIn[]
+}
+
+export interface ConvertOut {
+  appointment_id: string
+  appointment_date: string
+}
+
+export function convertRequest(id: string, body: ConvertRequestIn): Promise<ConvertOut> {
+  return api.post<ConvertOut>(`/appointment-requests/${id}/convert`, body)
+}
