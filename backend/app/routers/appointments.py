@@ -460,3 +460,106 @@ async def update_appointment_status(
     await db.commit()
     await db.refresh(appt)
     return await _load_appointment_out(appt, db)
+
+
+# ── Add / remove items on existing appointment ────────────────────────────────
+
+async def _load_active_appointment(appointment_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> Appointment:
+    appt = (
+        await db.execute(
+            select(Appointment).where(
+                Appointment.id == uuid.UUID(appointment_id),
+                Appointment.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if appt is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    if appt.status in (AppointmentStatus.completed, AppointmentStatus.cancelled):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot modify a completed or cancelled appointment",
+        )
+    return appt
+
+
+@router.post("/{appointment_id}/items", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
+async def add_appointment_item(
+    appointment_id: str,
+    body: AppointmentItemIn,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentOut:
+    appt = await _load_active_appointment(appointment_id, current_user.tenant_id, db)
+
+    provider = (
+        await db.execute(
+            select(Provider).where(
+                Provider.id == uuid.UUID(body.provider_id),
+                Provider.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if provider is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+
+    service = (
+        await db.execute(
+            select(Service).where(
+                Service.id == uuid.UUID(body.service_id),
+                Service.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if service is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+
+    new_item = AppointmentItem(
+        tenant_id=current_user.tenant_id,
+        appointment_id=appt.id,
+        service_id=service.id,
+        provider_id=provider.id,
+        sequence=body.sequence,
+        start_time=body.start_time,
+        duration_minutes=body.duration_minutes,
+        duration_override_minutes=body.duration_override_minutes,
+        price=body.price,
+        price_is_locked=True,
+        status=AppointmentItemStatus.pending,
+        notes=body.notes,
+    )
+    db.add(new_item)
+    await db.commit()
+    await db.refresh(appt)
+    return await _load_appointment_out(appt, db)
+
+
+@router.delete("/{appointment_id}/items/{item_id}", response_model=AppointmentOut)
+async def remove_appointment_item(
+    appointment_id: str,
+    item_id: str,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentOut:
+    appt = await _load_active_appointment(appointment_id, current_user.tenant_id, db)
+
+    all_items = (
+        await db.execute(
+            select(AppointmentItem).where(AppointmentItem.appointment_id == appt.id)
+        )
+    ).scalars().all()
+
+    if len(all_items) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot remove the last item from an appointment",
+        )
+
+    item = next((i for i in all_items if str(i.id) == item_id), None)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    await db.delete(item)
+    await db.commit()
+    await db.refresh(appt)
+    return await _load_appointment_out(appt, db)

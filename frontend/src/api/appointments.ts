@@ -69,3 +69,25 @@ export function patchAppointmentItem(
 ): Promise<Appointment> {
   return api.patch<Appointment>(`/appointments/${appointmentId}/items/${itemId}`, patch)
 }
+
+export function addAppointmentItem(
+  appointmentId: string,
+  item: {
+    service_id: string
+    provider_id: string
+    start_time: string
+    duration_minutes: number
+    price: number
+    sequence: number
+    notes?: string
+  },
+): Promise<Appointment> {
+  return api.post<Appointment>(`/appointments/${appointmentId}/items`, item)
+}
+
+export function removeAppointmentItem(
+  appointmentId: string,
+  itemId: string,
+): Promise<Appointment> {
+  return api.delete<Appointment>(`/appointments/${appointmentId}/items/${itemId}`)
+}
