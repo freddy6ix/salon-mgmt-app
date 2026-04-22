@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 
@@ -15,6 +15,7 @@ from app.models.appointment import (
     Appointment,
     AppointmentItem,
     AppointmentItemStatus,
+    AppointmentRequestItem,
     AppointmentSource,
     AppointmentStatus,
 )
@@ -559,6 +560,12 @@ async def remove_appointment_item(
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
+    # Clear FK reference from request items before deleting
+    await db.execute(
+        update(AppointmentRequestItem)
+        .where(AppointmentRequestItem.converted_to_item_id == item.id)
+        .values(converted_to_item_id=None)
+    )
     await db.delete(item)
     await db.commit()
     await db.refresh(appt)
