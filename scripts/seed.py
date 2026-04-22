@@ -22,7 +22,11 @@ from app.models.service import ServiceCategory, Service, PricingType
 from app.models.provider_service_price import ProviderServicePrice
 from app.models.schedule import TenantOperatingHours, ProviderSchedule
 
-engine = create_async_engine(settings.database_url)
+_url = settings.database_url
+# Cloud SQL Proxy via TCP doesn't support SSL negotiation — disable it.
+# Unix-socket connections (Cloud Run) are unaffected.
+_connect_args = {"ssl": False} if ("127.0.0.1" in _url or "localhost" in _url) else {}
+engine = create_async_engine(_url, connect_args=_connect_args)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
