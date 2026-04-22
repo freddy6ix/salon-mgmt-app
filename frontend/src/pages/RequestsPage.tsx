@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
 import {
   type AppointmentRequest,
   listAllRequests,
@@ -181,16 +180,9 @@ export default function RequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background px-4 py-2 flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Schedule
-        </Button>
-        <span className="font-semibold">Appointment Requests</span>
-      </header>
-
+    <div className="h-full overflow-auto bg-muted/30">
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+        <h1 className="text-xl font-semibold">Appointment Requests</h1>
         <div className="flex items-center gap-2">
           {FILTER_OPTIONS.map(opt => (
             <Button
@@ -274,7 +266,7 @@ export default function RequestsPage() {
         onClose={() => setConverting(null)}
         onConverted={() => {
           setConverting(null)
-          navigate('/')
+          navigate('/appointments')
         }}
       />
     </div>
