@@ -49,10 +49,12 @@ function ReviewDialog({
   request,
   onClose,
   onSave,
+  onConvert,
 }: {
   request: AppointmentRequest | null
   onClose: () => void
   onSave: (id: string, status: AppointmentRequest['status'], notes: string) => Promise<void>
+  onConvert: () => void
 }) {
   const [newStatus, setNewStatus] = useState<AppointmentRequest['status']>('reviewed')
   const [notes, setNotes] = useState('')
@@ -136,8 +138,11 @@ function ReviewDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-wrap gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={() => { onClose(); onConvert() }} disabled={saving}>
+            Convert to appointment
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
@@ -259,6 +264,7 @@ export default function RequestsPage() {
         request={reviewing}
         onClose={() => setReviewing(null)}
         onSave={handleSave}
+        onConvert={() => setConverting(reviewing)}
       />
 
       <ConvertRequestDialog

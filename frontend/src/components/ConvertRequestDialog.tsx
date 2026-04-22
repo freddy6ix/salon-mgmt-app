@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { searchClients, createClient, type Client } from '@/api/clients'
 import { listServices } from '@/api/services'
 import { listProviders } from '@/api/providers'
+import { listAppointments, type AppointmentItem } from '@/api/appointments'
 import { type AppointmentRequest, convertRequest } from '@/api/appointmentRequests'
 import {
   Dialog,
@@ -47,6 +48,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
   const [apptNotes, setApptNotes] = useState('')
   const [items, setItems] = useState<ItemFormState[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [clashWarning, setClashWarning] = useState<string[] | null>(null)
 
   const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: listServices })
   const { data: providers = [] } = useQuery({ queryKey: ['providers'], queryFn: listProviders })
@@ -160,9 +162,41 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
     },
   })
 
-  async function handleSubmit() {
+  function detectClashes(existingItems: AppointmentItem[]): string[] {
+    const conflicts: string[] = []
+    for (const item of items) {
+      if (!item.providerId) continue
+      const [nh, nm] = item.startTime.split(':').map(Number)
+      const newStart = nh * 60 + nm
+      const newEnd = newStart + item.durationMinutes
+      for (const ex of existingItems) {
+        if (ex.provider.id !== item.providerId) continue
+        const timePart = ex.start_time.split('T')[1] ?? ex.start_time
+        const [eh, em] = timePart.split(':').map(Number)
+        const exStart = eh * 60 + em
+        const exEnd = exStart + (ex.duration_override_minutes ?? ex.duration_minutes)
+        if (newStart < exEnd && newEnd > exStart) {
+          const provider = activeProviders.find(p => p.id === item.providerId)
+          conflicts.push(`${provider?.display_name ?? 'Provider'} at ${item.startTime}`)
+        }
+      }
+    }
+    return conflicts
+  }
+
+  async function handleSubmit(force = false) {
     setError(null)
+    setClashWarning(null)
     try {
+      if (!force && appointmentDate) {
+        const existing = await listAppointments(appointmentDate)
+        const existingItems = existing.flatMap(a => a.items)
+        const clashes = detectClashes(existingItems)
+        if (clashes.length > 0) {
+          setClashWarning(clashes)
+          return
+        }
+      }
       await mutateAsync()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Conversion failed')
@@ -431,15 +465,32 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
               />
             </div>
 
+            {clashWarning && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <p className="font-medium mb-1">Scheduling conflict</p>
+                {clashWarning.map((c, i) => <p key={i} className="text-xs">{c} overlaps an existing appointment</p>)}
+                <p className="text-xs mt-1">Book anyway?</p>
+              </div>
+            )}
+
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
         )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!isValid || isPending}>
-            {isPending ? 'Creating…' : 'Create appointment'}
-          </Button>
+          {clashWarning ? (
+            <>
+              <Button variant="outline" onClick={() => setClashWarning(null)} disabled={isPending}>Back</Button>
+              <Button onClick={() => handleSubmit(true)} disabled={isPending}>
+                {isPending ? 'Creating…' : 'Book anyway'}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => handleSubmit()} disabled={!isValid || isPending}>
+              {isPending ? 'Creating…' : 'Create appointment'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
