@@ -10,6 +10,7 @@ import BookingForm from '@/components/appointment-book/BookingForm'
 import ClientCard from '@/components/ClientCard'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function AppointmentBookPage() {
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
@@ -20,6 +21,9 @@ export default function AppointmentBookPage() {
     return (saved ? Number(saved) : 10) as SlotMinutes
   })
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [showCancelled, setShowCancelled] = useState(() =>
+    localStorage.getItem('showCancelled') === 'true'
+  )
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],
@@ -49,6 +53,16 @@ export default function AppointmentBookPage() {
   function prev() { setDate(format(subDays(displayDate, 1), 'yyyy-MM-dd')) }
   function next() { setDate(format(addDays(displayDate, 1), 'yyyy-MM-dd')) }
   function today() { setDate(format(new Date(), 'yyyy-MM-dd')) }
+  function toggleCancelled() {
+    setShowCancelled(v => {
+      localStorage.setItem('showCancelled', String(!v))
+      return !v
+    })
+  }
+
+  const displayedAppointments = showCancelled
+    ? appointments
+    : appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
 
   const isLoading = providersLoading || apptLoading
 
@@ -64,7 +78,19 @@ export default function AppointmentBookPage() {
           <Button variant="outline" size="sm" onClick={next}>›</Button>
         </div>
 
-        <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleCancelled}
+            className={showCancelled ? '' : 'text-muted-foreground'}
+            title={showCancelled ? 'Hide cancelled & no-show' : 'Show cancelled & no-show'}
+          >
+            {showCancelled ? <Eye size={14} /> : <EyeOff size={14} />}
+            <span className="ml-1.5">Cancelled</span>
+          </Button>
+          <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-hidden p-4">
@@ -76,7 +102,7 @@ export default function AppointmentBookPage() {
         ) : (
           <TimeGrid
             providers={visibleProviders}
-            appointments={appointments}
+            appointments={displayedAppointments}
             date={date}
             slotMinutes={slotMinutes}
             providerHours={schedules}
