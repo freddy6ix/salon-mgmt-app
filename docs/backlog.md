@@ -80,6 +80,15 @@ From the appointment book, staff can add new `AppointmentItem`(s) to an existing
 ### P1-5 · Creative login / landing page
 Replace the plain login page with a branded, visually engaging entry point appropriate for a premium Toronto salon. Should work well as the public-facing first impression for guests arriving to submit a booking request.
 
+### P1-8 · Show service times in client Appointments tab
+
+The Appointments tab on the client profile (Clients page) shows each service with the date but not the specific start time. Add the start time to each service line so staff can see exactly when each service is/was scheduled.
+
+- Frontend only: update `VisitHistory` in `ClientsPage.tsx` to include the `start_time` from each visit item
+- Requires the backend `/clients/{id}/history` endpoint to return `start_time` per item (currently only returns `service_name`, `provider_name`, `price`)
+- Backend: add `start_time: str` to the `VisitItem` model in `clients.py` and populate it from `AppointmentItem.start_time`
+- Frontend: display formatted time (e.g. "9:00 AM") alongside service name and provider on each item row
+
 ### P1-7 · Delete client
 
 Staff can soft-delete (deactivate) a client record from the Clients page. A deleted client's history is preserved for reporting but they no longer appear in search results or the client list.
