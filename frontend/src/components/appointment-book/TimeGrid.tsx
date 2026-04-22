@@ -383,9 +383,13 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
             data-provider-col={provider.id}
             className="flex-1 min-w-32 relative"
           >
-            {/* Vertical column separator — explicit absolute overlay, avoids flex border-r quirks */}
+            {/* Vertical column separator — explicit height because column div is flex-constrained
+                to viewport height, so bottom:0 would stop at the viewport, not the grid bottom */}
             {providerIdx < activeProviders.length - 1 && (
-              <div className="absolute right-0 top-0 bottom-0 w-px bg-gray-300 pointer-events-none" style={{ zIndex: 11 }} />
+              <div
+                className="absolute right-0 top-0 w-px bg-gray-300 pointer-events-none"
+                style={{ height: TOTAL_HEIGHT + HEADER_HEIGHT, zIndex: 11 }}
+              />
             )}
             {/* Header */}
             <div
