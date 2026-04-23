@@ -173,7 +173,7 @@ export default function StaffSchedulePage() {
           )}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Provider hours must fall within salon hours. Changes take effect immediately.
+          Provider hours must fall within salon hours. Changes take effect from today — past schedules are locked and preserved as history.
         </p>
       </main>
     </div>

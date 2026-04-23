@@ -9,7 +9,7 @@ PUT  /schedules/weekly/{provider_id}   — upsert a provider's weekly schedule (
 import uuid
 from datetime import date, time as dtime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,8 +21,6 @@ from app.models.provider import Provider
 from app.models.schedule import ProviderSchedule, ProviderScheduleException, TenantOperatingHours
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
-
-EPOCH = date(2000, 1, 1)  # effective_from sentinel for "default schedule"
 
 
 # ── Response models ──────────────────────────────────────────────────────────
@@ -152,6 +150,12 @@ async def set_working_status(
     tid = current_user.tenant_id
     provider_id = uuid.UUID(body.provider_id)
 
+    if body.date < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot modify a past date's schedule",
+        )
+
     provider = (
         await db.execute(
             select(Provider).where(Provider.id == provider_id, Provider.tenant_id == tid)
@@ -259,19 +263,22 @@ async def set_weekly(
         )
     ).scalar_one_or_none()
 
-    # Delete existing default rows for this provider and re-insert
+    today = date.today()
+
+    def _parse(t: str | None) -> dtime | None:
+        return dtime.fromisoformat(t) if t else None
+
+    # Replace only today's rows so re-saving on the same day is idempotent.
+    # Rows with effective_from < today are kept as immutable history.
     await db.execute(
         delete(ProviderSchedule).where(
             ProviderSchedule.tenant_id == tid,
             ProviderSchedule.provider_id == pid,
-            ProviderSchedule.effective_from == EPOCH,
+            ProviderSchedule.effective_from == today,
         )
     )
 
     for day in body.days:
-        def _parse(t: str | None) -> dtime | None:
-            return dtime.fromisoformat(t) if t else None
-
         db.add(ProviderSchedule(
             tenant_id=tid,
             provider_id=pid,
@@ -280,7 +287,7 @@ async def set_weekly(
             is_working=day.is_working,
             start_time=_parse(day.start_time),
             end_time=_parse(day.end_time),
-            effective_from=EPOCH,
+            effective_from=today,
             effective_to=None,
         ))
 
