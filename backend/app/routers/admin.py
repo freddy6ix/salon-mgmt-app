@@ -364,4 +364,7 @@ async def test_email_config(
       <h2 style="margin-top:0;">Test email</h2>
       <p>Your SMTP configuration is working correctly.</p>
     </div>"""
-    await send_email(smtp_cfg, body.to, "Salon Lyol — SMTP test", html)
+    try:
+        await send_email(smtp_cfg, body.to, "Salon Lyol — SMTP test", html)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
