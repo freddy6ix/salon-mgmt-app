@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getClient, getClientHistory, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
+import { updateAppointmentStatus } from '@/api/appointments'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -70,6 +71,11 @@ export default function ClientCard({ clientId, onClose }: Props) {
       setNewNoteText('')
       setNewNoteDate(format(new Date(), 'yyyy-MM-dd'))
     },
+  })
+
+  const cancelAppt = useMutation({
+    mutationFn: (appointmentId: string) => updateAppointmentStatus(appointmentId, 'cancelled'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client-history', clientId] }),
   })
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -210,7 +216,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                         Upcoming
                       </h3>
                       {upcoming.map(visit => (
-                        <VisitRow key={visit.appointment_id} visit={visit} />
+                        <VisitRow key={visit.appointment_id} visit={visit} onCancel={id => cancelAppt.mutate(id)} />
                       ))}
                     </div>
                   )}
@@ -327,7 +333,10 @@ export default function ClientCard({ clientId, onClose }: Props) {
   )
 }
 
-function VisitRow({ visit }: { visit: { appointment_id: string; date: string; status: string; items: { service_name: string; provider_name: string; price: number }[] } }) {
+function VisitRow({ visit, onCancel }: {
+  visit: { appointment_id: string; date: string; status: string; items: { service_name: string; provider_name: string; price: number }[] }
+  onCancel?: (id: string) => void
+}) {
   const dateObj = parseISO(visit.date + 'T12:00:00')
   const total = visit.items.reduce((sum, i) => sum + i.price, 0)
   return (
@@ -341,6 +350,14 @@ function VisitRow({ visit }: { visit: { appointment_id: string; date: string; st
           <span className={`text-xs ${VISIT_STATUS_COLOR[visit.status] ?? ''}`}>
             {VISIT_STATUS_LABEL[visit.status] ?? visit.status}
           </span>
+          {onCancel && visit.status === 'confirmed' && (
+            <button
+              onClick={() => onCancel(visit.appointment_id)}
+              className="text-xs text-destructive hover:underline"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
       {visit.items.map((item, i) => (

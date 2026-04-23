@@ -184,6 +184,7 @@ async def delete_client(
                 Appointment.client_id == row.id,
                 Appointment.tenant_id == current_user.tenant_id,
                 Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.in_progress]),
+                Appointment.appointment_date >= date.today(),
             )
         )
     ).scalars().first()

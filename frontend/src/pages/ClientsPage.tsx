@@ -12,6 +12,7 @@ import {
   updateClientNotes,
   deleteClient,
 } from '@/api/clients'
+import { updateAppointmentStatus } from '@/api/appointments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Star, ChevronRight } from 'lucide-react'
@@ -189,50 +190,92 @@ const VISIT_STATUS_LABEL: Record<string, string> = {
   in_progress: 'In progress',
 }
 
+function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) => void }) {
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const isUpcoming = visit.date >= todayStr
+  return (
+    <li className="rounded-md border p-3 text-sm space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium">
+          {new Date(visit.date + 'T00:00:00').toLocaleDateString('en-CA', {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+          })}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {VISIT_STATUS_LABEL[visit.status] ?? visit.status}
+          </span>
+          {isUpcoming && visit.status === 'confirmed' && onCancel && (
+            <button
+              onClick={() => onCancel(visit.appointment_id)}
+              className="text-xs text-destructive hover:underline"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+      <ul className="space-y-0.5">
+        {visit.items.map((item, i) => (
+          <li key={i} className="text-muted-foreground text-xs">
+            <span className="tabular-nums text-foreground">
+              {new Date(item.start_time).toLocaleTimeString('en-CA', {
+                hour: 'numeric', minute: '2-digit', hour12: true,
+              })}
+            </span>
+            {' · '}{item.service_name} — {item.provider_name}
+            {' · '}${item.price.toFixed(2)}
+          </li>
+        ))}
+      </ul>
+      {visit.items.length > 0 && (
+        <p className="text-xs font-medium pt-0.5">
+          Total: ${visit.items.reduce((sum, i) => sum + i.price, 0).toFixed(2)}
+        </p>
+      )}
+    </li>
+  )
+}
+
 function VisitHistory({ clientId }: { clientId: string }) {
+  const qc = useQueryClient()
+  const todayStr = new Date().toISOString().slice(0, 10)
+
   const { data: visits = [], isLoading } = useQuery({
     queryKey: ['client-history', clientId],
     queryFn: () => getClientHistory(clientId),
   })
 
+  const { mutate: cancelAppt } = useMutation({
+    mutationFn: (appointmentId: string) => updateAppointmentStatus(appointmentId, 'cancelled'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client-history', clientId] }),
+  })
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   if (visits.length === 0) return <p className="text-sm text-muted-foreground">No visits yet.</p>
 
+  const upcoming = visits.filter(v => v.date >= todayStr).reverse()
+  const past = visits.filter(v => v.date < todayStr)
+
   return (
-    <ul className="space-y-2">
-      {visits.map((v: Visit) => (
-        <li key={v.appointment_id} className="rounded-md border p-3 text-sm space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">
-              {new Date(v.date + 'T00:00:00').toLocaleDateString('en-CA', {
-                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-              })}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {VISIT_STATUS_LABEL[v.status] ?? v.status}
-            </span>
-          </div>
-          <ul className="space-y-0.5">
-            {v.items.map((item, i) => (
-              <li key={i} className="text-muted-foreground text-xs">
-                <span className="tabular-nums text-foreground">
-                  {new Date(item.start_time).toLocaleTimeString('en-CA', {
-                    hour: 'numeric', minute: '2-digit', hour12: true,
-                  })}
-                </span>
-                {' · '}{item.service_name} — {item.provider_name}
-                {' · '}${item.price.toFixed(2)}
-              </li>
-            ))}
+    <div className="space-y-5">
+      {upcoming.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Upcoming</h3>
+          <ul className="space-y-2">
+            {upcoming.map(v => <VisitRow key={v.appointment_id} visit={v} onCancel={id => cancelAppt(id)} />)}
           </ul>
-          {v.items.length > 0 && (
-            <p className="text-xs font-medium pt-0.5">
-              Total: ${v.items.reduce((sum, i) => sum + i.price, 0).toFixed(2)}
-            </p>
-          )}
-        </li>
-      ))}
-    </ul>
+        </div>
+      )}
+      {past.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">History</h3>
+          <ul className="space-y-2">
+            {past.map(v => <VisitRow key={v.appointment_id} visit={v} />)}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 
