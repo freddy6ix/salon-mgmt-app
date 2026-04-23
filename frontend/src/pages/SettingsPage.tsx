@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Save } from 'lucide-react'
 import { getBranding, updateBranding, type BrandingSettings } from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
 import { useAuth } from '@/store/auth'
@@ -111,6 +112,7 @@ export default function SettingsPage() {
           )}
 
           <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
+            <Save size={14} className="mr-1.5" />
             {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
           </Button>
         </section>
@@ -281,7 +283,8 @@ function EmailSection() {
           onClick={() => { setSaveMsg(null); saveMutation.mutate() }}
           disabled={saveMutation.isPending}
         >
-          {saveMutation.isPending ? 'Saving…' : 'Save'}
+          <Save size={14} className="mr-1.5" />
+            {saveMutation.isPending ? 'Saving…' : 'Save SMTP settings'}
         </Button>
         {saveMsg && (
           <span className={`text-sm ${saveMsg === 'Saved.' ? 'text-green-600' : 'text-destructive'}`}>
