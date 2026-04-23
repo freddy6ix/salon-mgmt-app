@@ -66,3 +66,7 @@ export function listColourNotes(clientId: string): Promise<ColourNote[]> {
 export function createColourNote(clientId: string, note_date: string, note_text: string): Promise<ColourNote> {
   return api.post<ColourNote>(`/clients/${clientId}/colour-notes`, { note_date, note_text })
 }
+
+export function deleteClient(clientId: string): Promise<void> {
+  return api.delete<void>(`/clients/${clientId}`)
+}

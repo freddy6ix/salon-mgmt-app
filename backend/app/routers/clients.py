@@ -161,6 +161,42 @@ async def update_client_notes(
     return _client_out(row)
 
 
+@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_client(
+    client_id: str,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    row = (
+        await db.execute(
+            select(Client).where(
+                Client.id == uuid.UUID(client_id),
+                Client.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+    upcoming = (
+        await db.execute(
+            select(Appointment).where(
+                Appointment.client_id == row.id,
+                Appointment.tenant_id == current_user.tenant_id,
+                Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.in_progress]),
+            )
+        )
+    ).scalars().first()
+    if upcoming:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Client has upcoming appointments and cannot be deleted",
+        )
+
+    row.is_active = False
+    await db.commit()
+
+
 class VisitItem(BaseModel):
     service_name: str
     provider_name: str

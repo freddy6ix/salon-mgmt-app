@@ -10,6 +10,7 @@ import {
   listColourNotes,
   createColourNote,
   updateClientNotes,
+  deleteClient,
 } from '@/api/clients'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -239,11 +240,13 @@ function VisitHistory({ clientId }: { clientId: string }) {
 
 type Tab = 'history' | 'colour' | 'notes'
 
-function ClientDetail({ clientId }: { clientId: string }) {
+function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: () => void }) {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('history')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesText, setNotesText] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const { data: client, isLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -259,6 +262,18 @@ function ClientDetail({ clientId }: { clientId: string }) {
     onSuccess: updated => {
       qc.setQueryData(['client', clientId], updated)
       setEditingNotes(false)
+    },
+  })
+
+  const { mutate: doDelete, isPending: deleting } = useMutation({
+    mutationFn: () => deleteClient(clientId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clients'] })
+      onDeleted()
+    },
+    onError: (e: Error) => {
+      setDeleteError(e.message || 'Could not delete client')
+      setConfirmDelete(false)
     },
   })
 
@@ -294,21 +309,41 @@ function ClientDetail({ clientId }: { clientId: string }) {
               {client.email && <span>{client.email}</span>}
             </div>
           </div>
-          <div className="flex gap-3 text-xs text-right flex-shrink-0">
-            {client.no_show_count > 0 && (
-              <div className="text-destructive">
-                <div className="font-semibold text-base leading-none">{client.no_show_count}</div>
-                <div>no-shows</div>
+          <div className="flex items-start gap-4 flex-shrink-0">
+            <div className="flex gap-3 text-xs text-right">
+              {client.no_show_count > 0 && (
+                <div className="text-destructive">
+                  <div className="font-semibold text-base leading-none">{client.no_show_count}</div>
+                  <div>no-shows</div>
+                </div>
+              )}
+              {client.late_cancellation_count > 0 && (
+                <div className="text-amber-600">
+                  <div className="font-semibold text-base leading-none">{client.late_cancellation_count}</div>
+                  <div>late cancel</div>
+                </div>
+              )}
+            </div>
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-destructive">Delete this client?</span>
+                <Button size="sm" variant="destructive" onClick={() => doDelete()} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Confirm'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteError(null) }} disabled={deleting}>
+                  Cancel
+                </Button>
               </div>
-            )}
-            {client.late_cancellation_count > 0 && (
-              <div className="text-amber-600">
-                <div className="font-semibold text-base leading-none">{client.late_cancellation_count}</div>
-                <div>late cancel</div>
-              </div>
+            ) : (
+              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => { setDeleteError(null); setConfirmDelete(true) }}>
+                Delete
+              </Button>
             )}
           </div>
         </div>
+        {deleteError && (
+          <p className="mt-2 text-xs text-destructive">{deleteError}</p>
+        )}
       </div>
 
       {/* Tabs */}
@@ -389,7 +424,7 @@ export default function ClientsPage() {
 
       <div className="flex-1 min-w-0 h-full overflow-hidden bg-white">
         {selectedId ? (
-          <ClientDetail key={selectedId} clientId={selectedId} />
+          <ClientDetail key={selectedId} clientId={selectedId} onDeleted={() => setSelectedId(null)} />
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Select a client to view their profile.
