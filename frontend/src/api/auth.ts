@@ -37,3 +37,7 @@ export async function register(
 export function getMe(): Promise<MeResponse> {
   return api.get<MeResponse>('/auth/me')
 }
+
+export function resetPassword(token: string, password: string): Promise<void> {
+  return api.post<void>('/auth/reset-password', { token, password })
+}

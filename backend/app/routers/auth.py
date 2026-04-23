@@ -1,4 +1,6 @@
+import hashlib
 import random
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,7 +14,7 @@ from app.database import get_db
 from app.deps import CurrentUser
 from app.models.client import Client
 from app.models.tenant import Tenant
-from app.models.user import User, UserRole
+from app.models.user import PasswordResetToken, User, UserRole
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -139,6 +141,41 @@ async def register(
         tenant_id=str(user.tenant_id),
     )
     return TokenResponse(access_token=token)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    reset_token = (
+        await db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.token_hash == token_hash,
+                PasswordResetToken.used_at.is_(None),
+                PasswordResetToken.expires_at > datetime.now(timezone.utc),
+            )
+        )
+    ).scalar_one_or_none()
+    if reset_token is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link")
+
+    user = (
+        await db.execute(select(User).where(User.id == reset_token.user_id))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link")
+
+    user.password_hash = hash_password(body.password)
+    user.is_active = True
+    reset_token.used_at = datetime.now(timezone.utc)
+    await db.commit()
 
 
 @router.get("/me", response_model=MeResponse)

@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell'
 import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import DashboardPage from '@/pages/DashboardPage'
 import AppointmentBookPage from '@/pages/AppointmentBookPage'
 import StaffSchedulePage from '@/pages/StaffSchedulePage'
@@ -11,6 +12,7 @@ import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ClientsPage from '@/pages/ClientsPage'
+import UsersPage from '@/pages/UsersPage'
 
 function StaffShell() {
   const { user, loading } = useAuth()
@@ -44,6 +46,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/my-requests"
@@ -63,6 +66,7 @@ export default function App() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/reports" element={<Placeholder title="Reports" />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/users" element={<UsersPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

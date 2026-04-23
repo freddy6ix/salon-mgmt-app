@@ -3,14 +3,15 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
 import {
-  Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut,
+  Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut, ShieldCheck,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
 import { applyBranding } from '@/lib/branding'
 
 export default function AppShell() {
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
+  const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
@@ -37,6 +38,7 @@ export default function AppShell() {
     { to: '/staff',        icon: UserCog,        label: 'Staff',            badge: 0 },
     { to: '/reports',      icon: BarChart2,      label: 'Reports',          badge: 0 },
     { to: '/settings',     icon: Settings,       label: 'Settings',         badge: 0 },
+    ...(isAdmin ? [{ to: '/users', icon: ShieldCheck, label: 'Users', badge: 0 }] : []),
   ]
 
   return (
