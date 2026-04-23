@@ -97,7 +97,7 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={role} onValueChange={v => { if (v) setRole(v) }}>
               <SelectTrigger id="role">
                 <SelectValue />
               </SelectTrigger>
@@ -156,7 +156,7 @@ function EditRoleDialog({
         <div className="space-y-4 pt-2">
           <div className="space-y-1.5">
             <Label>Role</Label>
-            <Select value={role} onValueChange={v => setRole(v as AdminUser['role'])}>
+            <Select value={role} onValueChange={v => { if (v) setRole(v as AdminUser['role']) }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
