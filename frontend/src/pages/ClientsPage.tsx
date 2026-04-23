@@ -325,7 +325,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
   }
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: 'history', label: 'Visit history' },
+    { id: 'history', label: 'Appointments' },
     { id: 'colour', label: 'Colour notes' },
     { id: 'notes', label: 'Special instructions' },
   ]
