@@ -219,6 +219,14 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
       if (clientMode === 'new' && !bypassDuplicateCheck) {
         const matches = await checkDuplicateClients(newEmail.trim(), newPhone.trim())
         if (matches.length > 0) {
+          const exactMatch = matches.find(m =>
+            m.first_name.trim().toLowerCase() === newFirst.trim().toLowerCase() &&
+            m.last_name.trim().toLowerCase() === newLast.trim().toLowerCase()
+          )
+          if (exactMatch) {
+            setError('A client with this exact name and contact information already exists.')
+            return
+          }
           setDuplicates(matches)
           return
         }
