@@ -20,6 +20,15 @@ class SmtpConfig:
 
 
 def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
+    if not cfg.host:
+        raise RuntimeError("SMTP host is not configured — fill in all fields and click Save first")
+    if not cfg.username:
+        raise RuntimeError("SMTP username is not configured")
+    if not cfg.password:
+        raise RuntimeError("SMTP password is not configured")
+    if not cfg.from_address:
+        raise RuntimeError("From address is not configured")
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = cfg.from_address
