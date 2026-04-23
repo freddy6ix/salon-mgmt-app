@@ -91,9 +91,21 @@ async def register(
     ).scalar_one_or_none()
 
     if existing is not None and existing.is_active:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        # Block only if there is also an active client linked to this user
+        active_client = (
+            await db.execute(
+                select(Client).where(
+                    Client.user_id == existing.id,
+                    Client.is_active == True,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if active_client is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        # Active user but client was deleted — deactivate to allow re-registration
+        existing.is_active = False
 
-    if existing is not None and not existing.is_active:
+    if existing is not None:
         # Reactivate the previously deactivated account with fresh credentials
         existing.is_active = True
         existing.password_hash = hash_password(body.password)
