@@ -230,15 +230,13 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Quick actions */}
-        <div className="flex gap-3">
-          <Button onClick={() => navigate('/appointments')}>Open appointment book</Button>
-          {pendingRequests.length > 0 && (
+        {pendingRequests.length > 0 && (
+          <div className="flex gap-3">
             <Button variant="outline" onClick={() => navigate('/requests')}>
               Review {pendingRequests.length} {pendingRequests.length === 1 ? 'request' : 'requests'}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
 
       </div>
     </div>
