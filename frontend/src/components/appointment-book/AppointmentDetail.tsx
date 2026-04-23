@@ -64,6 +64,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   })
   const [addError, setAddError] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
   const clientId = appointment?.client.id ?? null
 
@@ -244,8 +245,8 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                         <div className="flex items-center gap-1">
                           {canEdit && sortedItems.length > 1 && (
                             <button
-                              onClick={() => removeMutation.mutate(apptItem.id)}
-                              disabled={removeMutation.isPending}
+                              onClick={() => setPendingRemoveId(apptItem.id)}
+                              disabled={removeMutation.isPending || statusMutation.isPending}
                               className="text-muted-foreground hover:text-destructive transition-colors"
                               title="Remove service"
                             >
@@ -266,6 +267,44 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 )
               })}
             </div>
+
+            {pendingRemoveId && (() => {
+              const target = sortedItems.find(i => i.id === pendingRemoveId)
+              return (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 space-y-2 text-sm text-amber-900">
+                  <p className="font-medium">Remove {target?.service.name}?</p>
+                  <p className="text-xs">This appointment has {sortedItems.length} services. Do you want to remove just this service, or cancel all services?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-amber-400 bg-white"
+                      disabled={removeMutation.isPending || statusMutation.isPending}
+                      onClick={() => { removeMutation.mutate(pendingRemoveId); setPendingRemoveId(null) }}
+                    >
+                      This service only
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="flex-1"
+                      disabled={removeMutation.isPending || statusMutation.isPending}
+                      onClick={() => { statusMutation.mutate('cancelled'); setPendingRemoveId(null) }}
+                    >
+                      Cancel all services
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={removeMutation.isPending || statusMutation.isPending}
+                      onClick={() => setPendingRemoveId(null)}
+                    >
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              )
+            })()}
 
             {removeError && (
               <p className="text-xs text-destructive">{removeError}</p>
