@@ -34,3 +34,34 @@ export function deleteUser(id: string): Promise<void> {
 export function sendWelcomeEmail(id: string): Promise<void> {
   return api.post<void>(`/admin/users/${id}/send-welcome`, {})
 }
+
+// ── Email config ──────────────────────────────────────────────────────────────
+
+export interface EmailConfig {
+  is_configured: boolean
+  smtp_host: string
+  smtp_port: number
+  smtp_username: string
+  smtp_password_set: boolean
+  smtp_use_tls: boolean
+  from_address: string
+}
+
+export function getEmailConfig(): Promise<EmailConfig> {
+  return api.get<EmailConfig>('/admin/email-config')
+}
+
+export function saveEmailConfig(data: {
+  smtp_host: string
+  smtp_port: number
+  smtp_username: string
+  smtp_password?: string
+  smtp_use_tls: boolean
+  from_address: string
+}): Promise<EmailConfig> {
+  return api.put<EmailConfig>('/admin/email-config', data)
+}
+
+export function testEmailConfig(to: string): Promise<void> {
+  return api.post<void>('/admin/email-config/test', { to })
+}
