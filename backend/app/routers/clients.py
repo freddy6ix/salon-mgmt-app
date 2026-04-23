@@ -11,6 +11,7 @@ from app.database import get_db
 from app.deps import CurrentUser
 from app.models.client import Client, ClientColourNote
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
+from app.models.user import User
 from app.models.provider import Provider
 from app.models.service import Service
 
@@ -221,6 +222,12 @@ async def delete_client(
         )
 
     row.is_active = False
+    if row.user_id:
+        linked_user = (
+            await db.execute(select(User).where(User.id == row.user_id))
+        ).scalar_one_or_none()
+        if linked_user:
+            linked_user.is_active = False
     await db.commit()
 
 

@@ -89,16 +89,23 @@ async def register(
             select(User).where(User.tenant_id == tenant.id, User.email == body.email)
         )
     ).scalar_one_or_none()
-    if existing is not None:
+
+    if existing is not None and existing.is_active:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    user = User(
-        tenant_id=tenant.id,
-        email=body.email,
-        password_hash=hash_password(body.password),
-        role=UserRole.guest,
-    )
-    db.add(user)
+    if existing is not None and not existing.is_active:
+        # Reactivate the previously deactivated account with fresh credentials
+        existing.is_active = True
+        existing.password_hash = hash_password(body.password)
+        user = existing
+    else:
+        user = User(
+            tenant_id=tenant.id,
+            email=body.email,
+            password_hash=hash_password(body.password),
+            role=UserRole.guest,
+        )
+        db.add(user)
     await db.flush()
 
     client_code = f"G{random.randint(10000, 99999)}"
