@@ -73,6 +73,32 @@ async def search_clients(
     return [_client_out(c) for c in rows]
 
 
+@router.get("/check-duplicates", response_model=list[ClientOut])
+async def check_duplicates(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    email: str = Query(""),
+    phone: str = Query(""),
+) -> list[ClientOut]:
+    if not email.strip() and not phone.strip():
+        return []
+    conditions = []
+    if email.strip():
+        conditions.append(Client.email == email.strip())
+    if phone.strip():
+        conditions.append(Client.cell_phone == phone.strip())
+    rows = (
+        await db.execute(
+            select(Client).where(
+                Client.tenant_id == current_user.tenant_id,
+                Client.is_active == True,  # noqa: E712
+                or_(*conditions),
+            ).order_by(Client.last_name, Client.first_name)
+        )
+    ).scalars().all()
+    return [_client_out(c) for c in rows]
+
+
 @router.get("/{client_id}", response_model=ClientOut)
 async def get_client(
     client_id: str,

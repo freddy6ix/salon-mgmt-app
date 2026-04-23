@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { searchClients, createClient, type Client } from '@/api/clients'
+import { searchClients, createClient, checkDuplicateClients, type Client } from '@/api/clients'
 import { listServices } from '@/api/services'
 import { listProviders } from '@/api/providers'
 import { listAppointments, type AppointmentItem } from '@/api/appointments'
@@ -49,6 +49,8 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
   const [items, setItems] = useState<ItemFormState[]>([])
   const [error, setError] = useState<string | null>(null)
   const [clashWarning, setClashWarning] = useState<string[] | null>(null)
+  const [duplicates, setDuplicates] = useState<Client[]>([])
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
 
   const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: listServices })
   const { data: providers = [] } = useQuery({ queryKey: ['providers'], queryFn: listProviders })
@@ -88,6 +90,8 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
     setAppointmentDate(request.desired_date)
     setApptNotes('')
     setError(null)
+    setDuplicates([])
+    setBypassDuplicateCheck(false)
     setItems(request.items.map((ri, idx) => {
       const offsetMinutes = idx * 60
       const h = Math.floor(offsetMinutes / 60) + 9
@@ -212,6 +216,13 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
     setError(null)
     setClashWarning(null)
     try {
+      if (clientMode === 'new' && !bypassDuplicateCheck) {
+        const matches = await checkDuplicateClients(newEmail.trim(), newPhone.trim())
+        if (matches.length > 0) {
+          setDuplicates(matches)
+          return
+        }
+      }
       if (!force && appointmentDate) {
         const existing = await listAppointments(appointmentDate)
         const existingItems = existing.flatMap(a => a.items)
@@ -489,6 +500,21 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
               />
             </div>
 
+            {duplicates.length > 0 && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 space-y-1">
+                <p className="font-medium">Possible duplicate client</p>
+                <p className="text-xs">A client with the same email or phone already exists:</p>
+                {duplicates.map(d => (
+                  <p key={d.id} className="text-xs font-medium">
+                    {d.first_name} {d.last_name}
+                    {d.cell_phone && ` · ${d.cell_phone}`}
+                    {d.email && ` · ${d.email}`}
+                  </p>
+                ))}
+                <p className="text-xs mt-1">Create a new client anyway? (e.g. family members sharing contact info)</p>
+              </div>
+            )}
+
             {clashWarning && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 <p className="font-medium mb-1">Scheduling conflict</p>
@@ -503,7 +529,14 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-          {clashWarning ? (
+          {duplicates.length > 0 ? (
+            <>
+              <Button variant="outline" onClick={() => setDuplicates([])} disabled={isPending}>Back</Button>
+              <Button onClick={() => { setBypassDuplicateCheck(true); setDuplicates([]); handleSubmit() }} disabled={isPending}>
+                Create anyway
+              </Button>
+            </>
+          ) : clashWarning ? (
             <>
               <Button variant="outline" onClick={() => setClashWarning(null)} disabled={isPending}>Back</Button>
               <Button onClick={() => handleSubmit(true)} disabled={isPending}>

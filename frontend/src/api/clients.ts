@@ -70,3 +70,10 @@ export function createColourNote(clientId: string, note_date: string, note_text:
 export function deleteClient(clientId: string): Promise<void> {
   return api.delete<void>(`/clients/${clientId}`)
 }
+
+export function checkDuplicateClients(email: string, phone: string): Promise<Client[]> {
+  const params = new URLSearchParams()
+  if (email) params.set('email', email)
+  if (phone) params.set('phone', phone)
+  return api.get<Client[]>(`/clients/check-duplicates?${params}`)
+}
