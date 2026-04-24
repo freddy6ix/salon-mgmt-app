@@ -139,7 +139,7 @@ export default function SettingsPage() {
 
             <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
               <Save size={14} className="mr-1.5" />
-              {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
+              {brandingMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
           </section>
         )}
@@ -350,7 +350,7 @@ function EmailSection() {
           disabled={saveMutation.isPending}
         >
           <Save size={14} className="mr-1.5" />
-            {saveMutation.isPending ? 'Saving…' : 'Save SMTP settings'}
+            {saveMutation.isPending ? 'Saving…' : 'Save'}
         </Button>
         {saveMsg && (
           <span className={`text-sm ${saveMsg === 'Saved.' ? 'text-green-600' : 'text-destructive'}`}>
