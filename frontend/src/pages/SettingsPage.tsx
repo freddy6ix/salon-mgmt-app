@@ -39,7 +39,15 @@ export default function SettingsPage() {
     },
   })
 
+  const [tab, setTab] = useState<'branding' | 'scheduling' | 'email'>('branding')
+
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+
+  const tabs = [
+    { id: 'branding', label: 'Branding' },
+    { id: 'scheduling', label: 'Scheduling' },
+    ...(isAdmin ? [{ id: 'email', label: 'Email' }] : []),
+  ] as const
 
   return (
     <div className="h-full overflow-auto bg-muted/30">
@@ -49,101 +57,134 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage your salon configuration.</p>
         </div>
 
-        {/* Branding */}
-        <section className="border rounded-lg p-5 space-y-5 bg-white">
-          <h2 className="text-base font-medium">Branding</h2>
+        {/* Tabs */}
+        <div className="flex border-b">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as typeof tab)}
+              className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors ${
+                tab === t.id
+                  ? 'border-foreground font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Logo URL</label>
-            <input
-              type="url"
-              value={logoUrl}
-              onChange={e => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
-            />
-            <p className="text-xs text-muted-foreground">
-              Paste a publicly accessible image URL. Recommended: square PNG or SVG, transparent background.
-            </p>
-            {logoUrl && (
-              <div className="flex items-center gap-4 pt-1">
-                <img
-                  src={logoUrl}
-                  alt="Logo preview"
-                  className="h-12 w-auto object-contain border rounded p-1 bg-muted/30"
-                  onError={e => (e.currentTarget.style.display = 'none')}
+        {/* Branding tab */}
+        {tab === 'branding' && (
+          <section className="border rounded-lg p-5 space-y-5 bg-white">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Logo URL</label>
+              <input
+                type="url"
+                value={logoUrl}
+                onChange={e => setLogoUrl(e.target.value)}
+                placeholder="https://example.com/logo.png"
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a publicly accessible image URL. Recommended: square PNG or SVG, transparent background.
+              </p>
+              {logoUrl && (
+                <div className="flex items-center gap-4 pt-1">
+                  <img
+                    src={logoUrl}
+                    alt="Logo preview"
+                    className="h-12 w-auto object-contain border rounded p-1 bg-muted/30"
+                    onError={e => (e.currentTarget.style.display = 'none')}
+                  />
+                  <span className="text-xs text-muted-foreground">Preview</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Brand colour</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={brandColor}
+                  onChange={e => setBrandColor(e.target.value)}
+                  className="h-9 w-16 cursor-pointer rounded border border-input p-0.5 bg-background"
                 />
-                <span className="text-xs text-muted-foreground">Preview</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Brand colour</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={brandColor}
-                onChange={e => setBrandColor(e.target.value)}
-                className="h-9 w-16 cursor-pointer rounded border border-input p-0.5 bg-background"
-              />
-              <input
-                type="text"
-                value={brandColor}
-                onChange={e => {
-                  const v = e.target.value
-                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setBrandColor(v)
-                }}
-                className="w-28 border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
-                maxLength={7}
-              />
-              <div
-                className="h-9 w-24 rounded border border-input text-xs flex items-center justify-center font-medium"
-                style={{ backgroundColor: brandColor.length === 7 ? brandColor : undefined }}
-              >
-                <span style={{ color: colorIsDark(brandColor) ? '#fff' : '#000' }}>Button</span>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">Applied to buttons and accents throughout the app.</p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Appointment book granularity</label>
-            <div className="flex gap-2">
-              {SLOT_OPTIONS.map(opt => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setSlotMinutes(opt)}
-                  className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
-                    slotMinutes === opt
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-input bg-background hover:bg-muted/50'
-                  }`}
+                <input
+                  type="text"
+                  value={brandColor}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setBrandColor(v)
+                  }}
+                  className="w-28 border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
+                  maxLength={7}
+                />
+                <div
+                  className="h-9 w-24 rounded border border-input text-xs flex items-center justify-center font-medium"
+                  style={{ backgroundColor: brandColor.length === 7 ? brandColor : undefined }}
                 >
-                  {opt} min
-                </button>
-              ))}
+                  <span style={{ color: colorIsDark(brandColor) ? '#fff' : '#000' }}>Button</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Applied to buttons and accents throughout the app.</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Controls the time slot grid resolution and snaps new appointment start times to these intervals.
-            </p>
-          </div>
 
-          {brandingMutation.isError && (
-            <p className="text-xs text-destructive">
-              {brandingMutation.error instanceof Error ? brandingMutation.error.message : 'Save failed'}
-            </p>
-          )}
+            {brandingMutation.isError && (
+              <p className="text-xs text-destructive">
+                {brandingMutation.error instanceof Error ? brandingMutation.error.message : 'Save failed'}
+              </p>
+            )}
 
-          <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
-            <Save size={14} className="mr-1.5" />
-            {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
-          </Button>
-        </section>
+            <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
+              <Save size={14} className="mr-1.5" />
+              {brandingMutation.isPending ? 'Saving…' : 'Save branding'}
+            </Button>
+          </section>
+        )}
 
-        {/* Email — admin only */}
-        {isAdmin && <EmailSection />}
+        {/* Scheduling tab */}
+        {tab === 'scheduling' && (
+          <section className="border rounded-lg p-5 space-y-5 bg-white">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Appointment book granularity</label>
+              <div className="flex gap-2">
+                {SLOT_OPTIONS.map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setSlotMinutes(opt)}
+                    className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
+                      slotMinutes === opt
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-input bg-background hover:bg-muted/50'
+                    }`}
+                  >
+                    {opt} min
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Controls the time slot grid resolution and snaps new appointment start times to these intervals.
+              </p>
+            </div>
+
+            {brandingMutation.isError && (
+              <p className="text-xs text-destructive">
+                {brandingMutation.error instanceof Error ? brandingMutation.error.message : 'Save failed'}
+              </p>
+            )}
+
+            <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
+              <Save size={14} className="mr-1.5" />
+              {brandingMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </section>
+        )}
+
+        {/* Email tab — admin only */}
+        {tab === 'email' && isAdmin && <EmailSection />}
       </div>
     </div>
   )
