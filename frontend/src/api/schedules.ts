@@ -31,8 +31,8 @@ export function getWeeklySchedules(): Promise<ProviderWeeklyHours[]> {
   return api.get<ProviderWeeklyHours[]>('/schedules/weekly')
 }
 
-export function setWeeklySchedule(provider_id: string, days: DayHours[]): Promise<ProviderWeeklyHours> {
-  return api.put<ProviderWeeklyHours>(`/schedules/weekly/${provider_id}`, { days })
+export function setWeeklySchedule(provider_id: string, days: DayHours[], effective_from?: string): Promise<ProviderWeeklyHours> {
+  return api.put<ProviderWeeklyHours>(`/schedules/weekly/${provider_id}`, { days, effective_from })
 }
 
 export function setWorkingStatus(provider_id: string, date: string, is_working: boolean): Promise<ProviderWorkStatus> {

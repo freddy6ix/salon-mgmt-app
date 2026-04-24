@@ -56,6 +56,7 @@ class ProviderWeeklyHours(BaseModel):
 
 class WeeklyHoursUpdate(BaseModel):
     days: list[DayHours]
+    effective_from: date | None = None  # defaults to today
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -210,13 +211,17 @@ async def get_weekly(
         )
     ).scalars().all()
 
+    today = date.today()
     all_rows = (
         await db.execute(
-            select(ProviderSchedule).where(ProviderSchedule.tenant_id == tid)
+            select(ProviderSchedule).where(
+                ProviderSchedule.tenant_id == tid,
+                ProviderSchedule.effective_from <= today,
+            )
         )
     ).scalars().all()
 
-    # Build map: provider_id → dow → most recent row
+    # Build map: provider_id → dow → most recent active row
     sched_map: dict[str, dict[int, ProviderSchedule]] = {}
     for row in sorted(all_rows, key=lambda x: x.effective_from):
         pid = str(row.provider_id)
@@ -264,17 +269,23 @@ async def set_weekly(
     ).scalar_one_or_none()
 
     today = date.today()
+    effective_from = body.effective_from or today
+
+    if effective_from < today:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="effective_from cannot be in the past — historical schedules are locked",
+        )
 
     def _parse(t: str | None) -> dtime | None:
         return dtime.fromisoformat(t) if t else None
 
-    # Replace only today's rows so re-saving on the same day is idempotent.
-    # Rows with effective_from < today are kept as immutable history.
+    # Re-saving on the same effective_from date is idempotent; older rows are immutable history.
     await db.execute(
         delete(ProviderSchedule).where(
             ProviderSchedule.tenant_id == tid,
             ProviderSchedule.provider_id == pid,
-            ProviderSchedule.effective_from == today,
+            ProviderSchedule.effective_from == effective_from,
         )
     )
 
@@ -287,7 +298,7 @@ async def set_weekly(
             is_working=day.is_working,
             start_time=_parse(day.start_time),
             end_time=_parse(day.end_time),
-            effective_from=today,
+            effective_from=effective_from,
             effective_to=None,
         ))
 

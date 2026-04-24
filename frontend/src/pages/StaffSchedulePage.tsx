@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getWeeklySchedules, setWeeklySchedule, type ProviderWeeklyHours, type DayHours } from '@/api/schedules'
 import { Button } from '@/components/ui/button'
+
+const TODAY = format(new Date(), 'yyyy-MM-dd')
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -24,7 +27,7 @@ function clamp(value: string, min: string, max: string): string {
 
 interface RowProps {
   provider: ProviderWeeklyHours
-  onSave: (provider_id: string, days: DayHours[]) => void
+  onSave: (provider_id: string, days: DayHours[], effective_from: string) => void
   saving: boolean
 }
 
@@ -33,6 +36,7 @@ function ProviderRow({ provider, onSave, saving }: RowProps) {
     provider.days.map((d) => ({ ...d }))
   )
   const [dirty, setDirty] = useState(false)
+  const [effectiveFrom, setEffectiveFrom] = useState(TODAY)
 
   function updateDay(dow: number, patch: Partial<DayHours>) {
     setDays((prev) => prev.map((d) => d.day_of_week === dow ? { ...d, ...patch } : d))
@@ -104,13 +108,25 @@ function ProviderRow({ provider, onSave, saving }: RowProps) {
         )
       })}
       <td className="pl-4 align-middle">
-        <Button
-          size="sm"
-          disabled={!dirty || saving}
-          onClick={() => { onSave(provider.provider_id, days); setDirty(false) }}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-muted-foreground whitespace-nowrap">From</label>
+            <input
+              type="date"
+              value={effectiveFrom}
+              min={TODAY}
+              onChange={e => { setEffectiveFrom(e.target.value); setDirty(true) }}
+              className="text-xs border border-input rounded px-1 py-0.5 bg-background"
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={!dirty || saving}
+            onClick={() => { onSave(provider.provider_id, days, effectiveFrom); setDirty(false) }}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </td>
     </tr>
   )
@@ -127,8 +143,8 @@ export default function StaffSchedulePage() {
   })
 
   const mutation = useMutation({
-    mutationFn: ({ provider_id, days }: { provider_id: string; days: DayHours[] }) =>
-      setWeeklySchedule(provider_id, days),
+    mutationFn: ({ provider_id, days, effective_from }: { provider_id: string; days: DayHours[]; effective_from: string }) =>
+      setWeeklySchedule(provider_id, days, effective_from),
     onMutate: ({ provider_id }) => setSavingId(provider_id),
     onSettled: () => {
       setSavingId(null)
@@ -165,7 +181,7 @@ export default function StaffSchedulePage() {
                     key={p.provider_id}
                     provider={p}
                     saving={savingId === p.provider_id}
-                    onSave={(id, days) => mutation.mutate({ provider_id: id, days })}
+                    onSave={(id, days, effective_from) => mutation.mutate({ provider_id: id, days, effective_from })}
                   />
                 ))}
               </tbody>
@@ -173,7 +189,7 @@ export default function StaffSchedulePage() {
           )}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Provider hours must fall within salon hours. Changes take effect from today — past schedules are locked and preserved as history.
+          Provider hours must fall within salon hours. Use the "From" date to schedule a change in advance — past schedules are locked and preserved as history.
         </p>
       </main>
     </div>
