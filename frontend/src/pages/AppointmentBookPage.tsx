@@ -1,18 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { format, addDays, subDays, parseISO } from 'date-fns'
 import { listAppointments, type Appointment, type AppointmentItem } from '@/api/appointments'
 import { listProviders, type Provider } from '@/api/providers'
 import { getSchedule } from '@/api/schedules'
+import { getRequest } from '@/api/appointmentRequests'
 import TimeGrid, { type SlotMinutes } from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
 import ClientCard from '@/components/ClientCard'
+import ConvertRequestPanel from '@/components/ConvertRequestPanel'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function AppointmentBookPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const requestId = searchParams.get('request')
+
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
@@ -24,6 +31,19 @@ export default function AppointmentBookPage() {
   const [showCancelled, setShowCancelled] = useState(() =>
     localStorage.getItem('showCancelled') === 'true'
   )
+
+  const { data: convertRequest } = useQuery({
+    queryKey: ['request', requestId],
+    queryFn: () => getRequest(requestId!),
+    enabled: !!requestId,
+  })
+
+  // Auto-jump to the requested date when the request loads
+  useEffect(() => {
+    if (convertRequest) {
+      setDate(convertRequest.desired_date)
+    }
+  }, [convertRequest?.id])
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],
@@ -135,6 +155,19 @@ export default function AppointmentBookPage() {
         clientId={selectedClientId}
         onClose={() => setSelectedClientId(null)}
       />
+
+      {convertRequest && (
+        <ConvertRequestPanel
+          request={convertRequest}
+          date={date}
+          onDateChange={setDate}
+          onClose={() => navigate('/appointments')}
+          onConverted={apptDate => {
+            setDate(apptDate)
+            navigate('/appointments')
+          }}
+        />
+      )}
     </div>
   )
 }

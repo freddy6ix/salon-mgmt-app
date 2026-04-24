@@ -219,6 +219,25 @@ async def list_requests(
     return [await _load_request_out(r, db) for r in requests]
 
 
+@router.get("/{request_id}", response_model=AppointmentRequestOut)
+async def get_request(
+    request_id: str,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AppointmentRequestOut:
+    row = (
+        await db.execute(
+            select(AppointmentRequest).where(
+                AppointmentRequest.id == uuid.UUID(request_id),
+                AppointmentRequest.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    return await _load_request_out(row, db)
+
+
 class ConvertItemIn(BaseModel):
     request_item_id: str
     service_id: str

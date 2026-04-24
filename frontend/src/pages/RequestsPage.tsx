@@ -6,7 +6,6 @@ import {
   listAllRequests,
   reviewRequest,
 } from '@/api/appointmentRequests'
-import ConvertRequestDialog from '@/components/ConvertRequestDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -167,7 +166,10 @@ export default function RequestsPage() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
   const [reviewing, setReviewing] = useState<AppointmentRequest | null>(null)
-  const [converting, setConverting] = useState<AppointmentRequest | null>(null)
+
+  function openConvert(req: AppointmentRequest) {
+    navigate(`/appointments?request=${req.id}`)
+  }
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['all-requests', filter],
@@ -239,7 +241,7 @@ export default function RequestsPage() {
                       <>
                         <Button
                           size="sm"
-                          onClick={() => setConverting(req)}
+                          onClick={() => openConvert(req)}
                         >
                           Convert to appointment
                         </Button>
@@ -264,16 +266,7 @@ export default function RequestsPage() {
         request={reviewing}
         onClose={() => setReviewing(null)}
         onSave={handleSave}
-        onConvert={() => setConverting(reviewing)}
-      />
-
-      <ConvertRequestDialog
-        request={converting}
-        onClose={() => setConverting(null)}
-        onConverted={() => {
-          setConverting(null)
-          navigate('/appointments')
-        }}
+        onConvert={() => { if (reviewing) openConvert(reviewing); setReviewing(null) }}
       />
     </div>
   )

@@ -44,6 +44,10 @@ export function listMyRequests(): Promise<AppointmentRequest[]> {
   return api.get<AppointmentRequest[]>('/appointment-requests')
 }
 
+export function getRequest(id: string): Promise<AppointmentRequest> {
+  return api.get<AppointmentRequest>(`/appointment-requests/${id}`)
+}
+
 export function listAllRequests(status?: string): Promise<AppointmentRequest[]> {
   const qs = status ? `?status=${status}` : ''
   return api.get<AppointmentRequest[]>(`/appointment-requests${qs}`)
