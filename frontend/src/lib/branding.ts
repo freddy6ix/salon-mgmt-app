@@ -31,10 +31,10 @@ export function applyBranding(branding: BrandingSettings): void {
   if (color) {
     const hsl = hexToHsl(color)
     if (hsl) {
-      root.style.setProperty('--primary', `${hsl[0]} ${hsl[1]}% ${hsl[2]}%`)
+      root.style.setProperty('--primary', `hsl(${hsl[0]} ${hsl[1]}% ${hsl[2]}%)`)
       // Keep foreground readable regardless of brand color lightness
       const isDark = hsl[2] < 50
-      root.style.setProperty('--primary-foreground', isDark ? '0 0% 100%' : '0 0% 0%')
+      root.style.setProperty('--primary-foreground', isDark ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)')
     }
   } else {
     root.style.removeProperty('--primary')
