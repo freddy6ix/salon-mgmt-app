@@ -30,6 +30,15 @@ export function createClient(data: {
   return api.post<Client>('/clients', data)
 }
 
+export function updateClient(clientId: string, data: {
+  first_name?: string
+  last_name?: string
+  email?: string | null
+  cell_phone?: string | null
+}): Promise<Client> {
+  return api.patch<Client>(`/clients/${clientId}`, data)
+}
+
 export function updateClientNotes(clientId: string, notes: string | null): Promise<Client> {
   return api.patch<Client>(`/clients/${clientId}/notes`, { special_instructions: notes })
 }

@@ -161,6 +161,43 @@ async def create_client(
     return _client_out(client)
 
 
+class ClientUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    cell_phone: str | None = None
+
+
+@router.patch("/{client_id}", response_model=ClientOut)
+async def update_client(
+    client_id: str,
+    body: ClientUpdate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClientOut:
+    row = (
+        await db.execute(
+            select(Client).where(
+                Client.id == uuid.UUID(client_id),
+                Client.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    if body.first_name is not None:
+        row.first_name = body.first_name.strip()
+    if body.last_name is not None:
+        row.last_name = body.last_name.strip()
+    if body.email is not None:
+        row.email = body.email.strip() or None
+    if body.cell_phone is not None:
+        row.cell_phone = body.cell_phone.strip() or None
+    await db.commit()
+    await db.refresh(row)
+    return _client_out(row)
+
+
 class ClientNotesUpdate(BaseModel):
     special_instructions: str | None
 

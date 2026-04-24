@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getClient, getClientHistory, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
+import { getClient, getClientHistory, updateClient, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
 import { updateAppointmentStatus } from '@/api/appointments'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 
 type Tab = 'profile' | 'appointments' | 'colour' | 'notes'
@@ -34,6 +36,12 @@ export default function ClientCard({ clientId, onClose }: Props) {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('profile')
   const [notesValue, setNotesValue] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editFirst, setEditFirst] = useState('')
+  const [editLast, setEditLast] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
   const [newNoteText, setNewNoteText] = useState('')
   const [newNoteDate, setNewNoteDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
@@ -57,6 +65,32 @@ export default function ClientCard({ clientId, onClose }: Props) {
       setNotesValue(null)
     },
   })
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateClient(clientId!, {
+      first_name: editFirst.trim(),
+      last_name: editLast.trim(),
+      email: editEmail.trim() || null,
+      cell_phone: editPhone.trim() || null,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client', clientId] })
+      qc.invalidateQueries({ queryKey: ['clients'] })
+      setEditing(false)
+      setEditError(null)
+    },
+    onError: (err: unknown) => setEditError((err as Error).message ?? 'Save failed'),
+  })
+
+  function startEdit() {
+    if (!client) return
+    setEditFirst(client.first_name)
+    setEditLast(client.last_name)
+    setEditEmail(client.email ?? '')
+    setEditPhone(client.cell_phone ?? '')
+    setEditError(null)
+    setEditing(true)
+  }
 
   const { data: colourNotes = [], isLoading: colourLoading } = useQuery({
     queryKey: ['client-colour-notes', clientId],
@@ -151,26 +185,71 @@ export default function ClientCard({ clientId, onClose }: Props) {
                 </div>
               ) : client ? (
                 <>
-                  <div className="space-y-2">
-                    {client.email && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="text-muted-foreground w-16 shrink-0">Email</span>
-                        <a href={`mailto:${client.email}`} className="hover:underline truncate">
-                          {client.email}
-                        </a>
+                  {editing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">First name</Label>
+                          <Input value={editFirst} onChange={e => setEditFirst(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Last name</Label>
+                          <Input value={editLast} onChange={e => setEditLast(e.target.value)} />
+                        </div>
                       </div>
-                    )}
-                    {client.cell_phone && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="text-muted-foreground w-16 shrink-0">Phone</span>
-                        <a href={`tel:${client.cell_phone}`} className="hover:underline">
-                          {client.cell_phone}
-                        </a>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Email</Label>
+                        <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="optional" />
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Phone</Label>
+                        <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="optional" />
+                      </div>
+                      {editError && <p className="text-xs text-destructive">{editError}</p>}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          disabled={updateMutation.isPending || !editFirst.trim() || !editLast.trim()}
+                          onClick={() => updateMutation.mutate()}
+                        >
+                          {updateMutation.isPending ? 'Saving…' : 'Save'}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        {client.email && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="text-muted-foreground w-16 shrink-0">Email</span>
+                            <a href={`mailto:${client.email}`} className="hover:underline truncate">
+                              {client.email}
+                            </a>
+                          </div>
+                        )}
+                        {client.cell_phone && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="text-muted-foreground w-16 shrink-0">Phone</span>
+                            <a href={`tel:${client.cell_phone}`} className="hover:underline">
+                              {client.cell_phone}
+                            </a>
+                          </div>
+                        )}
+                        {!client.email && !client.cell_phone && (
+                          <p className="text-sm text-muted-foreground">No contact info on file.</p>
+                        )}
+                      </div>
+                      <Button size="sm" variant="outline" onClick={startEdit}>
+                        Edit profile
+                      </Button>
+                    </>
+                  )}
 
-                  {(client.no_show_count > 0 || client.late_cancellation_count > 0) && (
+                  {(client.no_show_count > 0 || client.late_cancellation_count > 0) && !editing && (
                     <>
                       <Separator />
                       <div className="space-y-1.5">
@@ -190,7 +269,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                     </>
                   )}
 
-                  {client.special_instructions && (
+                  {client.special_instructions && !editing && (
                     <>
                       <Separator />
                       <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
