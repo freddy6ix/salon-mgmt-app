@@ -412,7 +412,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
             <div
               className="relative"
               style={{ height: TOTAL_HEIGHT }}
-              onClick={(e) => {
+              onDoubleClick={(e) => {
                 if (!onSlotClick || dragRef.current || didDragRef.current) return
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
