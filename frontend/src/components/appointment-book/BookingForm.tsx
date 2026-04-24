@@ -335,13 +335,20 @@ export default function BookingForm({
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Start time</label>
-                  <input
-                    type="time"
+                  <select
                     value={startTime}
-                    step={slotMinutes * 60}
-                    onChange={(e) => setStartTime(snapToSlot(e.target.value, slotMinutes))}
+                    onChange={(e) => setStartTime(e.target.value)}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
-                  />
+                  >
+                    {Array.from({ length: (22 * 60) / slotMinutes - (8 * 60) / slotMinutes }, (_, i) => {
+                      const totalMins = 8 * 60 + i * slotMinutes
+                      const h = Math.floor(totalMins / 60)
+                      const m = totalMins % 60
+                      const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+                      const label = `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                      return <option key={val} value={val}>{label}</option>
+                    })}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Price ($)</label>
