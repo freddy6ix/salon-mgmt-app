@@ -346,9 +346,8 @@ export default function BookingForm({
                 <div>
                   <label className="text-xs text-muted-foreground">Price ($)</label>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder={selectedService?.default_price?.toFixed(2) ?? '0.00'}
