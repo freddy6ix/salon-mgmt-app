@@ -13,7 +13,7 @@ from app.models.tenant import Tenant
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-VALID_SLOT_MINUTES = {10, 15, 20, 30}
+VALID_SLOT_MINUTES = {5, 10, 15, 20, 30}
 
 
 class BrandingOut(BaseModel):

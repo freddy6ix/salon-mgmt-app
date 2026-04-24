@@ -1,6 +1,6 @@
 import { api } from './client'
 
-export const SLOT_OPTIONS = [10, 15, 20, 30] as const
+export const SLOT_OPTIONS = [5, 10, 15, 20, 30] as const
 export type SlotMinutes = typeof SLOT_OPTIONS[number]
 
 export interface BrandingSettings {
