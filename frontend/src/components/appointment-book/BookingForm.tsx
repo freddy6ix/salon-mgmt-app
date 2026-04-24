@@ -386,7 +386,13 @@ export default function BookingForm({
 
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep('client')}>← Back</Button>
-              <Button disabled={items.length === 0} onClick={() => setStep('confirm')}>
+              <Button
+                disabled={items.length === 0 && (!serviceId || !providerId)}
+                onClick={() => {
+                  if (items.length === 0 && serviceId && providerId) addItem()
+                  setStep('confirm')
+                }}
+              >
                 Review →
               </Button>
             </div>
