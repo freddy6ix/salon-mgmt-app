@@ -94,8 +94,13 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
 
   const activeProviders = providers.filter((p) => p.has_appointments)
 
-  // Current time indicator
+  // Current time indicator — only shown when viewing today
   useEffect(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    if (date !== todayStr) {
+      setNowPx(null)
+      return
+    }
     function update() {
       const now = new Date()
       const mins = (now.getHours() - START_HOUR) * 60 + now.getMinutes()
@@ -108,7 +113,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
     update()
     const id = setInterval(update, 60_000)
     return () => clearInterval(id)
-  }, [SLOT_MINUTES])
+  }, [SLOT_MINUTES, date])
 
   const blocksByProvider = useMemo(() => {
     const map = new Map<string, AppointmentBlock[]>()
