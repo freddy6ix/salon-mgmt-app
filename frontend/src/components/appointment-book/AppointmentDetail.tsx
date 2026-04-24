@@ -421,6 +421,13 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 >
                   Check out
                 </Button>
+                <Button
+                  variant="outline"
+                  disabled={statusMutation.isPending}
+                  onClick={() => statusMutation.mutate('confirmed')}
+                >
+                  Not arrived
+                </Button>
                 {confirmCancel ? (
                   <span className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Sure?</span>
@@ -436,7 +443,16 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             )}
 
             {apptStatus === 'completed' && (
-              <p className="text-xs text-muted-foreground text-center pt-1">Checked out</p>
+              <div className="flex gap-2 pt-1 justify-center">
+                <p className="text-xs text-muted-foreground">Checked out</p>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  disabled={statusMutation.isPending}
+                  onClick={() => statusMutation.mutate('in_progress')}
+                >
+                  Undo
+                </button>
+              </div>
             )}
             {apptStatus === 'cancelled' && (
               <p className="text-xs text-destructive text-center pt-1">Cancelled</p>

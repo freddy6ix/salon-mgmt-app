@@ -407,8 +407,8 @@ async def patch_appointment_item(
 
 VALID_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     AppointmentStatus.confirmed: {AppointmentStatus.in_progress, AppointmentStatus.cancelled, AppointmentStatus.no_show},
-    AppointmentStatus.in_progress: {AppointmentStatus.completed, AppointmentStatus.cancelled},
-    AppointmentStatus.completed: set(),
+    AppointmentStatus.in_progress: {AppointmentStatus.confirmed, AppointmentStatus.completed, AppointmentStatus.cancelled},
+    AppointmentStatus.completed: {AppointmentStatus.in_progress},
     AppointmentStatus.cancelled: set(),
     AppointmentStatus.no_show: set(),
 }
