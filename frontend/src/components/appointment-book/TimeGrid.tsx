@@ -20,8 +20,6 @@ const END_HOUR = 21
 const SLOT_HEIGHT = 20   // px per slot
 const HEADER_HEIGHT = 40 // px
 
-export const SLOT_OPTIONS = [10, 15, 20, 30] as const
-export type SlotMinutes = typeof SLOT_OPTIONS[number]
 
 function minutesFromGridStart(isoTime: string): number {
   // Parse HH:MM directly from the ISO string to avoid browser UTC→local conversion.
@@ -64,7 +62,7 @@ interface Props {
   providers: Provider[]
   appointments: Appointment[]
   date: string
-  slotMinutes: SlotMinutes
+  slotMinutes: number
   providerHours?: ProviderWorkStatus[]
   onItemClick?: (item: AppointmentItem, appointment: Appointment) => void
   onSlotClick?: (time: string, providerId: string) => void

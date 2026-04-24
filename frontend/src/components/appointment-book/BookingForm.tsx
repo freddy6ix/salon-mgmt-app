@@ -21,8 +21,16 @@ interface Props {
   initialProviderId?: string
   providers: Provider[]
   providerHours?: ProviderWorkStatus[]
+  slotMinutes?: number
   onClose: () => void
   onSaved: () => void
+}
+
+function snapToSlot(time: string, slotMinutes: number): string {
+  const [h, m] = time.split(':').map(Number)
+  const snapped = Math.round(m / slotMinutes) * slotMinutes
+  if (snapped >= 60) return `${String(h + 1).padStart(2, '0')}:00`
+  return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
 }
 
 interface ItemDraft {
@@ -43,7 +51,7 @@ function isItemOutsideHours(startHHMM: string, durationMins: number, hours: Prov
 }
 
 export default function BookingForm({
-  open, date, initialTime, initialProviderId, providers, providerHours = [], onClose, onSaved,
+  open, date, initialTime, initialProviderId, providers, providerHours = [], slotMinutes = 10, onClose, onSaved,
 }: Props) {
   const qc = useQueryClient()
 
@@ -98,7 +106,7 @@ export default function BookingForm({
       setItems([])
       setServiceId('')
       setProviderId(initialProviderId ?? providers[0]?.id ?? '')
-      setStartTime(initialTime ?? '09:00')
+      setStartTime(snapToSlot(initialTime ?? '09:00', slotMinutes))
       setPrice('')
       setNotes('')
     }
@@ -330,7 +338,8 @@ export default function BookingForm({
                   <input
                     type="time"
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    step={slotMinutes * 60}
+                    onChange={(e) => setStartTime(snapToSlot(e.target.value, slotMinutes))}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                   />
                 </div>

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, String, Text, func
+from sqlalchemy import Boolean, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import DateTime
@@ -20,6 +20,7 @@ class Tenant(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     logo_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    slot_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Save } from 'lucide-react'
-import { getBranding, updateBranding, type BrandingSettings } from '@/api/settings'
+import { getBranding, updateBranding, type BrandingSettings, SLOT_OPTIONS } from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
@@ -21,16 +21,18 @@ export default function SettingsPage() {
 
   const [logoUrl, setLogoUrl] = useState('')
   const [brandColor, setBrandColor] = useState('#18181b')
+  const [slotMinutes, setSlotMinutes] = useState<number>(10)
 
   useEffect(() => {
     if (branding) {
       setLogoUrl(branding.logo_url ?? '')
       setBrandColor(branding.brand_color ?? '#18181b')
+      setSlotMinutes(branding.slot_minutes ?? 10)
     }
   }, [branding])
 
   const brandingMutation = useMutation({
-    mutationFn: () => updateBranding({ logo_url: logoUrl || null, brand_color: brandColor }),
+    mutationFn: () => updateBranding({ logo_url: logoUrl || null, brand_color: brandColor, slot_minutes: slotMinutes }),
     onSuccess: (updated: BrandingSettings) => {
       qc.setQueryData(['branding'], updated)
       applyBranding(updated)
@@ -103,6 +105,29 @@ export default function SettingsPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Applied to buttons and accents throughout the app.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Appointment book granularity</label>
+            <div className="flex gap-2">
+              {SLOT_OPTIONS.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setSlotMinutes(opt)}
+                  className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
+                    slotMinutes === opt
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-input bg-background hover:bg-muted/50'
+                  }`}
+                >
+                  {opt} min
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Controls the time slot grid resolution and snaps new appointment start times to these intervals.
+            </p>
           </div>
 
           {brandingMutation.isError && (

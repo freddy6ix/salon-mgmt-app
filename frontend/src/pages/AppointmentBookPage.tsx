@@ -6,7 +6,8 @@ import { listAppointments, type Appointment, type AppointmentItem } from '@/api/
 import { listProviders, type Provider } from '@/api/providers'
 import { getSchedule } from '@/api/schedules'
 import { getRequest } from '@/api/appointmentRequests'
-import TimeGrid, { type SlotMinutes } from '@/components/appointment-book/TimeGrid'
+import { getBranding, type SlotMinutes } from '@/api/settings'
+import TimeGrid from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
 import ClientCard from '@/components/ClientCard'
@@ -23,10 +24,8 @@ export default function AppointmentBookPage() {
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
-  const [slotMinutes] = useState<SlotMinutes>(() => {
-    const saved = localStorage.getItem('slotMinutes')
-    return (saved ? Number(saved) : 10) as SlotMinutes
-  })
+  const { data: branding } = useQuery({ queryKey: ['branding'], queryFn: getBranding })
+  const slotMinutes: SlotMinutes = (branding?.slot_minutes ?? 10) as SlotMinutes
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [showCancelled, setShowCancelled] = useState(() =>
     localStorage.getItem('showCancelled') === 'true'
@@ -147,6 +146,7 @@ export default function AppointmentBookPage() {
         initialProviderId={booking?.providerId}
         providers={visibleProviders}
         providerHours={schedules}
+        slotMinutes={slotMinutes}
         onClose={() => setBooking(null)}
         onSaved={() => setBooking(null)}
       />
