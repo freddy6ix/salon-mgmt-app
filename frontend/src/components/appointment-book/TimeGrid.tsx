@@ -414,6 +414,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
               style={{ height: TOTAL_HEIGHT }}
               onDoubleClick={(e) => {
                 if (!onSlotClick || dragRef.current || didDragRef.current) return
+                if (date < format(new Date(), 'yyyy-MM-dd')) return
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
                 const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
