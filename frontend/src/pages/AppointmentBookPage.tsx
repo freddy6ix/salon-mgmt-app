@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function AppointmentBookPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestId = searchParams.get('request')
 
