@@ -416,6 +416,7 @@ function VisitRow({ visit, onCancel }: {
   visit: { appointment_id: string; date: string; status: string; items: { service_name: string; provider_name: string; price: number }[] }
   onCancel?: (id: string) => void
 }) {
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const dateObj = parseISO(visit.date + 'T12:00:00')
   const total = visit.items.reduce((sum, i) => sum + i.price, 0)
   return (
@@ -430,12 +431,18 @@ function VisitRow({ visit, onCancel }: {
             {VISIT_STATUS_LABEL[visit.status] ?? visit.status}
           </span>
           {onCancel && visit.status === 'confirmed' && (
-            <button
-              onClick={() => onCancel(visit.appointment_id)}
-              className="text-xs text-destructive hover:underline"
-            >
-              Cancel
-            </button>
+            confirmCancel ? (
+              <span className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">Sure?</span>
+                <button onClick={() => { onCancel(visit.appointment_id); setConfirmCancel(false) }}
+                  className="text-xs text-destructive hover:underline">Yes</button>
+                <button onClick={() => setConfirmCancel(false)}
+                  className="text-xs text-muted-foreground hover:underline">No</button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmCancel(true)}
+                className="text-xs text-destructive hover:underline">Cancel</button>
+            )
           )}
         </div>
       </div>

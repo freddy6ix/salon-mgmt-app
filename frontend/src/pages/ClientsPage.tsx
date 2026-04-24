@@ -194,6 +194,7 @@ const VISIT_STATUS_LABEL: Record<string, string> = {
 }
 
 function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) => void }) {
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const todayStr = new Date().toISOString().slice(0, 10)
   const isUpcoming = visit.date >= todayStr
   return (
@@ -209,12 +210,18 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
             {VISIT_STATUS_LABEL[visit.status] ?? visit.status}
           </span>
           {isUpcoming && visit.status === 'confirmed' && onCancel && (
-            <button
-              onClick={() => onCancel(visit.appointment_id)}
-              className="text-xs text-destructive hover:underline"
-            >
-              Cancel
-            </button>
+            confirmCancel ? (
+              <span className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">Sure?</span>
+                <button onClick={() => { onCancel(visit.appointment_id); setConfirmCancel(false) }}
+                  className="text-xs text-destructive hover:underline">Yes</button>
+                <button onClick={() => setConfirmCancel(false)}
+                  className="text-xs text-muted-foreground hover:underline">No</button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmCancel(true)}
+                className="text-xs text-destructive hover:underline">Cancel</button>
+            )
           )}
         </div>
       </div>

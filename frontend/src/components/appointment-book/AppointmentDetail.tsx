@@ -65,6 +65,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   const [addError, setAddError] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const clientId = appointment?.client.id ?? null
 
@@ -389,7 +390,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             )}
 
             {apptStatus === 'confirmed' && (
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 flex-wrap">
                 <Button
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                   disabled={statusMutation.isPending}
@@ -397,18 +398,22 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 >
                   Client arrived
                 </Button>
-                <Button
-                  variant="destructive"
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate('cancelled')}
-                >
-                  Cancel
-                </Button>
+                {confirmCancel ? (
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Sure?</span>
+                    <Button size="sm" variant="destructive" disabled={statusMutation.isPending}
+                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>Yes</Button>
+                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>No</Button>
+                  </span>
+                ) : (
+                  <Button variant="destructive" disabled={statusMutation.isPending}
+                    onClick={() => setConfirmCancel(true)}>Cancel</Button>
+                )}
               </div>
             )}
 
             {apptStatus === 'in_progress' && (
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 flex-wrap">
                 <Button
                   className="flex-1"
                   disabled={statusMutation.isPending}
@@ -416,13 +421,17 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 >
                   Check out
                 </Button>
-                <Button
-                  variant="destructive"
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate('cancelled')}
-                >
-                  Cancel
-                </Button>
+                {confirmCancel ? (
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Sure?</span>
+                    <Button size="sm" variant="destructive" disabled={statusMutation.isPending}
+                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>Yes</Button>
+                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>No</Button>
+                  </span>
+                ) : (
+                  <Button variant="destructive" disabled={statusMutation.isPending}
+                    onClick={() => setConfirmCancel(true)}>Cancel</Button>
+                )}
               </div>
             )}
 
