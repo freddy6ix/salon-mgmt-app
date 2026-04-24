@@ -9,12 +9,15 @@ import {
   getClientHistory,
   listColourNotes,
   createColourNote,
+  updateClient,
   updateClientNotes,
   deleteClient,
 } from '@/api/clients'
 import { updateAppointmentStatus } from '@/api/appointments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Star, ChevronRight } from 'lucide-react'
 
 // ── Client list ───────────────────────────────────────────────────────────────
@@ -290,6 +293,12 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
   const [notesText, setNotesText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [editFirst, setEditFirst] = useState('')
+  const [editLast, setEditLast] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
 
   const { data: client, isLoading } = useQuery({
     queryKey: ['client', clientId],
@@ -307,6 +316,32 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
       setEditingNotes(false)
     },
   })
+
+  const { mutate: saveProfile, isPending: savingProfile } = useMutation({
+    mutationFn: () => updateClient(clientId, {
+      first_name: editFirst.trim(),
+      last_name: editLast.trim(),
+      email: editEmail.trim() || null,
+      cell_phone: editPhone.trim() || null,
+    }),
+    onSuccess: updated => {
+      qc.setQueryData(['client', clientId], updated)
+      qc.invalidateQueries({ queryKey: ['clients'] })
+      setEditingProfile(false)
+      setEditError(null)
+    },
+    onError: (e: Error) => setEditError(e.message || 'Save failed'),
+  })
+
+  function startEditProfile() {
+    if (!client) return
+    setEditFirst(client.first_name)
+    setEditLast(client.last_name)
+    setEditEmail(client.email ?? '')
+    setEditPhone(client.cell_phone ?? '')
+    setEditError(null)
+    setEditingProfile(true)
+  }
 
   const { mutate: doDelete, isPending: deleting } = useMutation({
     mutationFn: () => deleteClient(clientId),
@@ -334,56 +369,94 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-6 pt-5 pb-4 border-b bg-white flex-shrink-0">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">
-                {client.first_name} {client.last_name}
-              </h2>
-              {client.is_vip && (
-                <Badge variant="outline" className="text-amber-600 border-amber-400 text-xs">VIP</Badge>
-              )}
-              {client.pronouns && (
-                <span className="text-xs text-muted-foreground">{client.pronouns}</span>
-              )}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground">
-              {client.cell_phone && <span>{client.cell_phone}</span>}
-              {client.email && <span>{client.email}</span>}
-            </div>
-          </div>
-          <div className="flex items-start gap-4 flex-shrink-0">
-            <div className="flex gap-3 text-xs text-right">
-              {client.no_show_count > 0 && (
-                <div className="text-destructive">
-                  <div className="font-semibold text-base leading-none">{client.no_show_count}</div>
-                  <div>no-shows</div>
-                </div>
-              )}
-              {client.late_cancellation_count > 0 && (
-                <div className="text-amber-600">
-                  <div className="font-semibold text-base leading-none">{client.late_cancellation_count}</div>
-                  <div>late cancel</div>
-                </div>
-              )}
-            </div>
-            {confirmDelete ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-destructive">Delete this client?</span>
-                <Button size="sm" variant="destructive" onClick={() => doDelete()} disabled={deleting}>
-                  {deleting ? 'Deleting…' : 'Confirm'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteError(null) }} disabled={deleting}>
-                  Cancel
-                </Button>
+        {editingProfile ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">First name</Label>
+                <Input value={editFirst} onChange={e => setEditFirst(e.target.value)} />
               </div>
-            ) : (
-              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => { setDeleteError(null); setConfirmDelete(true) }}>
-                Delete
+              <div className="space-y-1">
+                <Label className="text-xs">Last name</Label>
+                <Input value={editLast} onChange={e => setEditLast(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="optional" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="optional" />
+              </div>
+            </div>
+            {editError && <p className="text-xs text-destructive">{editError}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => saveProfile()} disabled={savingProfile || !editFirst.trim() || !editLast.trim()}>
+                {savingProfile ? 'Saving…' : 'Save'}
               </Button>
-            )}
+              <Button size="sm" variant="outline" onClick={() => setEditingProfile(false)} disabled={savingProfile}>
+                Cancel
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">
+                  {client.first_name} {client.last_name}
+                </h2>
+                {client.is_vip && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-400 text-xs">VIP</Badge>
+                )}
+                {client.pronouns && (
+                  <span className="text-xs text-muted-foreground">{client.pronouns}</span>
+                )}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground">
+                {client.cell_phone && <span>{client.cell_phone}</span>}
+                {client.email && <span>{client.email}</span>}
+                {!client.cell_phone && !client.email && <span>No contact info</span>}
+              </div>
+            </div>
+            <div className="flex items-start gap-4 flex-shrink-0">
+              <div className="flex gap-3 text-xs text-right">
+                {client.no_show_count > 0 && (
+                  <div className="text-destructive">
+                    <div className="font-semibold text-base leading-none">{client.no_show_count}</div>
+                    <div>no-shows</div>
+                  </div>
+                )}
+                {client.late_cancellation_count > 0 && (
+                  <div className="text-amber-600">
+                    <div className="font-semibold text-base leading-none">{client.late_cancellation_count}</div>
+                    <div>late cancel</div>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={startEditProfile}>
+                Edit
+              </Button>
+              {confirmDelete ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Delete this client?</span>
+                  <Button size="sm" variant="destructive" onClick={() => doDelete()} disabled={deleting}>
+                    {deleting ? 'Deleting…' : 'Confirm'}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteError(null) }} disabled={deleting}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => { setDeleteError(null); setConfirmDelete(true) }}>
+                  Delete
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         {deleteError && (
           <p className="mt-2 text-xs text-destructive">{deleteError}</p>
         )}
