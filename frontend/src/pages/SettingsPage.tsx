@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Save } from 'lucide-react'
-import { getBranding, updateBranding, type BrandingSettings, SLOT_OPTIONS } from '@/api/settings'
+import { getBranding, updateBranding, type BrandingSettings, type SlotMinutes, SLOT_OPTIONS } from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
@@ -21,13 +21,13 @@ export default function SettingsPage() {
 
   const [logoUrl, setLogoUrl] = useState('')
   const [brandColor, setBrandColor] = useState('#18181b')
-  const [slotMinutes, setSlotMinutes] = useState<number>(10)
+  const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(10)
 
   useEffect(() => {
     if (branding) {
       setLogoUrl(branding.logo_url ?? '')
       setBrandColor(branding.brand_color ?? '#18181b')
-      setSlotMinutes(branding.slot_minutes ?? 10)
+      setSlotMinutes((branding.slot_minutes ?? 10) as SlotMinutes)
     }
   }, [branding])
 
