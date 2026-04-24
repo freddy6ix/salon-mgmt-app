@@ -262,6 +262,8 @@ async def create_appointment(
     if not body.items:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="At least one item required")
 
+    _assert_not_past(body.appointment_date)
+
     appt = Appointment(
         tenant_id=tid,
         client_id=client.id,
@@ -366,6 +368,8 @@ async def patch_appointment_item(
             detail="Cannot modify a completed or cancelled appointment",
         )
 
+    _assert_not_past(appt.appointment_date)
+
     item = (
         await db.execute(
             select(AppointmentItem).where(
@@ -465,6 +469,15 @@ async def update_appointment_status(
 
 # ── Add / remove items on existing appointment ────────────────────────────────
 
+def _assert_not_past(appt_date: datetime | date) -> None:
+    d = appt_date.date() if isinstance(appt_date, datetime) else appt_date
+    if d < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot create or modify appointments in the past",
+        )
+
+
 async def _load_active_appointment(appointment_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> Appointment:
     appt = (
         await db.execute(
@@ -481,6 +494,7 @@ async def _load_active_appointment(appointment_id: str, tenant_id: uuid.UUID, db
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Cannot modify a completed or cancelled appointment",
         )
+    _assert_not_past(appt.appointment_date)
     return appt
 
 
