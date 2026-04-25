@@ -179,7 +179,10 @@ export default function RequestsPage() {
   const { mutateAsync: doReview } = useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: AppointmentRequest['status']; notes: string }) =>
       reviewRequest(id, { status, staff_notes: notes || undefined }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['all-requests'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-requests'] })
+      qc.invalidateQueries({ queryKey: ['requests', 'new'] })
+    },
   })
 
   async function handleSave(id: string, status: AppointmentRequest['status'], notes: string) {

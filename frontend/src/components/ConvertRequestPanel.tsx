@@ -171,6 +171,7 @@ export default function ConvertRequestPanel({ request, date, onDateChange, onClo
     onSuccess: result => {
       if (result) {
         qc.invalidateQueries({ queryKey: ['all-requests'] })
+        qc.invalidateQueries({ queryKey: ['requests', 'new'] })
         qc.invalidateQueries({ queryKey: ['appointments', result.appointment_date] })
         onConverted(result.appointment_date)
       }
