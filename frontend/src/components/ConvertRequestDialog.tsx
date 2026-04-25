@@ -191,7 +191,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
   })
 
   function detectClashes(existingItems: AppointmentItem[]): string[] {
-    const conflicts: string[] = []
+    const seen = new Set<string>()
     for (const item of items) {
       if (!item.providerId) continue
       const [nh, nm] = item.startTime.split(':').map(Number)
@@ -205,11 +205,11 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
         const exEnd = exStart + (ex.duration_override_minutes ?? ex.duration_minutes)
         if (newStart < exEnd && newEnd > exStart) {
           const provider = activeProviders.find(p => p.id === item.providerId)
-          conflicts.push(`${provider?.display_name ?? 'Provider'} at ${item.startTime}`)
+          seen.add(`${provider?.display_name ?? 'Provider'} at ${item.startTime}`)
         }
       }
     }
-    return conflicts
+    return Array.from(seen)
   }
 
   async function handleSubmit(force = false) {
