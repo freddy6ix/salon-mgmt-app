@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import CheckoutPanel from '@/components/appointment-book/CheckoutPanel'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending: 'secondary',
@@ -66,6 +67,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   const [removeError, setRemoveError] = useState<string | null>(null)
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
 
   const clientId = appointment?.client.id ?? null
 
@@ -174,6 +176,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   )
 
   return (
+    <>
     <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -417,7 +420,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                 <Button
                   className="flex-1"
                   disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate('completed')}
+                  onClick={() => setCheckoutOpen(true)}
                 >
                   Check out
                 </Button>
@@ -517,5 +520,15 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
         )}
       </DialogContent>
     </Dialog>
+
+    {checkoutOpen && appointment && (
+      <CheckoutPanel
+        appointment={appointment}
+        date={date}
+        onClose={() => setCheckoutOpen(false)}
+        onCompleted={() => { setCheckoutOpen(false); onClose() }}
+      />
+    )}
+    </>
   )
 }
