@@ -262,3 +262,50 @@ Sale items already reference `appointment_item_id` — they naturally span multi
 **Reporting impact:** P2-5 needs to count each appointment-item once (not multiply across grouped appointments). The junction model makes this natural — items are already 1:1 with appointment_items.
 
 **Depends on:** revisits P2-1 (the `appointment_id` FK on `Sale` and the unique constraint). Pre-UAT lifecycle means we drop the column and add the junction in a single migration with no backfill drama.
+
+### P2-12 · Retail items (catalog + checkout integration)
+
+Salons sell product (shampoo, styling product, tools) alongside services. Today the system has no concept of retail. Adds the retail catalog and lets staff add retail lines to a sale at checkout.
+
+**Data model:**
+- `RetailItem` (per tenant): `sku` (optional), `name`, `description`, `category_id` (nullable, links to a new `RetailCategory` table), `default_price`, `default_cost`, `is_gst_exempt`, `is_pst_exempt`, `is_active`. Stock fields live in P2-13, not here — keep this entity catalog-only.
+- `SaleItem` needs a kind discriminator (`service` | `retail`) and a nullable `retail_item_id` alongside the existing `appointment_item_id`. Exactly one of the two FKs is set per row. The existing `description`/`unit_price`/`discount_amount`/`line_total` columns work for both kinds.
+
+**UX:**
+- Top-level "Retail" nav entry — admin-managed list + edit (matches the data/config pattern: this is data, not settings).
+- CheckoutPanel: a "+ Add retail item" affordance (separate from service items) opens a picker; selecting one creates a SaleItem with kind=retail, defaults from the catalog, editable price/discount inline.
+
+**Tax handling:** retail typically has different tax treatment than services (e.g. PST applies to retail in Ontario but not to most services). The per-item `is_gst_exempt`/`is_pst_exempt` flags carry over to checkout — sale total computation uses each line's flags rather than a flat tenant rate.
+
+### P2-13 · Inventory management
+
+Stock tracking on retail items so staff know what's on hand and the till deducts on sale. Builds on P2-12.
+
+**Data model:**
+- `RetailStockMovement`: per-tenant ledger keyed by `retail_item_id`. Each row has `kind` (`receive` | `sell` | `adjust` | `return`), `quantity` (positive integer), `unit_cost` (nullable, populated on receive/adjust), `sale_item_id` (nullable, set when kind=sell or return), `note`, `created_by_user_id`, `created_at`.
+- Current stock = sum of signed quantities (receive +, sell −, adjust ±, return +). Compute on read; no denormalised "on_hand" column in v1 (avoid drift).
+
+**Hooks:**
+- Checkout completion: on a successful sale containing retail lines, write `kind=sell` movements atomically with the sale.
+- Edit/void of a retail sale (P2-7 territory): inverse movement so stock stays consistent.
+- Manual receive/adjust UI: simple form on the retail item detail page — receive a shipment (qty + unit cost), adjust to a counted number with a reason.
+
+**Out of scope for v1:** reorder points, low-stock alerts, supplier records, purchase orders. Those are v2 once the basic ledger is trusted.
+
+### P2-14 · Services management (top-level page)
+
+Backend already has `Service`, `ServiceCategory`, and `ProviderServicePrice` — including processing-offset and processing-duration columns for colour-development gap time. What's missing is the staff UI: today only `GET /services` exists, so adding/editing a service requires a developer to touch the database. Blocks salon self-sufficiency before UAT.
+
+**Backend additions:**
+- `POST /services`, `PATCH /services/{id}`, `DELETE /services/{id}` (soft via `is_active=false`).
+- `POST /service-categories`, `PATCH /service-categories/{id}`, `DELETE /service-categories/{id}`.
+- `GET/POST/PATCH/DELETE /provider-service-prices` for the capability + per-provider override matrix. (May exist partially — verify.)
+
+**Frontend (top-level "Services" nav entry):**
+- Service catalog grouped by category: list view with name, default price, default duration, active toggle.
+- Edit form covering all the fields the data model exposes: code, name, description, category, default price/cost, duration, processing offset + duration, haircut type (when relevant), pricing type (fixed/hourly), tax flags, addon flag, suggestions/notes.
+- Inside the service edit view: provider matrix — which providers offer this service, with optional per-provider price + duration overrides. Adds rows to `ProviderServicePrice`.
+
+**Out of scope for v1:** tier-based pricing across providers, time-bounded `effective_from`/`effective_to` on prices (column exists; UI defers it), service photos, online booking eligibility flags.
+
+**Why this is the natural next step:** services are the catalogue the entire appointment book operates on. Without staff CRUD, every catalogue change is a developer task. P2-12 (Retail) reuses the same UI conventions, so building Services first establishes the pattern.
