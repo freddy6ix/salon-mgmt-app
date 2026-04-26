@@ -72,3 +72,6 @@ class Payment(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("tenant_payment_methods.id"), nullable=False, index=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    cashback_amount: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, default=Decimal("0")
+    )

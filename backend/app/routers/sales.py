@@ -45,6 +45,7 @@ class SaleItemIn(BaseModel):
 class PaymentIn(BaseModel):
     payment_method_id: str
     amount: Decimal
+    cashback_amount: Decimal = Decimal("0")
 
 
 class SaleIn(BaseModel):
@@ -70,6 +71,7 @@ class PaymentOut(BaseModel):
     payment_method_code: str
     payment_method_label: str
     amount: str
+    cashback_amount: str
 
 
 class SaleOut(BaseModel):
@@ -125,6 +127,7 @@ def _serialize(
                 payment_method_code=methods_by_id[p.payment_method_id].code,
                 payment_method_label=methods_by_id[p.payment_method_id].label,
                 amount=str(p.amount),
+                cashback_amount=str(p.cashback_amount),
             )
             for p in payments
         ],
@@ -220,19 +223,32 @@ async def create_sale(
     pst = _money(subtotal * PST_RATE)
     total = _money(subtotal + gst + pst)
 
-    # R18 — payments must sum to total exactly
-    payments_total = _money(sum((p.amount for p in body.payments), Decimal("0")))
-    if payments_total != total:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Payments total ({payments_total}) must equal sale total ({total})",
-        )
+    # R18 — (amount − cashback) summed across all payments must equal sale total.
+    # Cashback is cash returned to the client out of the till; only the
+    # post-cashback portion counts toward the bill. See P2-9 in docs/backlog.md.
     for p in body.payments:
         if p.amount <= 0:  # R19
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Each payment amount must be > 0",
             )
+        if p.cashback_amount < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="cashback_amount must be ≥ 0",
+            )
+        if p.cashback_amount > p.amount:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="cashback_amount cannot exceed payment amount",
+            )
+
+    applied_total = _money(sum((p.amount - p.cashback_amount for p in body.payments), Decimal("0")))
+    if applied_total != total:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Payments after cashback ({applied_total}) must equal sale total ({total})",
+        )
 
     # Validate payment methods belong to this tenant and are active.
     method_uuids = {uuid.UUID(p.payment_method_id) for p in body.payments}
@@ -306,6 +322,7 @@ async def create_sale(
             sale_id=sale.id,
             payment_method_id=uuid.UUID(in_pay.payment_method_id),
             amount=_money(in_pay.amount),
+            cashback_amount=_money(in_pay.cashback_amount),
         )
         db.add(sp)
         sale_payments.append(sp)

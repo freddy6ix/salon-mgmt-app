@@ -24,10 +24,10 @@ interface ItemDraft {
 interface PaymentDraft {
   payment_method_id: string
   amount: string
-  // Cash-only, informational. The recorded payment is `amount`; the
-  // overage (tendered - amount) is given back as cashback to the client,
-  // who hands it to the staff member as a tip. Off the books — see P2-9.
-  tendered?: string
+  // Cash returned to the client out of the till. (amount - cashback) is
+  // what counts toward the bill. Used for both card-tip-via-cashback (the
+  // common case at Salon Lyol) and cash change-making — see P2-9.
+  cashback: string
 }
 
 const GST_RATE = 0.05
@@ -63,14 +63,15 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Initialise payment row once methods are loaded (default: first method, $0).
+  // Initialise payment row once methods are loaded (default: first method, $0, no cashback).
   useEffect(() => {
     if (methods.length > 0 && payments.length === 0) {
-      setPayments([{ payment_method_id: methods[0].id, amount: '0.00' }])
+      setPayments([{ payment_method_id: methods[0].id, amount: '0.00', cashback: '0.00' }])
     }
   }, [methods, payments.length])
 
   // Compute totals. Tip is intentionally not part of the sale — see P2-9.
+  // Bill is covered when sum(amount - cashback) across payments equals total.
   const totals = useMemo(() => {
     const subtotal = items.reduce(
       (sum, i) => sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)),
@@ -80,8 +81,11 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     const gst = Math.round(subtotal * GST_RATE * 100) / 100
     const pst = Math.round(subtotal * PST_RATE * 100) / 100
     const total = Math.round((subtotal + gst + pst) * 100) / 100
-    const paid = payments.reduce((sum, p) => sum + toMoney(p.amount), 0)
-    const remaining = Math.round((total - paid) * 100) / 100
+    const applied = payments.reduce(
+      (sum, p) => sum + toMoney(p.amount) - toMoney(p.cashback),
+      0,
+    )
+    const remaining = Math.round((total - applied) * 100) / 100
     return { subtotal, discountTotal, gst, pst, total, remaining }
   }, [items, payments])
 
@@ -103,7 +107,10 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
 
   function addPaymentRow() {
     if (methods.length === 0) return
-    setPayments(prev => [...prev, { payment_method_id: methods[0].id, amount: fmt(Math.max(0, totals.remaining)) }])
+    setPayments(prev => [
+      ...prev,
+      { payment_method_id: methods[0].id, amount: fmt(Math.max(0, totals.remaining)), cashback: '0.00' },
+    ])
   }
 
   function removePaymentRow(idx: number) {
@@ -119,7 +126,11 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         unit_price: fmt(toMoney(i.unitPrice)),
         discount_amount: fmt(toMoney(i.discount)),
       })),
-      payments: payments.map(p => ({ payment_method_id: p.payment_method_id, amount: fmt(toMoney(p.amount)) })),
+      payments: payments.map(p => ({
+        payment_method_id: p.payment_method_id,
+        amount: fmt(toMoney(p.amount)),
+        cashback_amount: fmt(toMoney(p.cashback)),
+      })),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
@@ -131,8 +142,13 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   function handleSubmit() {
     setError(null)
     if (totals.remaining !== 0) {
-      setError(`Payments must equal total. Remaining: $${fmt(totals.remaining)}`)
+      setError(`Bill not balanced. Remaining: $${fmt(totals.remaining)}`)
       return
+    }
+    for (const p of payments) {
+      const cb = toMoney(p.cashback)
+      if (cb < 0) { setError('Cashback cannot be negative'); return }
+      if (cb > toMoney(p.amount)) { setError('Cashback cannot exceed payment amount'); return }
     }
     mutation.mutate()
   }
@@ -232,10 +248,10 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
             </p>
           )}
           {payments.map((p, idx) => {
-            const method = methods.find(m => m.id === p.payment_method_id)
-            const isCash = method?.kind === 'cash'
-            const tenderedNum = toMoney(p.tendered ?? p.amount)
-            const change = isCash ? Math.max(0, Math.round((tenderedNum - toMoney(p.amount)) * 100) / 100) : 0
+            const amountNum = toMoney(p.amount)
+            const cashbackNum = toMoney(p.cashback)
+            const applied = Math.round((amountNum - cashbackNum) * 100) / 100
+            const cashbackInvalid = cashbackNum < 0 || cashbackNum > amountNum
             return (
               <div key={idx} className="space-y-1.5">
                 <div className="flex gap-2 items-center">
@@ -253,7 +269,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
                     inputMode="decimal"
                     value={p.amount}
                     onChange={e => updatePayment(idx, { amount: e.target.value })}
-                    title="Recorded payment (the amount kept by the salon)"
+                    title="Total paid via this method (charged to card or handed over in cash)"
                     className="w-24 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
                   />
                   {payments.length > 1 && (
@@ -266,34 +282,32 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
                     </button>
                   )}
                 </div>
-                {isCash && (
-                  <div className="flex gap-2 items-center pl-2 border-l-2 border-muted-foreground/20">
-                    <label className="text-xs text-muted-foreground w-20">Tendered</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={p.tendered ?? p.amount}
-                      onChange={e => updatePayment(idx, { tendered: e.target.value })}
-                      placeholder={p.amount}
-                      className="w-24 border border-input rounded-md px-2 py-1 text-xs bg-background"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      Change due:{' '}
-                      <span className={change > 0 ? 'text-foreground font-medium' : ''}>
-                        ${fmt(change)}
-                      </span>
-                    </span>
-                  </div>
-                )}
+                <div className="flex gap-2 items-center pl-2 border-l-2 border-muted-foreground/20">
+                  <label className="text-xs text-muted-foreground w-20">Cashback</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={p.cashback}
+                    onChange={e => updatePayment(idx, { cashback: e.target.value })}
+                    title="Cash returned to client out of the till (often handed to the staff member as a tip)"
+                    className={`w-24 border rounded-md px-2 py-1 text-xs bg-background ${
+                      cashbackInvalid ? 'border-destructive' : 'border-input'
+                    }`}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Applies to bill:{' '}
+                    <span className="text-foreground font-medium">${fmt(applied)}</span>
+                  </span>
+                </div>
               </div>
             )
           })}
           <p className={`text-xs ${totals.remaining === 0 ? 'text-green-600' : 'text-destructive'}`}>
             {totals.remaining === 0
-              ? 'Payments balanced'
+              ? 'Bill balanced'
               : totals.remaining > 0
-                ? `Remaining: $${fmt(totals.remaining)}`
-                : `Over by: $${fmt(-totals.remaining)}`}
+                ? `Bill short by $${fmt(totals.remaining)}`
+                : `Bill over by $${fmt(-totals.remaining)} — increase cashback or reduce a payment`}
           </p>
         </div>
 

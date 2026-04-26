@@ -16,6 +16,7 @@ export interface SalePayment {
   payment_method_code: string
   payment_method_label: string
   amount: string
+  cashback_amount: string
 }
 
 export interface Sale {
@@ -43,6 +44,7 @@ export interface SaleItemIn {
 export interface SalePaymentIn {
   payment_method_id: string
   amount: string
+  cashback_amount: string
 }
 
 export interface SaleIn {
