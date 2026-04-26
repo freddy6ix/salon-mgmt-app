@@ -16,15 +16,6 @@ class SaleStatus(str, enum.Enum):
     completed = "completed"
 
 
-class PaymentType(str, enum.Enum):
-    amex = "amex"
-    cash = "cash"
-    debit = "debit"
-    e_transfer = "e_transfer"
-    mastercard = "mastercard"
-    visa = "visa"
-
-
 class Sale(TenantScopedBase):
     __tablename__ = "sales"
     __table_args__ = (
@@ -78,7 +69,7 @@ class Payment(TenantScopedBase):
     sale_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sales.id"), nullable=False, index=True
     )
-    payment_type: Mapped[PaymentType] = mapped_column(
-        SQLEnum(PaymentType, name="payment_type"), nullable=False
+    payment_method_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenant_payment_methods.id"), nullable=False, index=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)

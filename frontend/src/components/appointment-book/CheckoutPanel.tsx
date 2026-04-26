@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Appointment } from '@/api/appointments'
-import { createSale, PAYMENT_TYPES, PAYMENT_LABEL, type PaymentType } from '@/api/sales'
+import { createSale } from '@/api/sales'
+import { listPaymentMethods } from '@/api/paymentMethods'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -21,7 +22,7 @@ interface ItemDraft {
 }
 
 interface PaymentDraft {
-  payment_type: PaymentType
+  payment_method_id: string
   amount: string
 }
 
@@ -40,6 +41,11 @@ function fmt(n: number): string {
 export default function CheckoutPanel({ appointment, onClose, onCompleted }: Props) {
   const qc = useQueryClient()
 
+  const { data: methods = [], isLoading: methodsLoading } = useQuery({
+    queryKey: ['payment-methods', 'active'],
+    queryFn: () => listPaymentMethods(true),
+  })
+
   const [items, setItems] = useState<ItemDraft[]>(() =>
     appointment.items.map(it => ({
       appointment_item_id: it.id,
@@ -51,10 +57,15 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   )
   const [tip, setTip] = useState('0.00')
   const [notes, setNotes] = useState('')
-  const [payments, setPayments] = useState<PaymentDraft[]>([
-    { payment_type: 'cash', amount: '0.00' },
-  ])
+  const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Initialise payment row once methods are loaded (default: first method, $0).
+  useEffect(() => {
+    if (methods.length > 0 && payments.length === 0) {
+      setPayments([{ payment_method_id: methods[0].id, amount: '0.00' }])
+    }
+  }, [methods, payments.length])
 
   // Compute totals
   const totals = useMemo(() => {
@@ -89,7 +100,8 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   }
 
   function addPaymentRow() {
-    setPayments(prev => [...prev, { payment_type: 'cash', amount: fmt(Math.max(0, totals.remaining)) }])
+    if (methods.length === 0) return
+    setPayments(prev => [...prev, { payment_method_id: methods[0].id, amount: fmt(Math.max(0, totals.remaining)) }])
   }
 
   function removePaymentRow(idx: number) {
@@ -106,7 +118,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         unit_price: fmt(toMoney(i.unitPrice)),
         discount_amount: fmt(toMoney(i.discount)),
       })),
-      payments: payments.map(p => ({ payment_type: p.payment_type, amount: fmt(toMoney(p.amount)) })),
+      payments: payments.map(p => ({ payment_method_id: p.payment_method_id, amount: fmt(toMoney(p.amount)) })),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
@@ -226,15 +238,23 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
               + Split
             </button>
           </div>
+          {methodsLoading && payments.length === 0 && (
+            <p className="text-xs text-muted-foreground">Loading payment methods…</p>
+          )}
+          {!methodsLoading && methods.length === 0 && (
+            <p className="text-xs text-destructive">
+              No active payment methods configured. An admin must add at least one in Settings → Payment methods.
+            </p>
+          )}
           {payments.map((p, idx) => (
             <div key={idx} className="flex gap-2 items-center">
               <select
-                value={p.payment_type}
-                onChange={e => updatePayment(idx, { payment_type: e.target.value as PaymentType })}
+                value={p.payment_method_id}
+                onChange={e => updatePayment(idx, { payment_method_id: e.target.value })}
                 className="border border-input rounded-md px-2 py-1.5 text-sm bg-background flex-1"
               >
-                {PAYMENT_TYPES.map(t => (
-                  <option key={t} value={t}>{PAYMENT_LABEL[t]}</option>
+                {methods.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
               </select>
               <input
@@ -285,7 +305,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
         <Button
           onClick={handleSubmit}
-          disabled={mutation.isPending || totals.remaining !== 0}
+          disabled={mutation.isPending || totals.remaining !== 0 || payments.length === 0}
           className="flex-1"
         >
           {mutation.isPending ? 'Processing…' : `Complete checkout · $${fmt(totals.total)}`}

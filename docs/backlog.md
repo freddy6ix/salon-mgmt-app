@@ -164,3 +164,36 @@ Follow-up to P2-1 (deferred Q3 from `docs/specs/P2-1-checkout-payment.md`). When
 - Frontend only (backend `GET /sales/by-appointment/{id}` already exists)
 - Fetch the sale when the appointment status is `completed`; render under the existing "Checked out" indicator
 - Read-only view in v1 (editing/voiding deferred — see P2-1 spec Q1)
+
+### P2-7 · Edit a completed sale (correct payment methods / splits)
+
+Staff sometimes record the wrong payment method or a bad split (e.g., charged $50 to Visa when it was actually Mastercard). They need to correct the receipt without voiding and re-creating the sale.
+
+- Scope of editable fields in v1: payment lines only — `payment_method`, `amount`, add/remove split lines. Total, items, prices, taxes are **not** editable here (those are voids/refunds, separate concern).
+- Server-side rule: edited payments must still sum to the existing sale total (no change to totals).
+- Audit trail: every edit writes a `SalePaymentEdit` record (who, when, before → after JSON snapshot). Original is preserved for reporting integrity.
+- Constraint: editable while the sale is on the same business day; older sales become read-only and require a void+redo (see future void/refund work). Tenant-configurable cutoff acceptable in v2.
+- Backend: `PATCH /sales/{id}/payments` — accepts the new payment list, validates total, writes edit log, replaces payment rows in a transaction.
+- Frontend: "Edit payments" action on the sale summary (P2-6); reuses payment selector from CheckoutPanel.
+
+### P2-8 · End-of-day cash reconciliation
+
+Cash is the one payment method that has to physically match a count at the end of the day. Staff need a flow that tracks the running cash position and supports a daily till count with variance.
+
+**Core model:**
+- A `CashReconciliation` record per tenant per business day, with: `opening_balance` (from previous close), `expected_cash`, `counted_cash`, `variance`, `deposit_amount`, `notes`, `closed_by_user_id`, `closed_at`.
+- "Expected cash" = previous closing balance + (cash payments since) − (cash refunds since) − (deposits since) ± (petty cash adjustments).
+- Petty cash entries (small in/out, e.g. coffee for staff, tip-out) recorded as `PettyCashEntry` rows tagged with the active reconciliation period.
+
+**Flow:**
+1. Staff opens the reconciliation page; app shows previous closing balance and cash movements since.
+2. Staff records actual counted cash + any deposit going to the bank.
+3. App computes variance and prompts for a note if non-zero.
+4. Closing the reconciliation locks all cash payments and petty-cash entries in that period — they can no longer be edited (protects audit trail).
+5. The closing balance becomes the next day's opening.
+
+**Why this matters:** without this, the P2-5 sales report can compute "cash sales" but no one can confirm the till matches. This is the linchpin of cash control and Milano had it.
+
+**Depends on:**
+- P2-5 (monthly sales report) — shares the reconciliation period model and petty cash semantics.
+- "Cash" payment method needs to be identifiable across tenant-defined payment methods (use `kind = 'cash'` on the `TenantPaymentMethod` row).

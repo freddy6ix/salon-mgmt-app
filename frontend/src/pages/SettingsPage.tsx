@@ -3,6 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Save } from 'lucide-react'
 import { getBranding, updateBranding, type BrandingSettings, type SlotMinutes, SLOT_OPTIONS } from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
+import {
+  listPaymentMethods,
+  createPaymentMethod,
+  updatePaymentMethod,
+  KIND_OPTIONS,
+  type PaymentMethod,
+  type PaymentMethodKind,
+} from '@/api/paymentMethods'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,13 +47,14 @@ export default function SettingsPage() {
     },
   })
 
-  const [tab, setTab] = useState<'branding' | 'scheduling' | 'email'>('branding')
+  const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'email'>('branding')
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
 
   const tabs = [
     { id: 'branding', label: 'Branding' },
     { id: 'scheduling', label: 'Scheduling' },
+    ...(isAdmin ? [{ id: 'payment-methods', label: 'Payment methods' }] : []),
     ...(isAdmin ? [{ id: 'email', label: 'Email' }] : []),
   ] as const
 
@@ -183,9 +192,194 @@ export default function SettingsPage() {
           </section>
         )}
 
+        {/* Payment methods tab — admin only */}
+        {tab === 'payment-methods' && isAdmin && <PaymentMethodsSection />}
+
         {/* Email tab — admin only */}
         {tab === 'email' && isAdmin && <EmailSection />}
       </div>
+    </div>
+  )
+}
+
+function PaymentMethodsSection() {
+  const qc = useQueryClient()
+  const { data: methods = [], isLoading } = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: () => listPaymentMethods(false),
+  })
+
+  const [showNew, setShowNew] = useState(false)
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  return (
+    <section className="border rounded-lg p-5 space-y-4 bg-white">
+      <div>
+        <h2 className="text-base font-medium">Payment methods</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Configure the payment options shown at checkout. Inactive methods stay on past sales but won't appear in the picker.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {methods.length === 0 && (
+          <p className="text-sm text-muted-foreground italic">No payment methods yet.</p>
+        )}
+        {methods.map(m => (
+          <PaymentMethodRow key={m.id} method={m} onSaved={() => qc.invalidateQueries({ queryKey: ['payment-methods'] })} />
+        ))}
+      </div>
+
+      {showNew ? (
+        <NewPaymentMethodForm
+          onCancel={() => setShowNew(false)}
+          onSaved={() => { setShowNew(false); qc.invalidateQueries({ queryKey: ['payment-methods'] }) }}
+        />
+      ) : (
+        <Button variant="outline" size="sm" onClick={() => setShowNew(true)}>
+          + Add payment method
+        </Button>
+      )}
+    </section>
+  )
+}
+
+function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved: () => void }) {
+  const [label, setLabel] = useState(method.label)
+  const [code, setCode] = useState(method.code)
+  const [kind, setKind] = useState<PaymentMethodKind>(method.kind)
+  const [isActive, setIsActive] = useState(method.is_active)
+  const [sortOrder, setSortOrder] = useState(String(method.sort_order))
+  const [error, setError] = useState<string | null>(null)
+
+  const dirty =
+    label !== method.label ||
+    code !== method.code ||
+    kind !== method.kind ||
+    isActive !== method.is_active ||
+    sortOrder !== String(method.sort_order)
+
+  const mutation = useMutation({
+    mutationFn: () => updatePaymentMethod(method.id, {
+      label,
+      code,
+      kind,
+      is_active: isActive,
+      sort_order: parseInt(sortOrder, 10) || 0,
+    }),
+    onSuccess: () => { setError(null); onSaved() },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
+  })
+
+  return (
+    <div className={`border rounded-md px-3 py-2.5 grid grid-cols-12 gap-2 items-center ${!isActive ? 'opacity-60' : ''}`}>
+      <input
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+        className="col-span-3 border border-input rounded px-2 py-1 text-sm bg-background"
+        placeholder="Label"
+      />
+      <input
+        value={code}
+        onChange={e => setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+        className="col-span-2 border border-input rounded px-2 py-1 text-sm bg-background font-mono"
+        placeholder="code"
+      />
+      <select
+        value={kind}
+        onChange={e => setKind(e.target.value as PaymentMethodKind)}
+        className="col-span-2 border border-input rounded px-2 py-1 text-sm bg-background"
+      >
+        {KIND_OPTIONS.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <input
+        type="number"
+        value={sortOrder}
+        onChange={e => setSortOrder(e.target.value)}
+        className="col-span-1 border border-input rounded px-2 py-1 text-sm bg-background"
+        title="Sort order"
+      />
+      <label className="col-span-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={e => setIsActive(e.target.checked)}
+          className="h-3.5 w-3.5"
+        />
+        Active
+      </label>
+      <Button
+        size="sm"
+        variant="outline"
+        className="col-span-2"
+        disabled={!dirty || mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </Button>
+      {error && <p className="col-span-12 text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+  const [label, setLabel] = useState('')
+  const [code, setCode] = useState('')
+  const [kind, setKind] = useState<PaymentMethodKind>('card')
+  const [error, setError] = useState<string | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: () => createPaymentMethod({ label, code, kind }),
+    onSuccess: () => { setError(null); onSaved() },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed to add'),
+  })
+
+  function submit() {
+    if (!label.trim()) { setError('Label required'); return }
+    if (!code.trim()) { setError('Code required'); return }
+    setError(null)
+    mutation.mutate()
+  }
+
+  return (
+    <div className="border border-dashed rounded-md px-3 py-3 space-y-2 bg-muted/20">
+      <p className="text-xs font-medium text-muted-foreground">New payment method</p>
+      <div className="grid grid-cols-12 gap-2 items-center">
+        <input
+          value={label}
+          onChange={e => {
+            setLabel(e.target.value)
+            if (!code) setCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_'))
+          }}
+          placeholder="Label (e.g. Apple Pay)"
+          className="col-span-4 border border-input rounded px-2 py-1 text-sm bg-background"
+        />
+        <input
+          value={code}
+          onChange={e => setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+          placeholder="code"
+          className="col-span-3 border border-input rounded px-2 py-1 text-sm bg-background font-mono"
+        />
+        <select
+          value={kind}
+          onChange={e => setKind(e.target.value as PaymentMethodKind)}
+          className="col-span-3 border border-input rounded px-2 py-1 text-sm bg-background"
+        >
+          {KIND_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <Button size="sm" className="col-span-1" onClick={submit} disabled={mutation.isPending}>
+          {mutation.isPending ? '…' : 'Add'}
+        </Button>
+        <Button size="sm" variant="ghost" className="col-span-1" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import StaffUser
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
-from app.models.sale import Payment, PaymentType, Sale, SaleItem, SaleStatus
+from app.models.payment_method import TenantPaymentMethod
+from app.models.sale import Payment, Sale, SaleItem, SaleStatus
 from app.models.service import Service
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -42,7 +43,7 @@ class SaleItemIn(BaseModel):
 
 
 class PaymentIn(BaseModel):
-    payment_type: PaymentType
+    payment_method_id: str
     amount: Decimal
 
 
@@ -66,7 +67,9 @@ class SaleItemOut(BaseModel):
 
 class PaymentOut(BaseModel):
     id: str
-    payment_type: str
+    payment_method_id: str
+    payment_method_code: str
+    payment_method_label: str
     amount: str
 
 
@@ -87,7 +90,12 @@ class SaleOut(BaseModel):
     payments: list[PaymentOut]
 
 
-def _serialize(sale: Sale, items: list[SaleItem], payments: list[Payment]) -> SaleOut:
+def _serialize(
+    sale: Sale,
+    items: list[SaleItem],
+    payments: list[Payment],
+    methods_by_id: dict[uuid.UUID, TenantPaymentMethod],
+) -> SaleOut:
     return SaleOut(
         id=str(sale.id),
         appointment_id=str(sale.appointment_id),
@@ -116,7 +124,9 @@ def _serialize(sale: Sale, items: list[SaleItem], payments: list[Payment]) -> Sa
         payments=[
             PaymentOut(
                 id=str(p.id),
-                payment_type=p.payment_type.value,
+                payment_method_id=str(p.payment_method_id),
+                payment_method_code=methods_by_id[p.payment_method_id].code,
+                payment_method_label=methods_by_id[p.payment_method_id].label,
                 amount=str(p.amount),
             )
             for p in payments
@@ -231,6 +241,29 @@ async def create_sale(
                 detail="Each payment amount must be > 0",
             )
 
+    # Validate payment methods belong to this tenant and are active.
+    method_uuids = {uuid.UUID(p.payment_method_id) for p in body.payments}
+    methods = (
+        await db.execute(
+            select(TenantPaymentMethod).where(
+                TenantPaymentMethod.tenant_id == tid,
+                TenantPaymentMethod.id.in_(method_uuids),
+            )
+        )
+    ).scalars().all()
+    methods_by_id = {m.id: m for m in methods}
+    if len(methods_by_id) != len(method_uuids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="One or more payment_method_id values are invalid for this tenant",
+        )
+    inactive = [m.label for m in methods if not m.is_active]
+    if inactive:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Inactive payment method(s): {', '.join(inactive)}",
+        )
+
     # Persist (R3 — atomic with appointment status)
     sale = Sale(
         tenant_id=tid,
@@ -279,7 +312,7 @@ async def create_sale(
         sp = Payment(
             tenant_id=tid,
             sale_id=sale.id,
-            payment_type=in_pay.payment_type,
+            payment_method_id=uuid.UUID(in_pay.payment_method_id),
             amount=_money(in_pay.amount),
         )
         db.add(sp)
@@ -289,7 +322,7 @@ async def create_sale(
 
     await db.commit()
     await db.refresh(sale)
-    return _serialize(sale, sale_items, sale_payments)
+    return _serialize(sale, sale_items, sale_payments, methods_by_id)
 
 
 # ── GET /sales/by-appointment/{appointment_id} ────────────────────────────────
@@ -314,4 +347,11 @@ async def get_sale_by_appointment(
 
     items = (await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id).order_by(SaleItem.sequence))).scalars().all()
     payments = (await db.execute(select(Payment).where(Payment.sale_id == sale.id))).scalars().all()
-    return _serialize(sale, list(items), list(payments))
+    method_ids = {p.payment_method_id for p in payments}
+    methods = (
+        await db.execute(
+            select(TenantPaymentMethod).where(TenantPaymentMethod.id.in_(method_ids))
+        )
+    ).scalars().all() if method_ids else []
+    methods_by_id = {m.id: m for m in methods}
+    return _serialize(sale, list(items), list(payments), methods_by_id)

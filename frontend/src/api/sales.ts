@@ -1,17 +1,5 @@
 import { api } from './client'
 
-export const PAYMENT_TYPES = ['cash', 'debit', 'visa', 'mastercard', 'amex', 'e_transfer'] as const
-export type PaymentType = typeof PAYMENT_TYPES[number]
-
-export const PAYMENT_LABEL: Record<PaymentType, string> = {
-  cash: 'Cash',
-  debit: 'Debit',
-  visa: 'Visa',
-  mastercard: 'Mastercard',
-  amex: 'AMEX',
-  e_transfer: 'E-Transfer',
-}
-
 export interface SaleItem {
   id: string
   description: string
@@ -24,7 +12,9 @@ export interface SaleItem {
 
 export interface SalePayment {
   id: string
-  payment_type: PaymentType
+  payment_method_id: string
+  payment_method_code: string
+  payment_method_label: string
   amount: string
 }
 
@@ -52,7 +42,7 @@ export interface SaleItemIn {
 }
 
 export interface SalePaymentIn {
-  payment_type: PaymentType
+  payment_method_id: string
   amount: string
 }
 

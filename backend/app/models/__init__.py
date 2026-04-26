@@ -16,4 +16,5 @@ from app.models.appointment import (  # noqa: F401
     AppointmentItem,
     AppointmentReminder,
 )
-from app.models.sale import Sale, SaleItem, Payment, SaleStatus, PaymentType  # noqa: F401
+from app.models.payment_method import TenantPaymentMethod, PaymentMethodKind  # noqa: F401
+from app.models.sale import Sale, SaleItem, Payment, SaleStatus  # noqa: F401
