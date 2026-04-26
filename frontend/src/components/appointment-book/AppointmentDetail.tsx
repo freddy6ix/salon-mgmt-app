@@ -177,6 +177,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
 
   return (
     <>
+    {!checkoutOpen && (
     <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -520,12 +521,13 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
         )}
       </DialogContent>
     </Dialog>
+    )}
 
     {checkoutOpen && appointment && (
       <CheckoutPanel
         appointment={appointment}
         date={date}
-        onClose={() => setCheckoutOpen(false)}
+        onClose={() => { setCheckoutOpen(false); onClose() }}
         onCompleted={() => { setCheckoutOpen(false); onClose() }}
       />
     )}
