@@ -156,3 +156,11 @@ Full spec in `docs/reports/reports-annotations.md`. Key sections:
 
 - Exportable as PDF
 - Key management metric: **Payroll % of Net Sales** (target: visible on report)
+
+### P2-6 · Show sale summary on completed appointment
+
+Follow-up to P2-1 (deferred Q3 from `docs/specs/P2-1-checkout-payment.md`). When viewing a completed appointment in `AppointmentDetail`, show the recorded sale: totals (subtotal, GST, PST, tip, total) and the payment breakdown (e.g., "Cash $40 · Visa $33.45").
+
+- Frontend only (backend `GET /sales/by-appointment/{id}` already exists)
+- Fetch the sale when the appointment status is `completed`; render under the existing "Checked out" indicator
+- Read-only view in v1 (editing/voiding deferred — see P2-1 spec Q1)
