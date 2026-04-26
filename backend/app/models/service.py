@@ -8,12 +8,6 @@ from sqlalchemy import ForeignKey
 from app.models.base import TenantScopedBase
 
 
-class HaircutType(str, enum.Enum):
-    type_1 = "type_1"
-    type_2 = "type_2"
-    type_2_plus = "type_2_plus"
-
-
 class PricingType(str, enum.Enum):
     fixed = "fixed"
     hourly = "hourly"
@@ -36,9 +30,6 @@ class Service(TenantScopedBase):
     service_code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    haircut_type: Mapped[HaircutType | None] = mapped_column(
-        Enum(HaircutType), nullable=True
-    )
     pricing_type: Mapped[PricingType] = mapped_column(
         Enum(PricingType), nullable=False, default=PricingType.fixed
     )
@@ -47,10 +38,7 @@ class Service(TenantScopedBase):
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     processing_offset_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processing_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_addon: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     requires_prior_consultation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_gst_exempt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_pst_exempt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_points_exempt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     split_commission: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     suggestions: Mapped[str | None] = mapped_column(Text, nullable=True)

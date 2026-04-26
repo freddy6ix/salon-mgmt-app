@@ -1,6 +1,5 @@
 import { api } from './client'
 
-export type HaircutType = 'type_1' | 'type_2' | 'type_2_plus'
 export type PricingType = 'fixed' | 'hourly'
 
 export interface Service {
@@ -10,7 +9,6 @@ export interface Service {
   category_name: string
   duration_minutes: number
   default_price: number | null
-  is_addon: boolean
   pricing_type: string
 }
 
@@ -21,17 +19,13 @@ export interface ServiceDetail {
   service_code: string
   name: string
   description: string | null
-  haircut_type: HaircutType | null
   pricing_type: PricingType
   default_price: string | null
   default_cost: string | null
   duration_minutes: number
   processing_offset_minutes: number
   processing_duration_minutes: number
-  is_addon: boolean
   requires_prior_consultation: boolean
-  is_gst_exempt: boolean
-  is_pst_exempt: boolean
   suggestions: string | null
   is_active: boolean
   display_order: number
@@ -42,17 +36,13 @@ export interface ServiceIn {
   service_code?: string | null
   name: string
   description?: string | null
-  haircut_type?: HaircutType | null
   pricing_type?: PricingType
   default_price?: number | null
   default_cost?: number | null
   duration_minutes?: number
   processing_offset_minutes?: number
   processing_duration_minutes?: number
-  is_addon?: boolean
   requires_prior_consultation?: boolean
-  is_gst_exempt?: boolean
-  is_pst_exempt?: boolean
   suggestions?: string | null
   is_active?: boolean
   display_order?: number

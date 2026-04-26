@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import AdminUser, CurrentUser
-from app.models.service import HaircutType, PricingType, Service, ServiceCategory
+from app.models.service import PricingType, Service, ServiceCategory
 
 router = APIRouter(prefix="/services", tags=["services"])
 
@@ -34,7 +34,6 @@ class ServiceOut(BaseModel):
     category_name: str
     duration_minutes: int
     default_price: float | None
-    is_addon: bool
     pricing_type: str
 
 
@@ -63,7 +62,6 @@ async def list_services(
             category_name=cat.name,
             duration_minutes=svc.duration_minutes,
             default_price=float(svc.default_price) if svc.default_price is not None else None,
-            is_addon=svc.is_addon,
             pricing_type=svc.pricing_type.value,
         )
         for svc, cat in rows
@@ -79,17 +77,13 @@ class ServiceDetailOut(BaseModel):
     service_code: str
     name: str
     description: str | None
-    haircut_type: str | None
     pricing_type: str
     default_price: str | None
     default_cost: str | None
     duration_minutes: int
     processing_offset_minutes: int
     processing_duration_minutes: int
-    is_addon: bool
     requires_prior_consultation: bool
-    is_gst_exempt: bool
-    is_pst_exempt: bool
     suggestions: str | None
     is_active: bool
     display_order: int
@@ -103,17 +97,13 @@ def _to_detail(svc: Service, cat: ServiceCategory) -> ServiceDetailOut:
         service_code=svc.service_code,
         name=svc.name,
         description=svc.description,
-        haircut_type=svc.haircut_type.value if svc.haircut_type else None,
         pricing_type=svc.pricing_type.value,
         default_price=str(svc.default_price) if svc.default_price is not None else None,
         default_cost=str(svc.default_cost) if svc.default_cost is not None else None,
         duration_minutes=svc.duration_minutes,
         processing_offset_minutes=svc.processing_offset_minutes,
         processing_duration_minutes=svc.processing_duration_minutes,
-        is_addon=svc.is_addon,
         requires_prior_consultation=svc.requires_prior_consultation,
-        is_gst_exempt=svc.is_gst_exempt,
-        is_pst_exempt=svc.is_pst_exempt,
         suggestions=svc.suggestions,
         is_active=svc.is_active,
         display_order=svc.display_order,
@@ -168,17 +158,13 @@ class ServiceIn(BaseModel):
     service_code: str | None = Field(default=None, max_length=50)
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    haircut_type: HaircutType | None = None
     pricing_type: PricingType = PricingType.fixed
     default_price: float | None = None
     default_cost: float | None = None
     duration_minutes: int = Field(default=60, ge=5)
     processing_offset_minutes: int = 0
     processing_duration_minutes: int = 0
-    is_addon: bool = False
     requires_prior_consultation: bool = False
-    is_gst_exempt: bool = False
-    is_pst_exempt: bool = False
     suggestions: str | None = None
     is_active: bool = True
     display_order: int = 0
@@ -189,17 +175,13 @@ class ServicePatch(BaseModel):
     service_code: str | None = Field(default=None, max_length=50)
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
-    haircut_type: HaircutType | None = None
     pricing_type: PricingType | None = None
     default_price: float | None = None
     default_cost: float | None = None
     duration_minutes: int | None = Field(default=None, ge=5)
     processing_offset_minutes: int | None = None
     processing_duration_minutes: int | None = None
-    is_addon: bool | None = None
     requires_prior_consultation: bool | None = None
-    is_gst_exempt: bool | None = None
-    is_pst_exempt: bool | None = None
     suggestions: str | None = None
     is_active: bool | None = None
     display_order: int | None = None
@@ -235,17 +217,13 @@ async def create_service(
         service_code=body.service_code or _slugify_code(body.name),
         name=body.name,
         description=body.description,
-        haircut_type=body.haircut_type,
         pricing_type=body.pricing_type,
         default_price=body.default_price,
         default_cost=body.default_cost,
         duration_minutes=body.duration_minutes,
         processing_offset_minutes=body.processing_offset_minutes,
         processing_duration_minutes=body.processing_duration_minutes,
-        is_addon=body.is_addon,
         requires_prior_consultation=body.requires_prior_consultation,
-        is_gst_exempt=body.is_gst_exempt,
-        is_pst_exempt=body.is_pst_exempt,
         suggestions=body.suggestions,
         is_active=body.is_active,
         display_order=body.display_order,

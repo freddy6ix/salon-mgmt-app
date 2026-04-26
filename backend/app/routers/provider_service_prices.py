@@ -36,6 +36,7 @@ class PSPOut(BaseModel):
     service_id: str
     service_name: str
     price: str
+    duration_minutes: int | None
     cost: str | None
     cost_is_percentage: bool
     effective_from: date
@@ -47,6 +48,7 @@ class PSPIn(BaseModel):
     provider_id: str
     service_id: str
     price: float
+    duration_minutes: int | None = None
     cost: float | None = None
     cost_is_percentage: bool = False
     effective_from: date | None = None  # defaults to today
@@ -56,6 +58,7 @@ class PSPIn(BaseModel):
 
 class PSPPatch(BaseModel):
     price: float | None = None
+    duration_minutes: int | None = None
     cost: float | None = None
     cost_is_percentage: bool | None = None
     effective_from: date | None = None
@@ -71,6 +74,7 @@ def _serialize(p: ProviderServicePrice, provider_name: str, service_name: str) -
         service_id=str(p.service_id),
         service_name=service_name,
         price=str(p.price),
+        duration_minutes=p.duration_minutes,
         cost=str(p.cost) if p.cost is not None else None,
         cost_is_percentage=p.cost_is_percentage,
         effective_from=p.effective_from,
@@ -137,6 +141,7 @@ async def create_psp(
         provider_id=prov.id,
         service_id=svc.id,
         price=body.price,
+        duration_minutes=body.duration_minutes,
         cost=body.cost,
         cost_is_percentage=body.cost_is_percentage,
         effective_from=body.effective_from or date.today(),

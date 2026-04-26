@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import {
@@ -9,7 +9,6 @@ import {
   type ServiceDetail,
   type ServiceIn,
   type ServicePatch,
-  type HaircutType,
   type PricingType,
 } from '@/api/services'
 import {
@@ -52,6 +51,25 @@ export default function ServicesPage() {
     qc.invalidateQueries({ queryKey: ['services-full'] })
     qc.invalidateQueries({ queryKey: ['services'] })
     qc.invalidateQueries({ queryKey: ['service-categories'] })
+  }
+
+  // After a save: if we just created a new service, flip the dialog into edit
+  // mode for that service so the Providers tab unlocks. Otherwise close.
+  const handleSaved = (svc: ServiceDetail | null) => {
+    refresh()
+    if (svc && creating) {
+      qc.setQueryData<ServiceDetail[]>(['services-full'], old => {
+        if (!old) return [svc]
+        return old.some(s => s.id === svc.id)
+          ? old.map(s => s.id === svc.id ? svc : s)
+          : [...old, svc]
+      })
+      setCreating(false)
+      setEditingId(svc.id)
+    } else {
+      setEditingId(null)
+      setCreating(false)
+    }
   }
 
   return (
@@ -121,13 +139,12 @@ export default function ServicesPage() {
                           onClick={() => setEditingId(svc.id)}
                           className={`w-full text-left px-5 py-3 hover:bg-muted/30 grid grid-cols-12 gap-3 items-center ${!svc.is_active ? 'opacity-60' : ''}`}
                         >
-                          <span className="col-span-5 text-sm font-medium">{svc.name}</span>
+                          <span className="col-span-6 text-sm font-medium">{svc.name}</span>
                           <span className="col-span-2 text-sm text-muted-foreground">
                             {svc.default_price ? `$${parseFloat(svc.default_price).toFixed(2)}` : '—'}
                           </span>
                           <span className="col-span-2 text-sm text-muted-foreground">{svc.duration_minutes} min</span>
-                          <span className="col-span-2 text-xs text-muted-foreground">{svc.is_addon ? 'Add-on' : ''}</span>
-                          <span className={`col-span-1 text-xs ${svc.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
+                          <span className={`col-span-2 text-xs ${svc.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
                             {svc.is_active ? '● Active' : '○ Inactive'}
                           </span>
                         </button>
@@ -145,7 +162,7 @@ export default function ServicesPage() {
             serviceId={editingId}
             categories={categories}
             onClose={() => { setEditingId(null); setCreating(false) }}
-            onSaved={() => { setEditingId(null); setCreating(false); refresh() }}
+            onSaved={handleSaved}
           />
         )}
       </div>
@@ -235,7 +252,7 @@ interface EditDialogProps {
   serviceId: string | null  // null → create mode
   categories: ServiceCategory[]
   onClose: () => void
-  onSaved: () => void
+  onSaved: (svc: ServiceDetail | null) => void
 }
 
 function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDialogProps) {
@@ -247,6 +264,16 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
   const initial = !isCreate ? cached?.find(s => s.id === serviceId) ?? null : null
 
   const [tab, setTab] = useState<'details' | 'providers'>('details')
+  // When the dialog transitions from create-mode to edit-mode of the just-created
+  // service, automatically jump to the Providers tab — that's where the user
+  // typically wants to go next.
+  const startedCreating = useRef(serviceId === null)
+  useEffect(() => {
+    if (startedCreating.current && serviceId !== null) {
+      setTab('providers')
+      startedCreating.current = false
+    }
+  }, [serviceId])
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -301,7 +328,7 @@ function DetailsForm({
   initial: ServiceDetail | null
   categories: ServiceCategory[]
   isCreate: boolean
-  onSaved: () => void
+  onSaved: (svc: ServiceDetail | null) => void
   onClose: () => void
 }) {
   const [form, setForm] = useState({
@@ -310,16 +337,12 @@ function DetailsForm({
     description: initial?.description ?? '',
     category_id: initial?.category_id ?? categories[0]?.id ?? '',
     pricing_type: (initial?.pricing_type ?? 'fixed') as PricingType,
-    haircut_type: (initial?.haircut_type ?? '') as HaircutType | '',
     default_price: initial?.default_price ?? '',
     default_cost: initial?.default_cost ?? '',
     duration_minutes: String(initial?.duration_minutes ?? 60),
     processing_offset_minutes: String(initial?.processing_offset_minutes ?? 0),
     processing_duration_minutes: String(initial?.processing_duration_minutes ?? 0),
-    is_addon: initial?.is_addon ?? false,
     requires_prior_consultation: initial?.requires_prior_consultation ?? false,
-    is_gst_exempt: initial?.is_gst_exempt ?? false,
-    is_pst_exempt: initial?.is_pst_exempt ?? false,
     is_active: initial?.is_active ?? true,
     suggestions: initial?.suggestions ?? '',
   })
@@ -336,17 +359,13 @@ function DetailsForm({
         service_code: form.service_code.trim() || undefined,
         name: form.name.trim(),
         description: form.description.trim() || null,
-        haircut_type: form.haircut_type || null,
         pricing_type: form.pricing_type,
         default_price: form.default_price ? parseFloat(form.default_price) : null,
         default_cost: form.default_cost ? parseFloat(form.default_cost) : null,
         duration_minutes: parseInt(form.duration_minutes, 10),
         processing_offset_minutes: parseInt(form.processing_offset_minutes, 10) || 0,
         processing_duration_minutes: parseInt(form.processing_duration_minutes, 10) || 0,
-        is_addon: form.is_addon,
         requires_prior_consultation: form.requires_prior_consultation,
-        is_gst_exempt: form.is_gst_exempt,
-        is_pst_exempt: form.is_pst_exempt,
         suggestions: form.suggestions.trim() || null,
         is_active: form.is_active,
       }
@@ -354,13 +373,13 @@ function DetailsForm({
         ? createService(body as ServiceIn)
         : updateService(initial!.id, body as ServicePatch)
     },
-    onSuccess: () => { setError(null); onSaved() },
+    onSuccess: (svc) => { setError(null); onSaved(svc) },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
   })
 
   const deactivateMut = useMutation({
     mutationFn: () => deactivateService(initial!.id),
-    onSuccess: () => onSaved(),
+    onSuccess: () => onSaved(null),
   })
 
   function submit() {
@@ -456,7 +475,7 @@ function DetailsForm({
           </select>
         </div>
         <div>
-          <Label>Processing offset (min) <span className="text-muted-foreground font-normal">— when colour begins</span></Label>
+          <Label>Processing offset (min) <span className="text-muted-foreground font-normal">— when processing begins</span></Label>
           <input
             type="number" min={0}
             value={form.processing_offset_minutes}
@@ -473,26 +492,10 @@ function DetailsForm({
             className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
           />
         </div>
-        <div>
-          <Label>Haircut type <span className="text-muted-foreground font-normal">— optional</span></Label>
-          <select
-            value={form.haircut_type}
-            onChange={e => set('haircut_type', e.target.value as HaircutType | '')}
-            className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
-          >
-            <option value="">—</option>
-            <option value="type_1">Type 1 (clippers)</option>
-            <option value="type_2">Type 2 (scissors)</option>
-            <option value="type_2_plus">Type 2+ (high-effort)</option>
-          </select>
-        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-2 border-t">
         <Toggle label="Active" value={form.is_active} onChange={v => set('is_active', v)} />
-        <Toggle label="Add-on" value={form.is_addon} onChange={v => set('is_addon', v)} />
-        <Toggle label="GST exempt" value={form.is_gst_exempt} onChange={v => set('is_gst_exempt', v)} />
-        <Toggle label="PST exempt" value={form.is_pst_exempt} onChange={v => set('is_pst_exempt', v)} />
         <Toggle label="Requires consultation" value={form.requires_prior_consultation} onChange={v => set('requires_prior_consultation', v)} />
       </div>
 
@@ -581,11 +584,16 @@ function ProviderMatrixRow({
 }) {
   const [enabled, setEnabled] = useState(!!existing)
   const [price, setPrice] = useState(existing?.price ?? service.default_price ?? '')
+  // Empty string = use service default. Number string = override.
+  const [duration, setDuration] = useState(
+    existing?.duration_minutes != null ? String(existing.duration_minutes) : ''
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setEnabled(!!existing)
     setPrice(existing?.price ?? service.default_price ?? '')
+    setDuration(existing?.duration_minutes != null ? String(existing.duration_minutes) : '')
   }, [existing, service])
 
   const createMut = useMutation({
@@ -593,13 +601,17 @@ function ProviderMatrixRow({
       provider_id: provider.id,
       service_id: service.id,
       price: parseFloat(price || service.default_price || '0'),
+      duration_minutes: duration ? parseInt(duration, 10) : null,
     }),
     onSuccess: () => { setError(null); onChanged() },
     onError: (e: unknown) => { setEnabled(false); setError(e instanceof Error ? e.message : 'Failed') },
   })
 
   const updateMut = useMutation({
-    mutationFn: () => updateProviderServicePrice(existing!.id, { price: parseFloat(price) }),
+    mutationFn: () => updateProviderServicePrice(existing!.id, {
+      price: parseFloat(price),
+      duration_minutes: duration ? parseInt(duration, 10) : null,
+    }),
     onSuccess: () => { setError(null); onChanged() },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed'),
   })
@@ -615,11 +627,14 @@ function ProviderMatrixRow({
     else if (!checked && existing) deleteMut.mutate()
   }
 
-  const priceDirty = existing && parseFloat(price || '0') !== parseFloat(existing.price)
+  const dirty = existing && (
+    parseFloat(price || '0') !== parseFloat(existing.price) ||
+    (duration ? parseInt(duration, 10) : null) !== existing.duration_minutes
+  )
 
   return (
-    <div className="flex gap-3 items-center border rounded-md px-3 py-2">
-      <label className="flex items-center gap-2 flex-1 text-sm cursor-pointer">
+    <div className="flex gap-3 items-center border rounded-md px-3 py-2 flex-wrap">
+      <label className="flex items-center gap-2 flex-1 min-w-[140px] text-sm cursor-pointer">
         <input
           type="checkbox"
           checked={enabled}
@@ -631,15 +646,27 @@ function ProviderMatrixRow({
       {enabled && (
         <>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Price $</span>
+            <span className="text-xs text-muted-foreground">$</span>
             <input
               type="text" inputMode="decimal"
               value={price}
               onChange={e => setPrice(e.target.value)}
               className="w-20 border border-input rounded px-2 py-1 text-sm bg-background"
+              title="Price (overrides service default)"
             />
           </div>
-          {priceDirty && (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number" min={5}
+              value={duration}
+              onChange={e => setDuration(e.target.value)}
+              placeholder={String(service.duration_minutes)}
+              className="w-16 border border-input rounded px-2 py-1 text-sm bg-background"
+              title="Duration override (blank = use service default)"
+            />
+            <span className="text-xs text-muted-foreground">min</span>
+          </div>
+          {dirty && (
             <Button size="sm" variant="outline" onClick={() => updateMut.mutate()} disabled={updateMut.isPending}>
               {updateMut.isPending ? '…' : 'Save'}
             </Button>

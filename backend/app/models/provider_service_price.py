@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, Date, ForeignKey, Numeric
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +18,7 @@ class ProviderServicePrice(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("services.id"), nullable=False, index=True
     )
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     cost_is_percentage: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
