@@ -250,15 +250,13 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
   const [code, setCode] = useState(method.code)
   const [kind, setKind] = useState<PaymentMethodKind>(method.kind)
   const [isActive, setIsActive] = useState(method.is_active)
-  const [sortOrder, setSortOrder] = useState(String(method.sort_order))
   const [error, setError] = useState<string | null>(null)
 
   const dirty =
     label !== method.label ||
     code !== method.code ||
     kind !== method.kind ||
-    isActive !== method.is_active ||
-    sortOrder !== String(method.sort_order)
+    isActive !== method.is_active
 
   const mutation = useMutation({
     mutationFn: () => updatePaymentMethod(method.id, {
@@ -266,7 +264,6 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
       code,
       kind,
       is_active: isActive,
-      sort_order: parseInt(sortOrder, 10) || 0,
     }),
     onSuccess: () => { setError(null); onSaved() },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
@@ -277,7 +274,7 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
       <input
         value={label}
         onChange={e => setLabel(e.target.value)}
-        className="col-span-3 border border-input rounded px-2 py-1 text-sm bg-background"
+        className="col-span-4 border border-input rounded px-2 py-1 text-sm bg-background"
         placeholder="Label"
       />
       <input
@@ -295,13 +292,6 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <input
-        type="number"
-        value={sortOrder}
-        onChange={e => setSortOrder(e.target.value)}
-        className="col-span-1 border border-input rounded px-2 py-1 text-sm bg-background"
-        title="Sort order"
-      />
       <label className="col-span-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <input
           type="checkbox"

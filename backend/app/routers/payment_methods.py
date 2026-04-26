@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,7 +65,7 @@ async def list_payment_methods(
 ) -> list[PaymentMethodOut]:
     q = select(TenantPaymentMethod).where(
         TenantPaymentMethod.tenant_id == current_user.tenant_id,
-    ).order_by(TenantPaymentMethod.sort_order, TenantPaymentMethod.label)
+    ).order_by(func.lower(TenantPaymentMethod.label))
     if active_only:
         q = q.where(TenantPaymentMethod.is_active.is_(True))
     rows = (await db.execute(q)).scalars().all()
