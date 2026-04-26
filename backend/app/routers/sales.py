@@ -49,7 +49,6 @@ class PaymentIn(BaseModel):
 
 class SaleIn(BaseModel):
     appointment_id: str
-    tip_amount: Decimal = Decimal("0")
     notes: str | None = None
     items: list[SaleItemIn] = Field(min_length=1)
     payments: list[PaymentIn] = Field(min_length=1)
@@ -81,7 +80,6 @@ class SaleOut(BaseModel):
     discount_total: str
     gst_amount: str
     pst_amount: str
-    tip_amount: str
     total: str
     status: str
     completed_at: datetime | None
@@ -104,7 +102,6 @@ def _serialize(
         discount_total=str(sale.discount_total),
         gst_amount=str(sale.gst_amount),
         pst_amount=str(sale.pst_amount),
-        tip_amount=str(sale.tip_amount),
         total=str(sale.total),
         status=sale.status.value,
         completed_at=sale.completed_at,
@@ -205,10 +202,7 @@ async def create_sale(
                 detail="discount_amount must be between 0 and unit_price",
             )
 
-    if body.tip_amount < 0:  # R15
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tip_amount must be ≥ 0")
-
-    # Compute totals server-side (R11–R16)
+    # Compute totals server-side (R11–R16). No tip — see P2-9 in docs/backlog.md.
     subtotal = Decimal("0")
     discount_total = Decimal("0")
     line_records: list[tuple[SaleItemIn, Decimal]] = []  # (input, line_total)
@@ -224,8 +218,7 @@ async def create_sale(
     discount_total = _money(discount_total)
     gst = _money(subtotal * GST_RATE)
     pst = _money(subtotal * PST_RATE)
-    tip = _money(body.tip_amount)
-    total = _money(subtotal + gst + pst + tip)
+    total = _money(subtotal + gst + pst)
 
     # R18 — payments must sum to total exactly
     payments_total = _money(sum((p.amount for p in body.payments), Decimal("0")))
@@ -273,7 +266,6 @@ async def create_sale(
         discount_total=discount_total,
         gst_amount=gst,
         pst_amount=pst,
-        tip_amount=tip,
         total=total,
         status=SaleStatus.completed,
         completed_at=datetime.now(timezone.utc),

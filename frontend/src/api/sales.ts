@@ -26,7 +26,6 @@ export interface Sale {
   discount_total: string
   gst_amount: string
   pst_amount: string
-  tip_amount: string
   total: string
   status: 'pending' | 'completed'
   completed_at: string | null
@@ -48,7 +47,6 @@ export interface SalePaymentIn {
 
 export interface SaleIn {
   appointment_id: string
-  tip_amount: string
   notes?: string | null
   items: SaleItemIn[]
   payments: SalePaymentIn[]

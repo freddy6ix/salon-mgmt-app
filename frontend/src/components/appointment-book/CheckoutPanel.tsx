@@ -24,6 +24,10 @@ interface ItemDraft {
 interface PaymentDraft {
   payment_method_id: string
   amount: string
+  // Cash-only, informational. The recorded payment is `amount`; the
+  // overage (tendered - amount) is given back as cashback to the client,
+  // who hands it to the staff member as a tip. Off the books — see P2-9.
+  tendered?: string
 }
 
 const GST_RATE = 0.05
@@ -55,7 +59,6 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       discount: '0.00',
     }))
   )
-  const [tip, setTip] = useState('0.00')
   const [notes, setNotes] = useState('')
   const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -67,7 +70,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     }
   }, [methods, payments.length])
 
-  // Compute totals
+  // Compute totals. Tip is intentionally not part of the sale — see P2-9.
   const totals = useMemo(() => {
     const subtotal = items.reduce(
       (sum, i) => sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)),
@@ -76,12 +79,11 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     const discountTotal = items.reduce((sum, i) => sum + toMoney(i.discount), 0)
     const gst = Math.round(subtotal * GST_RATE * 100) / 100
     const pst = Math.round(subtotal * PST_RATE * 100) / 100
-    const tipAmt = toMoney(tip)
-    const total = Math.round((subtotal + gst + pst + tipAmt) * 100) / 100
+    const total = Math.round((subtotal + gst + pst) * 100) / 100
     const paid = payments.reduce((sum, p) => sum + toMoney(p.amount), 0)
     const remaining = Math.round((total - paid) * 100) / 100
-    return { subtotal, discountTotal, gst, pst, tip: tipAmt, total, remaining }
-  }, [items, tip, payments])
+    return { subtotal, discountTotal, gst, pst, total, remaining }
+  }, [items, payments])
 
   // When the total changes (and there's only one payment row at default), update it
   useEffect(() => {
@@ -111,7 +113,6 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   const mutation = useMutation({
     mutationFn: () => createSale({
       appointment_id: appointment.id,
-      tip_amount: fmt(totals.tip),
       notes: notes.trim() || null,
       items: items.map(i => ({
         appointment_item_id: i.appointment_item_id,
@@ -195,19 +196,6 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
           })}
         </div>
 
-        {/* Tip */}
-        <div className="space-y-1.5">
-          <Label htmlFor="tip">Tip ($)</Label>
-          <input
-            id="tip"
-            type="text"
-            inputMode="decimal"
-            value={tip}
-            onChange={e => setTip(e.target.value)}
-            className="w-32 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
-          />
-        </div>
-
         {/* Totals */}
         <div className="rounded-md bg-muted/40 p-3 space-y-1 text-sm">
           <div className="flex justify-between"><span>Subtotal</span><span>${fmt(totals.subtotal)}</span></div>
@@ -218,9 +206,6 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
           )}
           <div className="flex justify-between"><span>GST (5%)</span><span>${fmt(totals.gst)}</span></div>
           <div className="flex justify-between"><span>PST (8%)</span><span>${fmt(totals.pst)}</span></div>
-          {totals.tip > 0 && (
-            <div className="flex justify-between"><span>Tip</span><span>${fmt(totals.tip)}</span></div>
-          )}
           <div className="flex justify-between font-semibold border-t pt-1 mt-1">
             <span>Total</span><span>${fmt(totals.total)}</span>
           </div>
@@ -246,35 +231,63 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
               No active payment methods configured. An admin must add at least one in Settings → Payment methods.
             </p>
           )}
-          {payments.map((p, idx) => (
-            <div key={idx} className="flex gap-2 items-center">
-              <select
-                value={p.payment_method_id}
-                onChange={e => updatePayment(idx, { payment_method_id: e.target.value })}
-                className="border border-input rounded-md px-2 py-1.5 text-sm bg-background flex-1"
-              >
-                {methods.map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={p.amount}
-                onChange={e => updatePayment(idx, { amount: e.target.value })}
-                className="w-28 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
-              />
-              {payments.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removePaymentRow(idx)}
-                  className="text-muted-foreground hover:text-destructive text-lg leading-none px-1"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+          {payments.map((p, idx) => {
+            const method = methods.find(m => m.id === p.payment_method_id)
+            const isCash = method?.kind === 'cash'
+            const tenderedNum = toMoney(p.tendered ?? p.amount)
+            const change = isCash ? Math.max(0, Math.round((tenderedNum - toMoney(p.amount)) * 100) / 100) : 0
+            return (
+              <div key={idx} className="space-y-1.5">
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={p.payment_method_id}
+                    onChange={e => updatePayment(idx, { payment_method_id: e.target.value })}
+                    className="border border-input rounded-md px-2 py-1.5 text-sm bg-background flex-1"
+                  >
+                    {methods.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={p.amount}
+                    onChange={e => updatePayment(idx, { amount: e.target.value })}
+                    title="Recorded payment (the amount kept by the salon)"
+                    className="w-24 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+                  />
+                  {payments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePaymentRow(idx)}
+                      className="text-muted-foreground hover:text-destructive text-lg leading-none px-1"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {isCash && (
+                  <div className="flex gap-2 items-center pl-2 border-l-2 border-muted-foreground/20">
+                    <label className="text-xs text-muted-foreground w-20">Tendered</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={p.tendered ?? p.amount}
+                      onChange={e => updatePayment(idx, { tendered: e.target.value })}
+                      placeholder={p.amount}
+                      className="w-24 border border-input rounded-md px-2 py-1 text-xs bg-background"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Change due:{' '}
+                      <span className={change > 0 ? 'text-foreground font-medium' : ''}>
+                        ${fmt(change)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
           <p className={`text-xs ${totals.remaining === 0 ? 'text-green-600' : 'text-destructive'}`}>
             {totals.remaining === 0
               ? 'Payments balanced'
