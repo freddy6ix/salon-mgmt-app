@@ -43,6 +43,38 @@ interface AppointmentBlock {
   heightPx: number
 }
 
+interface RenderSegment {
+  topPx: number
+  heightPx: number
+}
+
+// An appointment with a processing gap (e.g. colour development) renders as two
+// segments — pre-processing and post-processing work — with the gap left
+// transparent so the grid background shows through as free time.
+function computeRenderSegments(
+  item: AppointmentItem,
+  topPx: number,
+  heightPx: number,
+  slotMinutes: number,
+): RenderSegment[] {
+  const procOffset = item.service.processing_offset_minutes
+  const procDuration = item.service.processing_duration_minutes
+  const dur = item.duration_override_minutes ?? item.duration_minutes
+  if (procDuration <= 0 || procOffset >= dur) {
+    return [{ topPx, heightPx }]
+  }
+  const pxPerMin = SLOT_HEIGHT / slotMinutes
+  const gapEnd = Math.min(dur, procOffset + procDuration)
+  const segments: RenderSegment[] = []
+  if (procOffset > 0) {
+    segments.push({ topPx, heightPx: procOffset * pxPerMin })
+  }
+  if (gapEnd < dur) {
+    segments.push({ topPx: topPx + gapEnd * pxPerMin, heightPx: (dur - gapEnd) * pxPerMin })
+  }
+  return segments.length > 0 ? segments : [{ topPx, heightPx }]
+}
+
 interface DragState {
   type: 'move' | 'resize'
   appointmentId: string
@@ -453,52 +485,60 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
                 />
               )}
 
-              {/* Appointment blocks */}
-              {(blocksByProvider.get(provider.id) ?? []).map(({ item, appointment, topPx, heightPx }) => {
+              {/* Appointment blocks — multi-segment when the service has a
+                  processing gap (e.g. colour development); the gap renders as
+                  empty grid so the provider reads as free during processing. */}
+              {(blocksByProvider.get(provider.id) ?? []).flatMap(({ item, appointment, topPx, heightPx }) => {
                 const isDragging = drag?.itemId === item.id
                 const colorClass = APPT_STATUS_COLOR[appointment.status] ?? APPT_STATUS_COLOR.confirmed
-                return (
-                  <div
-                    key={item.id}
-                    className={`absolute left-1 right-1 rounded border text-left overflow-hidden flex flex-col z-[2]
-                      ${colorClass}
-                      ${isDragging ? 'opacity-30' : 'hover:opacity-90'}
-                      ${appointment.status === 'completed' || appointment.status === 'cancelled' ? '' : 'cursor-grab active:cursor-grabbing'}
-                    `}
-                    style={{ top: topPx + 1, height: Math.max(heightPx - 2, 18) }}
-                  >
-                    {/* Main click / drag area */}
+                const segments = computeRenderSegments(item, topPx, heightPx, SLOT_MINUTES)
+                return segments.map((seg, segIdx) => {
+                  const isLastSeg = segIdx === segments.length - 1
+                  return (
                     <div
-                      className="flex-1 px-1.5 py-0.5 overflow-hidden"
-                      onClick={(e) => { if (!didDragRef.current) { e.stopPropagation(); onItemClick?.(item, appointment) } }}
-                      onPointerDown={(e) => onMovePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
+                      key={`${item.id}-${segIdx}`}
+                      className={`absolute left-1 right-1 rounded border text-left overflow-hidden flex flex-col z-[2]
+                        ${colorClass}
+                        ${isDragging ? 'opacity-30' : 'hover:opacity-90'}
+                        ${appointment.status === 'completed' || appointment.status === 'cancelled' ? '' : 'cursor-grab active:cursor-grabbing'}
+                      `}
+                      style={{ top: seg.topPx + 1, height: Math.max(seg.heightPx - 2, 18) }}
                     >
-                      <p className="text-xs font-medium truncate leading-tight">
-                        <span
-                          onPointerDown={e => e.stopPropagation()}
-                          onClick={e => { e.stopPropagation(); if (!didDragRef.current) onClientClick?.(appointment.client.id) }}
-                          className={onClientClick ? 'hover:underline cursor-pointer' : ''}
+                      {/* Main click / drag area — drag uses the full envelope's
+                          topPx/heightPx so move/resize work on the whole appointment. */}
+                      <div
+                        className="flex-1 px-1.5 py-0.5 overflow-hidden"
+                        onClick={(e) => { if (!didDragRef.current) { e.stopPropagation(); onItemClick?.(item, appointment) } }}
+                        onPointerDown={(e) => onMovePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
+                      >
+                        <p className="text-xs font-medium truncate leading-tight">
+                          <span
+                            onPointerDown={e => e.stopPropagation()}
+                            onClick={e => { e.stopPropagation(); if (!didDragRef.current) onClientClick?.(appointment.client.id) }}
+                            className={onClientClick ? 'hover:underline cursor-pointer' : ''}
+                          >
+                            {appointment.client.first_name} {appointment.client.last_name}
+                          </span>
+                        </p>
+                        {seg.heightPx >= 36 && (
+                          <p className="text-xs truncate leading-tight opacity-75">{item.service.name}</p>
+                        )}
+                      </div>
+
+                      {/* Resize handle — only on the last segment, since resizing
+                          extends the post-processing end of the appointment. */}
+                      {isLastSeg && appointment.status !== 'completed' && appointment.status !== 'cancelled' && seg.heightPx >= 24 && (
+                        <div
+                          className="h-2 cursor-ns-resize flex-shrink-0 flex items-center justify-center"
+                          onPointerDown={(e) => onResizePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {appointment.client.first_name} {appointment.client.last_name}
-                        </span>
-                      </p>
-                      {heightPx >= 36 && (
-                        <p className="text-xs truncate leading-tight opacity-75">{item.service.name}</p>
+                          <div className="w-6 h-0.5 rounded bg-current opacity-30" />
+                        </div>
                       )}
                     </div>
-
-                    {/* Resize handle — bottom strip */}
-                    {appointment.status !== 'completed' && appointment.status !== 'cancelled' && heightPx >= 24 && (
-                      <div
-                        className="h-2 cursor-ns-resize flex-shrink-0 flex items-center justify-center"
-                        onPointerDown={(e) => onResizePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="w-6 h-0.5 rounded bg-current opacity-30" />
-                      </div>
-                    )}
-                  </div>
-                )
+                  )
+                })
               })}
             </div>
           </div>
