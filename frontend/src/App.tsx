@@ -12,6 +12,7 @@ import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ClientsPage from '@/pages/ClientsPage'
+import ServicesPage from '@/pages/ServicesPage'
 import UsersPage from '@/pages/UsersPage'
 
 function StaffShell() {
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/staff" element={<StaffSchedulePage />} />
         <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/services" element={<ServicesPage />} />
         <Route path="/reports" element={<Placeholder title="Reports" />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/users" element={<UsersPage />} />

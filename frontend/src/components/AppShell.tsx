@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
 import {
-  Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut, ShieldCheck,
+  Home, CalendarDays, Users, ClipboardList, UserCog, BarChart2, Settings, LogOut, ShieldCheck, Scissors,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
@@ -34,6 +34,7 @@ export default function AppShell() {
     { to: '/dashboard',    icon: Home,           label: 'Home',             badge: 0 },
     { to: '/appointments', icon: CalendarDays,   label: 'Appointment Book', badge: 0 },
     { to: '/clients',      icon: Users,          label: 'Clients',          badge: 0 },
+    { to: '/services',     icon: Scissors,       label: 'Services',         badge: 0 },
     { to: '/requests',     icon: ClipboardList,  label: 'Requests',         badge: pendingCount },
     { to: '/staff',        icon: UserCog,        label: 'Staff',            badge: 0 },
     { to: '/reports',      icon: BarChart2,      label: 'Reports',          badge: 0 },
