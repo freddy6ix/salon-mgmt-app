@@ -16,8 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    sale_status = sa.Enum('pending', 'completed', name='sale_status')
-    payment_type = sa.Enum('amex', 'cash', 'debit', 'e_transfer', 'mastercard', 'visa', name='payment_type')
+    # create_type=False — we create the types explicitly below with checkfirst,
+    # so op.create_table must not auto-emit CREATE TYPE again.
+    sale_status = postgresql.ENUM('pending', 'completed', name='sale_status', create_type=False)
+    payment_type = postgresql.ENUM('amex', 'cash', 'debit', 'e_transfer', 'mastercard', 'visa', name='payment_type', create_type=False)
     sale_status.create(op.get_bind(), checkfirst=True)
     payment_type.create(op.get_bind(), checkfirst=True)
 
@@ -91,5 +93,5 @@ def downgrade() -> None:
     op.drop_table('sale_payments')
     op.drop_table('sale_items')
     op.drop_table('sales')
-    sa.Enum(name='payment_type').drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name='sale_status').drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name='payment_type', create_type=False).drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name='sale_status', create_type=False).drop(op.get_bind(), checkfirst=True)
