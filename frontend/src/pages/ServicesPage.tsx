@@ -588,20 +588,32 @@ function ProviderMatrixRow({
   const [duration, setDuration] = useState(
     existing?.duration_minutes != null ? String(existing.duration_minutes) : ''
   )
+  const [procOffset, setProcOffset] = useState(
+    existing?.processing_offset_minutes != null ? String(existing.processing_offset_minutes) : ''
+  )
+  const [procDuration, setProcDuration] = useState(
+    existing?.processing_duration_minutes != null ? String(existing.processing_duration_minutes) : ''
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setEnabled(!!existing)
     setPrice(existing?.price ?? service.default_price ?? '')
     setDuration(existing?.duration_minutes != null ? String(existing.duration_minutes) : '')
+    setProcOffset(existing?.processing_offset_minutes != null ? String(existing.processing_offset_minutes) : '')
+    setProcDuration(existing?.processing_duration_minutes != null ? String(existing.processing_duration_minutes) : '')
   }, [existing, service])
+
+  const intOrNull = (s: string) => s.trim() ? parseInt(s, 10) : null
 
   const createMut = useMutation({
     mutationFn: () => createProviderServicePrice({
       provider_id: provider.id,
       service_id: service.id,
       price: parseFloat(price || service.default_price || '0'),
-      duration_minutes: duration ? parseInt(duration, 10) : null,
+      duration_minutes: intOrNull(duration),
+      processing_offset_minutes: intOrNull(procOffset),
+      processing_duration_minutes: intOrNull(procDuration),
     }),
     onSuccess: () => { setError(null); onChanged() },
     onError: (e: unknown) => { setEnabled(false); setError(e instanceof Error ? e.message : 'Failed') },
@@ -610,7 +622,9 @@ function ProviderMatrixRow({
   const updateMut = useMutation({
     mutationFn: () => updateProviderServicePrice(existing!.id, {
       price: parseFloat(price),
-      duration_minutes: duration ? parseInt(duration, 10) : null,
+      duration_minutes: intOrNull(duration),
+      processing_offset_minutes: intOrNull(procOffset),
+      processing_duration_minutes: intOrNull(procDuration),
     }),
     onSuccess: () => { setError(null); onChanged() },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed'),
@@ -629,7 +643,9 @@ function ProviderMatrixRow({
 
   const dirty = existing && (
     parseFloat(price || '0') !== parseFloat(existing.price) ||
-    (duration ? parseInt(duration, 10) : null) !== existing.duration_minutes
+    intOrNull(duration) !== existing.duration_minutes ||
+    intOrNull(procOffset) !== existing.processing_offset_minutes ||
+    intOrNull(procDuration) !== existing.processing_duration_minutes
   )
 
   return (
@@ -645,27 +661,41 @@ function ProviderMatrixRow({
       </label>
       {enabled && (
         <>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">$</span>
+          <Field label="$" title="Price (overrides service default)">
             <input
               type="text" inputMode="decimal"
               value={price}
               onChange={e => setPrice(e.target.value)}
               className="w-20 border border-input rounded px-2 py-1 text-sm bg-background"
-              title="Price (overrides service default)"
             />
-          </div>
-          <div className="flex items-center gap-1.5">
+          </Field>
+          <Field label="min" title="Duration override (blank = use service default)" trailing>
             <input
               type="number" min={5}
               value={duration}
               onChange={e => setDuration(e.target.value)}
               placeholder={String(service.duration_minutes)}
               className="w-16 border border-input rounded px-2 py-1 text-sm bg-background"
-              title="Duration override (blank = use service default)"
             />
-            <span className="text-xs text-muted-foreground">min</span>
-          </div>
+          </Field>
+          <Field label="proc offset" title="Processing offset override — minutes after the start when processing begins (blank = use service default)" trailing>
+            <input
+              type="number" min={0}
+              value={procOffset}
+              onChange={e => setProcOffset(e.target.value)}
+              placeholder={String(service.processing_offset_minutes)}
+              className="w-16 border border-input rounded px-2 py-1 text-sm bg-background"
+            />
+          </Field>
+          <Field label="proc min" title="Processing duration override — gap during which the provider is free (blank = use service default)" trailing>
+            <input
+              type="number" min={0}
+              value={procDuration}
+              onChange={e => setProcDuration(e.target.value)}
+              placeholder={String(service.processing_duration_minutes)}
+              className="w-16 border border-input rounded px-2 py-1 text-sm bg-background"
+            />
+          </Field>
           {dirty && (
             <Button size="sm" variant="outline" onClick={() => updateMut.mutate()} disabled={updateMut.isPending}>
               {updateMut.isPending ? '…' : 'Save'}
@@ -674,6 +704,23 @@ function ProviderMatrixRow({
         </>
       )}
       {error && <X size={14} className="text-destructive" aria-label={error} />}
+    </div>
+  )
+}
+
+function Field({
+  label, title, trailing = false, children,
+}: {
+  label: string
+  title?: string
+  trailing?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-1.5" title={title}>
+      {!trailing && <span className="text-xs text-muted-foreground">{label}</span>}
+      {children}
+      {trailing && <span className="text-xs text-muted-foreground">{label}</span>}
     </div>
   )
 }

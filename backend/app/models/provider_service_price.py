@@ -19,6 +19,8 @@ class ProviderServicePrice(TenantScopedBase):
     )
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    processing_offset_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    processing_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     cost_is_percentage: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)

@@ -8,6 +8,8 @@ export interface ProviderServicePrice {
   service_name: string
   price: string
   duration_minutes: number | null
+  processing_offset_minutes: number | null
+  processing_duration_minutes: number | null
   cost: string | null
   cost_is_percentage: boolean
   effective_from: string
@@ -20,6 +22,8 @@ export interface PSPIn {
   service_id: string
   price: number
   duration_minutes?: number | null
+  processing_offset_minutes?: number | null
+  processing_duration_minutes?: number | null
   cost?: number | null
   cost_is_percentage?: boolean
   effective_from?: string | null
