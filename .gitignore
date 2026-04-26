@@ -27,6 +27,13 @@ frontend/.vite/
 # IDE
 .vscode/settings.json
 .idea/
+.claude/settings.local.json
+
+# One-off dev scripts (don't commit; they may carry real data)
+scripts/delete_users.py
+
+# Out-of-scope docs (kept locally, not part of this repo)
+docs/cgi-l4-worked-examples.md
 
 # Terraform
 infra/.terraform/
