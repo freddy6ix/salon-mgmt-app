@@ -102,7 +102,25 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   }
 
   function updatePayment(idx: number, patch: Partial<PaymentDraft>) {
-    setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...patch } : p))
+    setPayments(prev => prev.map((p, i) => {
+      if (i !== idx) return p
+      const updated = { ...p, ...patch }
+      // When amount changes (and the user isn't simultaneously editing cashback),
+      // auto-set cashback to the overage above what this row needs to contribute
+      // to the bill. Common case: bill $73.45, user types amount $83.45 → cashback
+      // auto-fills to $10.00. The user can still override cashback manually after.
+      if (patch.amount !== undefined && patch.cashback === undefined) {
+        const otherApplied = prev.reduce(
+          (sum, op, j) => j === i ? sum : sum + toMoney(op.amount) - toMoney(op.cashback),
+          0,
+        )
+        const needed = Math.max(0, Math.round((totals.total - otherApplied) * 100) / 100)
+        const newAmount = toMoney(updated.amount)
+        const newCashback = Math.max(0, Math.round((newAmount - needed) * 100) / 100)
+        updated.cashback = fmt(newCashback)
+      }
+      return updated
+    }))
   }
 
   function addPaymentRow() {
