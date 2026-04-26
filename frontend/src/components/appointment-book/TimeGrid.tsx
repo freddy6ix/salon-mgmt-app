@@ -5,6 +5,7 @@ import type { Appointment, AppointmentItem } from '@/api/appointments'
 import { patchAppointmentItem } from '@/api/appointments'
 import type { Provider } from '@/api/providers'
 import type { ProviderWorkStatus } from '@/api/schedules'
+import { updateTimeBlock, type TimeBlock } from '@/api/timeBlocks'
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,9 @@ function computeRenderSegments(
 
 interface DragState {
   type: 'move' | 'resize'
+  kind: 'appointment' | 'time_block'
+  // For appointments: appointmentId + itemId (the appointment-item being moved).
+  // For time blocks: itemId is the block id, appointmentId is unused.
   appointmentId: string
   itemId: string
   originalTop: number
@@ -90,18 +94,29 @@ interface DragState {
   label: string
 }
 
+interface SlotMenu {
+  // Click-popover state when staff clicks an empty slot.
+  x: number
+  y: number
+  time: string       // 'HH:MM' format
+  providerId: string
+}
+
 interface Props {
   providers: Provider[]
   appointments: Appointment[]
+  timeBlocks: TimeBlock[]
   date: string
   slotMinutes: number
   providerHours?: ProviderWorkStatus[]
   onItemClick?: (item: AppointmentItem, appointment: Appointment) => void
-  onSlotClick?: (time: string, providerId: string) => void
+  onNewAppointment?: (time: string, providerId: string) => void
+  onNewBlock?: (time: string, providerId: string) => void
+  onBlockClick?: (block: TimeBlock) => void
   onClientClick?: (clientId: string) => void
 }
 
-export default function TimeGrid({ providers, appointments, date, slotMinutes, providerHours = [], onItemClick, onSlotClick, onClientClick }: Props) {
+export default function TimeGrid({ providers, appointments, timeBlocks, date, slotMinutes, providerHours = [], onItemClick, onNewAppointment, onNewBlock, onBlockClick, onClientClick }: Props) {
   const qc = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -109,12 +124,14 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
   const didDragRef = useRef(false)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [nowPx, setNowPx] = useState<number | null>(null)
+  const [slotMenu, setSlotMenu] = useState<SlotMenu | null>(null)
 
   type PendingPatch = {
     appointmentId: string
     itemId: string
     patch: Parameters<typeof patchAppointmentItem>[2]
     providerName: string
+    issues: string[]  // human-readable reasons we paused: outside-hours, time-block overlap, etc.
   }
   const [pendingPatch, setPendingPatch] = useState<PendingPatch | null>(null)
 
@@ -163,6 +180,22 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
     }
     return map
   }, [activeProviders, appointments, SLOT_MINUTES])
+
+  const timeBlocksByProvider = useMemo(() => {
+    const map = new Map<string, { block: TimeBlock; topPx: number; heightPx: number }[]>()
+    for (const p of activeProviders) map.set(p.id, [])
+    for (const b of timeBlocks) {
+      const list = map.get(b.provider_id)
+      if (!list) continue
+      const offsetMins = minutesFromGridStart(b.start_time)
+      list.push({
+        block: b,
+        topPx: (offsetMins / SLOT_MINUTES) * SLOT_HEIGHT,
+        heightPx: (b.duration_minutes / SLOT_MINUTES) * SLOT_HEIGHT,
+      })
+    }
+    return map
+  }, [activeProviders, timeBlocks, SLOT_MINUTES])
 
   const timeLabels = useMemo(() => {
     const labels: { label: string; topPx: number }[] = []
@@ -239,6 +272,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
     e.currentTarget.setPointerCapture(e.pointerId)
     const state: DragState = {
       type: 'move',
+      kind: 'appointment',
       appointmentId: appointment.id,
       itemId: item.id,
       originalTop: topPx,
@@ -269,6 +303,7 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
     e.currentTarget.setPointerCapture(e.pointerId)
     const state: DragState = {
       type: 'resize',
+      kind: 'appointment',
       appointmentId: appointment.id,
       itemId: item.id,
       originalTop: topPx,
@@ -280,6 +315,49 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
       currentHeight: heightPx,
       currentProviderIdx: providerIdx,
       label: `${appointment.client.first_name} ${appointment.client.last_name} · ${item.service.name}`,
+    }
+    dragRef.current = state
+    setDrag({ ...state })
+  }, [])
+
+  const onBlockMovePointerDown = useCallback((
+    e: React.PointerEvent,
+    block: TimeBlock,
+    topPx: number,
+    heightPx: number,
+    providerIdx: number,
+  ) => {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const state: DragState = {
+      type: 'move', kind: 'time_block',
+      appointmentId: '', itemId: block.id,
+      originalTop: topPx, originalHeight: heightPx, originalProviderIdx: providerIdx,
+      startY: e.clientY, startX: e.clientX,
+      currentTop: topPx, currentHeight: heightPx, currentProviderIdx: providerIdx,
+      label: block.note ?? 'Time block',
+    }
+    dragRef.current = state
+    didDragRef.current = false
+    setDrag({ ...state })
+  }, [])
+
+  const onBlockResizePointerDown = useCallback((
+    e: React.PointerEvent,
+    block: TimeBlock,
+    topPx: number,
+    heightPx: number,
+    providerIdx: number,
+  ) => {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const state: DragState = {
+      type: 'resize', kind: 'time_block',
+      appointmentId: '', itemId: block.id,
+      originalTop: topPx, originalHeight: heightPx, originalProviderIdx: providerIdx,
+      startY: e.clientY, startX: e.clientX,
+      currentTop: topPx, currentHeight: heightPx, currentProviderIdx: providerIdx,
+      label: block.note ?? 'Time block',
     }
     dragRef.current = state
     setDrag({ ...state })
@@ -338,23 +416,46 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
       const targetProvider = activeProviders[targetProviderIdx]
       const hours = targetProvider ? hoursMap.get(targetProvider.id) : undefined
 
-      let outsideHours = false
-      if (hours) {
-        const startPx = d.type === 'move' ? d.currentTop : d.originalTop
-        const endPx = d.type === 'move'
-          ? d.currentTop + d.originalHeight
-          : d.originalTop + d.currentHeight
-        outsideHours = startPx < hours.startPx || endPx > hours.endPx
+      const startPx = d.type === 'move' ? d.currentTop : d.originalTop
+      const endPx = d.type === 'move'
+        ? d.currentTop + d.originalHeight
+        : d.originalTop + d.currentHeight
+
+      const issues: string[] = []
+      if (hours && (startPx < hours.startPx || endPx > hours.endPx)) {
+        issues.push(`falls outside ${targetProvider?.display_name}'s scheduled hours`)
+      }
+      if (d.kind === 'appointment' && targetProvider) {
+        const overlapping = (timeBlocksByProvider.get(targetProvider.id) ?? []).filter(({ topPx, heightPx }) => {
+          return startPx < topPx + heightPx && endPx > topPx
+        })
+        if (overlapping.length > 0) {
+          const labels = overlapping.map(({ block }) => block.note?.trim() || 'a blocked time').join(', ')
+          issues.push(`overlaps a time block (${labels})`)
+        }
       }
 
-      if (outsideHours && targetProvider) {
-        setPendingPatch({ appointmentId: d.appointmentId, itemId: d.itemId, patch, providerName: targetProvider.display_name })
+      if (d.kind === 'appointment' && issues.length > 0 && targetProvider) {
+        setPendingPatch({
+          appointmentId: d.appointmentId, itemId: d.itemId, patch,
+          providerName: targetProvider.display_name, issues,
+        })
         return
       }
 
       try {
-        await patchAppointmentItem(d.appointmentId, d.itemId, patch)
-        qc.invalidateQueries({ queryKey: ['appointments', date] })
+        if (d.kind === 'appointment') {
+          await patchAppointmentItem(d.appointmentId, d.itemId, patch)
+          qc.invalidateQueries({ queryKey: ['appointments', date] })
+        } else {
+          // Translate appointment-shaped patch fields into TimeBlock patch fields.
+          const blockPatch: Parameters<typeof updateTimeBlock>[1] = {}
+          if (patch.start_time !== undefined) blockPatch.start_time = patch.start_time
+          if (patch.duration_override_minutes !== undefined) blockPatch.duration_minutes = patch.duration_override_minutes
+          if (patch.provider_id !== undefined) blockPatch.provider_id = patch.provider_id
+          await updateTimeBlock(d.itemId, blockPatch)
+          qc.invalidateQueries({ queryKey: ['time-blocks', date] })
+        }
       } catch (err) {
         console.error('Patch failed', err)
       }
@@ -444,15 +545,20 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
             <div
               className="relative"
               style={{ height: TOTAL_HEIGHT }}
-              onDoubleClick={(e) => {
-                if (!onSlotClick || dragRef.current || didDragRef.current) return
+              onClick={(e) => {
+                if (dragRef.current || didDragRef.current) return
                 if (date < format(new Date(), 'yyyy-MM-dd')) return
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
                 const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
                 const h = Math.floor(totalMins / 60)
                 const m = totalMins % 60
-                onSlotClick(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, provider.id)
+                setSlotMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+                  providerId: provider.id,
+                })
               }}
             >
               {/* Off-hours shading */}
@@ -540,21 +646,96 @@ export default function TimeGrid({ providers, appointments, date, slotMinutes, p
                   )
                 })
               })}
+
+              {/* Time blocks — striped grey, note text, draggable like appointments. */}
+              {(timeBlocksByProvider.get(provider.id) ?? []).map(({ block, topPx, heightPx }) => {
+                const isDragging = drag?.kind === 'time_block' && drag.itemId === block.id
+                return (
+                  <div
+                    key={block.id}
+                    className={`absolute left-1 right-1 rounded border border-gray-400 overflow-hidden flex flex-col z-[2]
+                      cursor-grab active:cursor-grabbing
+                      ${isDragging ? 'opacity-30' : 'hover:opacity-80'}
+                    `}
+                    style={{
+                      top: topPx + 1,
+                      height: Math.max(heightPx - 2, 18),
+                      // Striped diagonal pattern in neutral grey — reads as 'blocked off'.
+                      backgroundImage: 'repeating-linear-gradient(45deg, rgb(229 231 235), rgb(229 231 235) 6px, rgb(209 213 219) 6px, rgb(209 213 219) 12px)',
+                    }}
+                  >
+                    <div
+                      className="flex-1 px-1.5 py-0.5 overflow-hidden"
+                      onClick={(e) => { if (!didDragRef.current) { e.stopPropagation(); onBlockClick?.(block) } }}
+                      onPointerDown={(e) => onBlockMovePointerDown(e, block, topPx, heightPx, providerIdx)}
+                    >
+                      <p className="text-xs font-medium truncate leading-tight text-gray-700">
+                        {block.note || 'Blocked'}
+                      </p>
+                    </div>
+                    {heightPx >= 24 && (
+                      <div
+                        className="h-2 cursor-ns-resize flex-shrink-0 flex items-center justify-center"
+                        onPointerDown={(e) => onBlockResizePointerDown(e, block, topPx, heightPx, providerIdx)}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="w-6 h-0.5 rounded bg-gray-500 opacity-50" />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         ))}
       </div>
     </div>
 
-    {/* Outside-hours confirmation dialog */}
+    {/* Slot popover — single-click on empty grid → choose New appointment / New block. */}
+    {slotMenu && (
+      <>
+        <div className="fixed inset-0 z-30" onClick={() => setSlotMenu(null)} />
+        <div
+          className="fixed z-40 bg-white border rounded-md shadow-lg py-1 min-w-[160px]"
+          style={{ left: slotMenu.x, top: slotMenu.y }}
+        >
+          <button
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+            onClick={() => {
+              const m = slotMenu
+              setSlotMenu(null)
+              onNewAppointment?.(m.time, m.providerId)
+            }}
+          >
+            New appointment
+          </button>
+          <button
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+            onClick={() => {
+              const m = slotMenu
+              setSlotMenu(null)
+              onNewBlock?.(m.time, m.providerId)
+            }}
+          >
+            New block
+          </button>
+        </div>
+      </>
+    )}
+
+    {/* Scheduling-conflict confirmation dialog (outside hours, time-block overlap, etc.) */}
     <Dialog open={pendingPatch !== null} onOpenChange={(open) => { if (!open) setPendingPatch(null) }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Outside scheduled hours</DialogTitle>
+          <DialogTitle>Scheduling conflict</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          This appointment falls outside {pendingPatch?.providerName}'s scheduled working hours. Book anyway?
-        </p>
+        <div className="text-sm text-muted-foreground space-y-1.5">
+          <p>This appointment:</p>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {pendingPatch?.issues.map((issue, i) => (<li key={i}>{issue}</li>))}
+          </ul>
+          <p className="pt-1">Book anyway?</p>
+        </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => setPendingPatch(null)}>Cancel</Button>
           <Button

@@ -7,9 +7,11 @@ import { listProviders, type Provider } from '@/api/providers'
 import { getSchedule } from '@/api/schedules'
 import { getRequest } from '@/api/appointmentRequests'
 import { getBranding, type SlotMinutes } from '@/api/settings'
+import { listTimeBlocks, type TimeBlock } from '@/api/timeBlocks'
 import TimeGrid from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
+import TimeBlockEditDialog from '@/components/appointment-book/TimeBlockEditDialog'
 import ClientCard from '@/components/ClientCard'
 import ConvertRequestPanel from '@/components/ConvertRequestPanel'
 import { Button } from '@/components/ui/button'
@@ -24,6 +26,8 @@ export default function AppointmentBookPage() {
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
+  const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null)
+  const [creatingBlock, setCreatingBlock] = useState<{ time: string; providerId: string } | null>(null)
   const { data: branding } = useQuery({ queryKey: ['branding'], queryFn: getBranding })
   const slotMinutes: SlotMinutes = (branding?.slot_minutes ?? 10) as SlotMinutes
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
@@ -57,6 +61,11 @@ export default function AppointmentBookPage() {
   const { data: schedules = [] } = useQuery({
     queryKey: ['schedules', date],
     queryFn: () => getSchedule(date),
+  })
+
+  const { data: timeBlocks = [] } = useQuery<TimeBlock[]>({
+    queryKey: ['time-blocks', date],
+    queryFn: () => listTimeBlocks(date),
   })
 
   const activeProviders = providers.filter((p) => p.has_appointments)
@@ -122,11 +131,14 @@ export default function AppointmentBookPage() {
           <TimeGrid
             providers={visibleProviders}
             appointments={displayedAppointments}
+            timeBlocks={timeBlocks}
             date={date}
             slotMinutes={slotMinutes}
             providerHours={schedules}
             onItemClick={(item, appt) => setSelected({ item, appt })}
-            onSlotClick={(time, providerId) => setBooking({ time, providerId })}
+            onNewAppointment={(time, providerId) => setBooking({ time, providerId })}
+            onNewBlock={(time, providerId) => setCreatingBlock({ time, providerId })}
+            onBlockClick={setEditingBlock}
             onClientClick={setSelectedClientId}
           />
         )}
@@ -149,6 +161,14 @@ export default function AppointmentBookPage() {
         slotMinutes={slotMinutes}
         onClose={() => setBooking(null)}
         onSaved={() => setBooking(null)}
+      />
+
+      <TimeBlockEditDialog
+        block={editingBlock}
+        creating={creatingBlock}
+        date={date}
+        providers={visibleProviders}
+        onClose={() => { setEditingBlock(null); setCreatingBlock(null) }}
       />
 
       <ClientCard
