@@ -370,3 +370,11 @@ The P2-2 confirmation dialog (and any future tenant-facing email composer) curre
 - Email footer (P2-16 layout) gains an address line + phone when set; falls back to name-only when blank.
 
 **Out of scope for v1:** geo-coding, multiple locations per tenant, opening-hours overrides for holidays.
+
+### P2-19 · Cancel-from-client-card stale grid state
+
+When an appointment is cancelled from the client card (Clients → client → Appointments tab → Cancel), it stays rendered as blue (confirmed) on the appointment book grid until a full page reload. A manual reload shows the correct cancelled state, so the data is being persisted; only the cached grid view is stale.
+
+**Likely fix:** the cancel mutation in `ClientsPage`'s `VisitHistory` invalidates `['client-history', clientId]` but not `['appointments', date]` — add the second invalidation (or all-dates: `['appointments']`). Same pattern that other appointment-mutating callers already follow. Verify in the browser after the patch.
+
+**Why it matters:** day-of-day book hygiene — staff who triage a no-show via the client card will still see the appointment as live on the grid and might double-book or get confused.
