@@ -166,6 +166,23 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
     addMutation.mutate()
   }
 
+  function defaultNextStartTime(): string {
+    const items = appointment?.items ?? []
+    if (items.length === 0) return '09:00'
+    const sorted = [...items].sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
+    const last = sorted[sorted.length - 1]
+    const dur = last.duration_override_minutes ?? last.duration_minutes
+    const end = new Date(new Date(last.start_time).getTime() + dur * 60000)
+    return `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+  }
+
+  function openAddForm() {
+    setAddForm(f => ({ ...f, startTime: defaultNextStartTime() }))
+    setShowAddForm(true)
+  }
+
   if (!item || !appointment) return null
 
   const apptStatus = appointment.status
@@ -322,7 +339,9 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             {canEdit && (
               showAddForm ? (
                 <div className="rounded-md border p-3 space-y-2 bg-muted/20">
-                  <p className="text-xs font-medium text-muted-foreground">Add service</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Add service · {format(parseISO(appointment.appointment_date), 'EEEE, MMM d')}
+                  </p>
                   <select
                     value={addForm.serviceId}
                     onChange={e => handleServiceChange(e.target.value)}
@@ -377,7 +396,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                   </div>
                 </div>
               ) : (
-                <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAddForm(true)}>
+                <Button variant="outline" size="sm" className="w-full" onClick={openAddForm}>
                   + Add service
                 </Button>
               )
