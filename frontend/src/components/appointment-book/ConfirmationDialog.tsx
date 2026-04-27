@@ -36,7 +36,6 @@ export default function ConfirmationDialog({
   const [body, setBody] = useState('')
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
 
   const { data: confirmation, isLoading } = useQuery({
     queryKey: ['confirmation', appointmentId],
@@ -51,7 +50,6 @@ export default function ConfirmationDialog({
       setBody(confirmation.body)
       setDirty(false)
       setError(null)
-      setShowPreview(false)
     }
   }, [open, confirmation])
 
@@ -120,35 +118,15 @@ export default function ConfirmationDialog({
                 />
               </div>
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Body (HTML)</label>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-                    onClick={() => setShowPreview((p) => !p)}
-                  >
-                    {showPreview ? 'Edit HTML' : 'Preview'}
-                  </button>
-                </div>
-                {showPreview ? (
-                  <div
-                    className="w-full min-h-[260px] border border-input rounded-md px-3 py-2 text-sm bg-white prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: body }}
-                  />
-                ) : (
-                  <textarea
-                    value={body}
-                    onChange={(e) => { setBody(e.target.value); setDirty(true) }}
-                    disabled={readOnly}
-                    rows={12}
-                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
-                  />
-                )}
-                {confirmation?.is_default && !dirty && !readOnly && (
-                  <p className="text-xs text-muted-foreground italic">
-                    Showing the default template — edits will be saved as a draft.
-                  </p>
-                )}
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">Preview</label>
+                <div
+                  className="w-full min-h-[260px] border border-input rounded-md px-4 py-3 text-sm bg-white prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: body }}
+                />
+                <p className="text-xs text-muted-foreground italic">
+                  Body is generated from the appointment details.
+                  {!readOnly && ' You can edit the subject above; rich-text body editing is coming soon.'}
+                </p>
               </div>
             </div>
 

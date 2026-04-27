@@ -339,3 +339,18 @@ All outbound emails (confirmations, welcome, password reset, future reminders) c
 **Out of scope for v1:** custom email header images per tenant, per-email-type logo overrides, dark-mode-aware emails, plain-text alternative parts (we already only send HTML).
 
 **Depends on:** P1-6 branding (already shipped — logo URL + brand colour live on `tenants`).
+
+### P2-17 · Rich-text email body editor
+
+The P2-2 confirmation dialog (and any future tenant-facing email composer) currently shows the body as a read-only rendered preview. Staff don't write HTML — they need a WYSIWYG that produces email-safe HTML they can edit comfortably.
+
+**Scope:**
+- A small WYSIWYG component (Tiptap or Lexical) with a minimal toolbar: bold, italic, underline, link, bullet list, paragraph break. No headings, no images in v1 — kept tight on purpose so output stays email-client-safe.
+- Output sanitized to a constrained allowlist of inline tags + attributes before persisting (`<p>`, `<strong>`, `<em>`, `<u>`, `<a href>`, `<ul>`, `<ol>`, `<li>`, `<br>`).
+- Replaces the preview block in `ConfirmationDialog`; subject input stays as-is.
+- Initial value comes from the existing default template (or saved draft).
+- Save / Send still post the resulting HTML to the existing endpoints — no schema change.
+
+**Out of scope for v1:** images, inline styles, custom fonts, source-HTML toggle, merge-tag insertion (e.g. `{{client.first_name}}`). Those land alongside tenant-customizable templates if/when that feature ships.
+
+**Depends on:** P2-2 (already shipped — endpoints accept arbitrary HTML body).
