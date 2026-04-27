@@ -66,12 +66,18 @@ jobs:
       # The API container runs `alembic upgrade head` on startup (docker-entrypoint.sh)
       # before uvicorn starts, so migrations run automatically on every deploy.
       - name: Deploy API to Cloud Run
+        env:
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
         run: |
+          ENV_FLAG=""
+          if [ -n "$FRONTEND_URL" ]; then
+            ENV_FLAG="--update-env-vars FRONTEND_URL=$FRONTEND_URL,CORS_ORIGINS=$FRONTEND_URL"
+          fi
           gcloud run deploy salon-api \
             --image ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
             --set-cloudsql-instances ${{ vars.CLOUD_SQL_INSTANCE }} \
-            --update-env-vars FRONTEND_URL=${{ vars.FRONTEND_URL }},CORS_ORIGINS=${{ vars.FRONTEND_URL }} \
+            $ENV_FLAG \
             --quiet
 
       - name: Deploy frontend to Cloud Run
