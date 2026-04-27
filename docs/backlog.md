@@ -319,3 +319,23 @@ Each tenant chooses whether the app displays times in 12-hour (`6:00 PM`) or 24-
 - Frontend: shared `formatTime(hhmm: string)` helper reading the tenant setting; replace ad-hoc `HH:mm` formatting throughout.
 - Setting lives under Settings → Scheduling alongside slot granularity and operating hours.
 - Display rule when 12h is active: drop leading zeros on the hour (e.g. `6:00 PM`, not `06:00 PM`).
+
+### P2-16 · Branded email layout
+
+All outbound emails (confirmations, welcome, password reset, future reminders) currently render as plain HTML with no consistent chrome. Wrap them in a tenant-branded layout that uses the same logo and brand colour set under Settings → Branding (P1-6).
+
+**Shared layout (a single `app/email_layout.py` helper):**
+- Header: tenant logo (`tenant.logo_url`) on a brand-coloured band, with the salon name as alt text fallback when no logo is set.
+- Body slot: rendered content (existing template HTML).
+- Footer: salon name + address + a small "If you weren't expecting this email…" line.
+- Inline CSS only (Gmail/Outlook compatibility); brass/brand colour pulled from `tenant.brand_color`; web-safe fallback fonts; readable text colour computed from brand colour luminance (white text on dark brands, near-black on light).
+- Fixed max-width container (~600px) with light cream background, mirroring the in-app aesthetic.
+
+**Wire-up:**
+- `email.py` gains a `wrap_branded(html, tenant)` helper. `send_email` callers pass the tenant (or a small `BrandingContext`) so the wrapper can inject the chrome.
+- Confirmation, welcome, and password-reset templates collapse to the inner body only; the outer chrome lives in the layout.
+- Settings → Email tab gains a "Send sample" button (in addition to the existing test) that previews the branded layout with a placeholder body.
+
+**Out of scope for v1:** custom email header images per tenant, per-email-type logo overrides, dark-mode-aware emails, plain-text alternative parts (we already only send HTML).
+
+**Depends on:** P1-6 branding (already shipped — logo URL + brand colour live on `tenants`).
