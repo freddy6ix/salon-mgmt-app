@@ -10,6 +10,8 @@ import {
   getOperatingHours,
   updateOperatingHours,
   type OperatingHoursDay,
+  getRequestNotifications,
+  updateRequestNotifications,
 } from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
 import {
@@ -208,7 +210,12 @@ export default function SettingsPage() {
         {tab === 'payment-methods' && isAdmin && <PaymentMethodsSection />}
 
         {/* Email tab — admin only */}
-        {tab === 'email' && isAdmin && <EmailSection />}
+        {tab === 'email' && isAdmin && (
+          <>
+            <EmailSection />
+            <RequestNotificationsSection />
+          </>
+        )}
       </div>
     </div>
   )
@@ -697,4 +704,94 @@ function colorIsDark(hex: string): boolean {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
+}
+
+function RequestNotificationsSection() {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['request-notifications'],
+    queryFn: getRequestNotifications,
+  })
+
+  const [enabled, setEnabled] = useState(true)
+  const [recipientsText, setRecipientsText] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.enabled)
+      setRecipientsText(data.recipients.join('\n'))
+      setDirty(false)
+    }
+  }, [data])
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const recipients = recipientsText
+        .split(/[\n,]/)
+        .map(r => r.trim())
+        .filter(Boolean)
+      return updateRequestNotifications({ enabled, recipients })
+    },
+    onSuccess: updated => {
+      qc.setQueryData(['request-notifications'], updated)
+      setRecipientsText(updated.recipients.join('\n'))
+      setDirty(false)
+      setError(null)
+      setSavedMsg('Saved.')
+      setTimeout(() => setSavedMsg(null), 3000)
+    },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
+  })
+
+  if (isLoading) return null
+
+  return (
+    <section className="border rounded-lg p-5 space-y-4 bg-white">
+      <div>
+        <h2 className="text-base font-medium">Booking-request notifications</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Email the salon when a guest submits a booking request through the public form.
+          Independent of the SMTP configuration above — uses the same outbound credentials.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => { setEnabled(e.target.checked); setDirty(true) }}
+          className="h-4 w-4"
+        />
+        <span className="text-sm">Send notifications when a new request is submitted</span>
+      </label>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="recipients">Recipient emails</Label>
+        <textarea
+          id="recipients"
+          value={recipientsText}
+          onChange={e => { setRecipientsText(e.target.value); setDirty(true) }}
+          rows={3}
+          placeholder="bookings@salonlyol.ca&#10;manager@salonlyol.ca"
+          className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none font-mono"
+        />
+        <p className="text-xs text-muted-foreground">
+          One per line (or comma-separated). Leave blank to disable notifications even when the toggle is on.
+        </p>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex items-center gap-3">
+        <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
+          <Save size={14} className="mr-1.5" />
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
+        {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
+      </div>
+    </section>
+  )
 }

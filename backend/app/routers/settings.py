@@ -175,3 +175,66 @@ async def set_operating_hours(
 
     await db.commit()
     return await get_operating_hours(current_user, db)
+
+
+# ── Request notifications ────────────────────────────────────────────────────
+
+
+class RequestNotificationsOut(BaseModel):
+    enabled: bool
+    recipients: list[str]
+
+
+class RequestNotificationsPatch(BaseModel):
+    enabled: bool | None = None
+    recipients: list[str] | None = None
+
+
+def _split_recipients(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [r.strip() for r in raw.split(",") if r.strip()]
+
+
+def _join_recipients(items: list[str]) -> str | None:
+    cleaned = [r.strip() for r in items if r and r.strip()]
+    return ",".join(cleaned) if cleaned else None
+
+
+@router.get("/notifications", response_model=RequestNotificationsOut)
+async def get_request_notifications(
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RequestNotificationsOut:
+    tenant = await _get_tenant(current_user.tenant_id, db)
+    return RequestNotificationsOut(
+        enabled=tenant.request_notifications_enabled,
+        recipients=_split_recipients(tenant.request_notification_recipients),
+    )
+
+
+@router.patch("/notifications", response_model=RequestNotificationsOut)
+async def update_request_notifications(
+    body: RequestNotificationsPatch,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RequestNotificationsOut:
+    tenant = await _get_tenant(current_user.tenant_id, db)
+    if body.enabled is not None:
+        tenant.request_notifications_enabled = body.enabled
+    if body.recipients is not None:
+        # Light shape validation — anything containing "@" is acceptable here;
+        # real address validation happens at the SMTP layer.
+        for r in body.recipients:
+            if "@" not in r:
+                raise HTTPException(
+                    status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{r}' doesn't look like an email address",
+                )
+        tenant.request_notification_recipients = _join_recipients(body.recipients)
+    await db.commit()
+    await db.refresh(tenant)
+    return RequestNotificationsOut(
+        enabled=tenant.request_notifications_enabled,
+        recipients=_split_recipients(tenant.request_notification_recipients),
+    )

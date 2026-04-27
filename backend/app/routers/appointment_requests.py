@@ -23,6 +23,7 @@ from app.models.client import Client
 from app.models.provider import Provider
 from app.models.service import Service
 from app.models.user import UserRole
+from app.request_notification import send_request_notification
 
 router = APIRouter(prefix="/appointment-requests", tags=["appointment-requests"])
 
@@ -189,6 +190,10 @@ async def create_request(
 
     await db.commit()
     await db.refresh(req)
+
+    # Best-effort notification to salon staff. Never blocks the response.
+    await send_request_notification(db, current_user.tenant_id, req)
+
     return await _load_request_out(req, db)
 
 

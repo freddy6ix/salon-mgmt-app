@@ -34,3 +34,18 @@ export function getOperatingHours(): Promise<OperatingHoursDay[]> {
 export function updateOperatingHours(days: OperatingHoursDay[]): Promise<OperatingHoursDay[]> {
   return api.put<OperatingHoursDay[]>('/settings/operating-hours', { days })
 }
+
+export interface RequestNotifications {
+  enabled: boolean
+  recipients: string[]
+}
+
+export function getRequestNotifications(): Promise<RequestNotifications> {
+  return api.get<RequestNotifications>('/settings/notifications')
+}
+
+export function updateRequestNotifications(
+  patch: { enabled?: boolean; recipients?: string[] },
+): Promise<RequestNotifications> {
+  return api.patch<RequestNotifications>('/settings/notifications', patch)
+}
