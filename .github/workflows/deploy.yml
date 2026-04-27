@@ -71,6 +71,7 @@ jobs:
             --image ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
             --set-cloudsql-instances ${{ vars.CLOUD_SQL_INSTANCE }} \
+            --update-env-vars FRONTEND_URL=${{ vars.FRONTEND_URL }},CORS_ORIGINS=${{ vars.FRONTEND_URL }} \
             --quiet
 
       - name: Deploy frontend to Cloud Run
