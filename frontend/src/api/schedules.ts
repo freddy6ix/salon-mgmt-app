@@ -14,6 +14,7 @@ export interface DayHours {
   is_working: boolean
   start_time: string | null
   end_time: string | null
+  has_schedule?: boolean  // false means no row exists yet for this day
 }
 
 export interface ProviderWeeklyHours {

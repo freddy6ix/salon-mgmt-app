@@ -290,7 +290,7 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
                   value={d.open_time ?? ''}
                   onChange={e => update(d.day_of_week, { open_time: e.target.value })}
                   disabled={!isAdmin}
-                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[90px]"
+                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[120px]"
                 />
                 <span className="text-xs text-muted-foreground">–</span>
                 <input
@@ -298,7 +298,7 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
                   value={d.close_time ?? ''}
                   onChange={e => update(d.day_of_week, { close_time: e.target.value })}
                   disabled={!isAdmin}
-                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[90px]"
+                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[120px]"
                 />
               </div>
             ) : (

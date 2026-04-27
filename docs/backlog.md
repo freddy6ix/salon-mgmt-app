@@ -309,3 +309,13 @@ Backend already has `Service`, `ServiceCategory`, and `ProviderServicePrice` —
 **Out of scope for v1:** tier-based pricing across providers, time-bounded `effective_from`/`effective_to` on prices (column exists; UI defers it), service photos, online booking eligibility flags.
 
 **Why this is the natural next step:** services are the catalogue the entire appointment book operates on. Without staff CRUD, every catalogue change is a developer task. P2-12 (Retail) reuses the same UI conventions, so building Services first establishes the pattern.
+
+### P2-15 · Tenant time format (12h / 24h)
+
+Each tenant chooses whether the app displays times in 12-hour (`6:00 PM`) or 24-hour (`18:00`) format. Affects every place a time is rendered: appointment book grid, appointment detail, sale summary, requests, settings, staff schedules, etc. Inputs (`<input type="time">`) honour the same setting where the browser allows it.
+
+- `tenants.time_format`: `"12h" | "24h"`, default `"12h"`.
+- Backend: expose on `GET /settings/branding` and accept on `PATCH /settings/branding`.
+- Frontend: shared `formatTime(hhmm: string)` helper reading the tenant setting; replace ad-hoc `HH:mm` formatting throughout.
+- Setting lives under Settings → Scheduling alongside slot granularity and operating hours.
+- Display rule when 12h is active: drop leading zeros on the hour (e.g. `6:00 PM`, not `06:00 PM`).

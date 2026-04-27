@@ -37,7 +37,15 @@ interface RowProps {
 
 function ProviderRow({ provider, salonHours, onSave, saving }: RowProps) {
   const [days, setDays] = useState<DayHours[]>(() =>
-    provider.days.map((d) => ({ ...d }))
+    provider.days.map((d) => {
+      const salon = salonHours[d.day_of_week]
+      // No saved row yet AND salon is open this day → default to Working with salon hours.
+      // This matches the common case: when a salon opens a previously-closed day, most providers will work it.
+      if (!d.has_schedule && salon) {
+        return { ...d, is_working: true, start_time: salon.open, end_time: salon.close }
+      }
+      return { ...d }
+    })
   )
   const [dirty, setDirty] = useState(false)
   const [effectiveFrom, setEffectiveFrom] = useState(TODAY)

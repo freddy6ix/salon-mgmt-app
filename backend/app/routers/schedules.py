@@ -45,6 +45,7 @@ class DayHours(BaseModel):
     is_working: bool
     start_time: str | None  # "HH:MM"
     end_time: str | None
+    has_schedule: bool = False  # GET only — false means no row exists yet for this day
 
 
 class ProviderWeeklyHours(BaseModel):
@@ -240,6 +241,7 @@ async def get_weekly(
                 is_working=row.is_working if row else False,
                 start_time=_fmt(row.start_time) if row else None,
                 end_time=_fmt(row.end_time) if row else None,
+                has_schedule=row is not None,
             ))
         result.append(ProviderWeeklyHours(
             provider_id=pid,
