@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { login } from '@/api/auth'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,42 +28,97 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40">
-      <Card className="w-full max-w-sm">
-        <CardContent className="pt-8">
-          <div className="flex justify-center mb-8">
-            <img src="/salon-lyol-logo.png" alt="Salon Lyol" className="h-56 w-auto" />
+    <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr]">
+      {/* Left: portrait hero panel */}
+      <div className="relative hidden lg:block">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: 'url(/images/Erin.Salon.Final-5.jpg)' }}
+          aria-hidden
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/60" aria-hidden />
+        <div className="relative z-10 h-full flex flex-col justify-between p-10 text-white">
+          <Link to="/" className="inline-block">
+            <img src="/salon-lyol-logo.png" alt="Salon Lyol" className="h-9 w-auto" />
+          </Link>
+          <div className="space-y-4 max-w-sm">
+            <p className="text-xs tracking-[0.4em] uppercase text-white/70">
+              Salon Lyol · Toronto
+            </p>
+            <p
+              className="text-3xl xl:text-4xl font-light leading-tight"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              Every day can be a <em className="font-normal">good hair day.</em>
+            </p>
           </div>
+        </div>
+      </div>
+
+      {/* Right: sign-in form */}
+      <div className="flex items-center justify-center px-6 py-12 bg-[#faf9f7]">
+        <div className="w-full max-w-sm space-y-8">
+          {/* Mobile-only logo */}
+          <div className="flex justify-center lg:hidden">
+            <img src="/salon-lyol-logo.png" alt="Salon Lyol" className="h-12 w-auto" />
+          </div>
+
+          <div className="space-y-2 text-center lg:text-left">
+            <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">
+              Welcome back
+            </p>
+            <h1
+              className="text-3xl font-light"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              Sign in to your account
+            </h1>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="border border-input rounded-md px-3 py-2 text-sm bg-background"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="border border-input rounded-md px-3 py-2 text-sm bg-background"
-            />
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full border-0 border-b border-input bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-foreground transition-colors"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full border-0 border-b border-input bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-foreground transition-colors"
+              />
+            </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="mt-2 h-12 rounded-sm tracking-widest uppercase text-xs"
+            >
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-muted-foreground pt-2">
               New client?{' '}
-              <Link to="/register" className="text-primary hover:underline">
+              <Link to="/register" className="text-foreground underline-offset-4 hover:underline">
                 Create an account
               </Link>
             </p>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
