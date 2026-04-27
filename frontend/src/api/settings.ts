@@ -3,7 +3,18 @@ import { api } from './client'
 export const SLOT_OPTIONS = [5, 10, 15, 20, 30] as const
 export type SlotMinutes = typeof SLOT_OPTIONS[number]
 
-export interface BrandingSettings {
+export interface ContactDetails {
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  region: string | null
+  postal_code: string | null
+  country: string | null
+  phone: string | null
+  hours_summary: string | null
+}
+
+export interface BrandingSettings extends ContactDetails {
   salon_name: string
   logo_url: string | null
   brand_color: string | null
@@ -14,10 +25,22 @@ export function getBranding(): Promise<BrandingSettings> {
   return api.get<BrandingSettings>('/settings/branding')
 }
 
-export function updateBranding(
-  patch: Partial<Pick<BrandingSettings, 'logo_url' | 'brand_color' | 'slot_minutes'>>,
-): Promise<BrandingSettings> {
+type BrandingPatchable = Partial<Pick<BrandingSettings,
+  'logo_url' | 'brand_color' | 'slot_minutes'
+> & ContactDetails>
+
+export function updateBranding(patch: BrandingPatchable): Promise<BrandingSettings> {
   return api.patch<BrandingSettings>('/settings/branding', patch)
+}
+
+export interface PublicTenantInfo extends ContactDetails {
+  name: string
+  logo_url: string | null
+  brand_color: string | null
+}
+
+export function getPublicTenantInfo(): Promise<PublicTenantInfo> {
+  return api.get<PublicTenantInfo>('/public/tenant-info')
 }
 
 export interface OperatingHoursDay {

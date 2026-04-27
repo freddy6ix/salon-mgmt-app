@@ -18,17 +18,39 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 VALID_SLOT_MINUTES = {5, 10, 15, 20, 30}
 
 
+CONTACT_FIELDS = (
+    "address_line1", "address_line2", "city", "region",
+    "postal_code", "country", "phone", "hours_summary",
+)
+
+
 class BrandingOut(BaseModel):
     salon_name: str
     logo_url: str | None
     brand_color: str | None
     slot_minutes: int
+    address_line1: str | None
+    address_line2: str | None
+    city: str | None
+    region: str | None
+    postal_code: str | None
+    country: str | None
+    phone: str | None
+    hours_summary: str | None
 
 
 class BrandingPatch(BaseModel):
     logo_url: str | None = None
     brand_color: str | None = None
     slot_minutes: int | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    phone: str | None = None
+    hours_summary: str | None = None
 
 
 async def _get_tenant(tenant_id: uuid.UUID, db: AsyncSession) -> Tenant:
@@ -37,18 +59,30 @@ async def _get_tenant(tenant_id: uuid.UUID, db: AsyncSession) -> Tenant:
     ).scalar_one()
 
 
+def _branding_out(tenant: Tenant) -> BrandingOut:
+    return BrandingOut(
+        salon_name=tenant.name,
+        logo_url=tenant.logo_url,
+        brand_color=tenant.brand_color,
+        slot_minutes=tenant.slot_minutes,
+        address_line1=tenant.address_line1,
+        address_line2=tenant.address_line2,
+        city=tenant.city,
+        region=tenant.region,
+        postal_code=tenant.postal_code,
+        country=tenant.country,
+        phone=tenant.phone,
+        hours_summary=tenant.hours_summary,
+    )
+
+
 @router.get("/branding", response_model=BrandingOut)
 async def get_branding(
     current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> BrandingOut:
     tenant = await _get_tenant(current_user.tenant_id, db)
-    return BrandingOut(
-        salon_name=tenant.name,
-        logo_url=tenant.logo_url,
-        brand_color=tenant.brand_color,
-        slot_minutes=tenant.slot_minutes,
-    )
+    return _branding_out(tenant)
 
 
 @router.patch("/branding", response_model=BrandingOut)
@@ -65,16 +99,14 @@ async def update_branding(
                 raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     detail=f"slot_minutes must be one of {sorted(VALID_SLOT_MINUTES)}")
             tenant.slot_minutes = value
+        elif field in CONTACT_FIELDS:
+            cleaned = value.strip() if isinstance(value, str) else value
+            setattr(tenant, field, cleaned or None)
         else:
             setattr(tenant, field, value or None)
     await db.commit()
     await db.refresh(tenant)
-    return BrandingOut(
-        salon_name=tenant.name,
-        logo_url=tenant.logo_url,
-        brand_color=tenant.brand_color,
-        slot_minutes=tenant.slot_minutes,
-    )
+    return _branding_out(tenant)
 
 
 # ── Operating hours ──────────────────────────────────────────────────────────

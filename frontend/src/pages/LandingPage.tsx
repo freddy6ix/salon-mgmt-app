@@ -1,6 +1,24 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getPublicTenantInfo, type PublicTenantInfo } from '@/api/settings'
+
+function formatAddress(t: PublicTenantInfo | undefined): string | null {
+  if (!t) return null
+  const street = [t.address_line1, t.address_line2].filter(Boolean).join(', ')
+  const city = [t.city, t.region].filter(Boolean).join(', ')
+  const parts = [street, city].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
 
 export default function LandingPage() {
+  const { data: tenant } = useQuery({
+    queryKey: ['public-tenant-info'],
+    queryFn: getPublicTenantInfo,
+  })
+
+  const address = formatAddress(tenant)
+  const phone = tenant?.phone
+
   return (
     <div className="min-h-screen relative flex flex-col text-white">
       {/* Hero background */}
@@ -35,7 +53,7 @@ export default function LandingPage() {
         <p
           className="text-xs sm:text-sm tracking-[0.4em] uppercase text-white/70 mb-6"
         >
-          Toronto · Yonge Street
+          {[tenant?.city, tenant?.region].filter(Boolean).join(' · ') || 'Toronto · Ontario'}
         </p>
         <h1
           className="text-5xl sm:text-7xl font-light leading-tight max-w-3xl"
@@ -66,13 +84,18 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 px-6 sm:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/60">
-        <p className="tracking-wider">1452 Yonge Street · Toronto, ON</p>
-        <a
-          href="https://salonlyol.ca"
-          className="tracking-wider hover:text-white transition-colors"
-        >
-          salonlyol.ca
-        </a>
+        <p className="tracking-wider">
+          {address ?? tenant?.name ?? 'Salon Lyol · Toronto, ON'}
+        </p>
+        <div className="flex gap-4 items-center">
+          {phone && <span className="tracking-wider">{phone}</span>}
+          <a
+            href="https://salonlyol.ca"
+            className="tracking-wider hover:text-white transition-colors"
+          >
+            salonlyol.ca
+          </a>
+        </div>
       </footer>
     </div>
   )

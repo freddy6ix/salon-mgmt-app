@@ -5,6 +5,7 @@ import {
   getBranding,
   updateBranding,
   type BrandingSettings,
+  type ContactDetails,
   type SlotMinutes,
   SLOT_OPTIONS,
   getOperatingHours,
@@ -41,19 +42,44 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [brandColor, setBrandColor] = useState('#18181b')
   const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(10)
+  const EMPTY_CONTACT: ContactDetails = {
+    address_line1: null, address_line2: null, city: null, region: null,
+    postal_code: null, country: null, phone: null, hours_summary: null,
+  }
+  const [contact, setContact] = useState<ContactDetails>(EMPTY_CONTACT)
 
   useEffect(() => {
     if (branding) {
       setLogoUrl(branding.logo_url ?? '')
       setBrandColor(branding.brand_color ?? '#18181b')
       setSlotMinutes((branding.slot_minutes ?? 10) as SlotMinutes)
+      setContact({
+        address_line1: branding.address_line1,
+        address_line2: branding.address_line2,
+        city: branding.city,
+        region: branding.region,
+        postal_code: branding.postal_code,
+        country: branding.country,
+        phone: branding.phone,
+        hours_summary: branding.hours_summary,
+      })
     }
   }, [branding])
 
+  function setContactField<K extends keyof ContactDetails>(field: K, value: string) {
+    setContact(prev => ({ ...prev, [field]: value || null }))
+  }
+
   const brandingMutation = useMutation({
-    mutationFn: () => updateBranding({ logo_url: logoUrl || null, brand_color: brandColor, slot_minutes: slotMinutes }),
+    mutationFn: () => updateBranding({
+      logo_url: logoUrl || null,
+      brand_color: brandColor,
+      slot_minutes: slotMinutes,
+      ...contact,
+    }),
     onSuccess: (updated: BrandingSettings) => {
       qc.setQueryData(['branding'], updated)
+      qc.invalidateQueries({ queryKey: ['public-tenant-info'] })
       applyBranding(updated)
     },
   })
@@ -149,6 +175,87 @@ export default function SettingsPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Applied to buttons and accents throughout the app.</p>
+            </div>
+
+            <div className="space-y-3 border-t pt-5">
+              <div>
+                <h2 className="text-sm font-medium">Contact</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Shown on the public landing page and in outbound email footers.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">Address</label>
+                <input
+                  type="text"
+                  value={contact.address_line1 ?? ''}
+                  onChange={e => setContactField('address_line1', e.target.value)}
+                  placeholder="Street address"
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                />
+                <input
+                  type="text"
+                  value={contact.address_line2 ?? ''}
+                  onChange={e => setContactField('address_line2', e.target.value)}
+                  placeholder="Suite, floor (optional)"
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={contact.city ?? ''}
+                    onChange={e => setContactField('city', e.target.value)}
+                    placeholder="City"
+                    className="border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                  <input
+                    type="text"
+                    value={contact.region ?? ''}
+                    onChange={e => setContactField('region', e.target.value)}
+                    placeholder="Province / state"
+                    className="border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                  <input
+                    type="text"
+                    value={contact.postal_code ?? ''}
+                    onChange={e => setContactField('postal_code', e.target.value)}
+                    placeholder="Postal code"
+                    className="border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={contact.country ?? ''}
+                  onChange={e => setContactField('country', e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="Country (2-letter)"
+                  maxLength={2}
+                  className="w-24 border border-input rounded-md px-3 py-2 text-sm bg-background uppercase"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Phone</label>
+                  <input
+                    type="tel"
+                    value={contact.phone ?? ''}
+                    onChange={e => setContactField('phone', e.target.value)}
+                    placeholder="416-555-0100"
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Hours summary</label>
+                  <input
+                    type="text"
+                    value={contact.hours_summary ?? ''}
+                    onChange={e => setContactField('hours_summary', e.target.value)}
+                    placeholder="Tue–Sat · 9–6"
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+              </div>
             </div>
 
             {brandingMutation.isError && (

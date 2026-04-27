@@ -36,6 +36,20 @@ def _readable_text_on(hex_color: str) -> str:
     return "#1a1a1a" if luminance >= 0.6 else "#ffffff"
 
 
+def _format_address(tenant: Tenant) -> str | None:
+    """Single-line address built from tenant contact fields, or None if blank."""
+    street_parts = [tenant.address_line1, tenant.address_line2]
+    locality_parts = [tenant.city, tenant.region]
+    street = ", ".join(p for p in street_parts if p)
+    locality = ", ".join(p for p in locality_parts if p)
+    if locality and tenant.postal_code:
+        locality = f"{locality}  {tenant.postal_code}"
+    elif tenant.postal_code:
+        locality = tenant.postal_code
+    bits = [b for b in (street, locality) if b]
+    return " · ".join(bits) if bits else None
+
+
 def _header_html(tenant: Tenant, brand_color: str, on_brand: str) -> str:
     name = escape(tenant.name)
     if tenant.logo_url:
@@ -63,6 +77,15 @@ def wrap_branded(inner_html: str, tenant: Tenant, *, subject: str | None = None)
     title = escape(subject or tenant.name)
     salon = escape(tenant.name)
     header = _header_html(tenant, brand, on_brand)
+    address = _format_address(tenant)
+    phone = tenant.phone
+
+    contact_lines: list[str] = []
+    if address:
+        contact_lines.append(f'<div style="margin-bottom:4px;">{escape(address)}</div>')
+    if phone:
+        contact_lines.append(f'<div style="margin-bottom:6px;">{escape(phone)}</div>')
+    contact_html = "".join(contact_lines)
 
     # Layout uses an outer table on a coloured page background, centring a
     # 600px max-width card. Tables + inline CSS = Gmail/Outlook safe.
@@ -100,7 +123,8 @@ def wrap_branded(inner_html: str, tenant: Tenant, *, subject: str | None = None)
                          border-top:1px solid {FOOTER_BORDER};
                          font-family:Helvetica,Arial,sans-serif;
                          font-size:12px;color:{MUTED};">
-                <div style="margin-bottom:6px;">{salon}</div>
+                <div style="margin-bottom:6px;font-weight:600;color:#444;">{salon}</div>
+                {contact_html}
                 <div style="color:{SUBTLE};">
                   If you weren't expecting this email, you can safely ignore it.
                 </div>

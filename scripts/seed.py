@@ -44,6 +44,20 @@ async def seed():
         else:
             print(f"Tenant already exists: {tenant.id}")
 
+        # Backfill / refresh contact details (idempotent)
+        if tenant.address_line1 is None:
+            tenant.address_line1 = "1452 Yonge Street"
+        if tenant.city is None:
+            tenant.city = "Toronto"
+        if tenant.region is None:
+            tenant.region = "ON"
+        if tenant.country is None:
+            tenant.country = "CA"
+        if tenant.phone is None:
+            tenant.phone = "416-922-0511"
+        if tenant.hours_summary is None:
+            tenant.hours_summary = "Tue–Sat · by appointment"
+
         tid = tenant.id
 
         # ── Departments ─────────────────────────────────────────────────────
