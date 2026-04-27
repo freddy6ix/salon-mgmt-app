@@ -579,7 +579,7 @@ function ConfirmationStatusRow({ status, sentAt, hasEmail, onOpen }: Confirmatio
       tone = 'text-green-700'
       break
     case 'draft':
-      label = 'Draft saved'
+      label = 'Confirmation draft saved'
       buttonLabel = 'Open draft'
       tone = 'text-amber-700'
       break
