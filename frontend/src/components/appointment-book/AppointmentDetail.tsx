@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import CheckoutPanel from '@/components/appointment-book/CheckoutPanel'
+import SaleSummary from '@/components/appointment-book/SaleSummary'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending: 'secondary',
@@ -447,15 +448,18 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             )}
 
             {apptStatus === 'completed' && (
-              <div className="flex gap-2 pt-1 justify-center">
-                <p className="text-xs text-muted-foreground">Checked out</p>
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate('in_progress')}
-                >
-                  Undo
-                </button>
+              <div className="pt-1">
+                <div className="flex gap-2 justify-center">
+                  <p className="text-xs text-muted-foreground">Checked out</p>
+                  <button
+                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                    disabled={statusMutation.isPending}
+                    onClick={() => statusMutation.mutate('in_progress')}
+                  >
+                    Undo
+                  </button>
+                </div>
+                <SaleSummary appointmentId={appointment.id} />
               </div>
             )}
             {apptStatus === 'cancelled' && (
