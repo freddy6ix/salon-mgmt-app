@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format, addMinutes } from 'date-fns'
+import { format } from 'date-fns'
 import { searchClients, createClient, type Client } from '@/api/clients'
 import { listServices, type Service } from '@/api/services'
 import { type Provider } from '@/api/providers'
@@ -31,6 +31,19 @@ function snapToSlot(time: string, slotMinutes: number): string {
   const snapped = Math.round(m / slotMinutes) * slotMinutes
   if (snapped >= 60) return `${String(h + 1).padStart(2, '0')}:00`
   return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
+}
+
+// Advance startTime by a duration and round UP to the nearest slot grid value
+// so the new time matches an option in the time <select>. Without rounding,
+// e.g. 10:10 + 45min = 10:55, which isn't a 10-min slot — the select would
+// silently fall back to its first option.
+function advanceToNextSlot(startHHMM: string, durationMins: number, slotMinutes: number): string {
+  const [h, m] = startHHMM.split(':').map(Number)
+  const endMins = h * 60 + m + durationMins
+  const snapped = Math.ceil(endMins / slotMinutes) * slotMinutes
+  const sh = Math.min(21, Math.floor(snapped / 60))
+  const sm = snapped >= 22 * 60 ? 50 : snapped % 60
+  return `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`
 }
 
 interface ItemDraft {
@@ -126,10 +139,8 @@ export default function BookingForm({
         price: price ? parseFloat(price) : (selectedService.default_price ?? 0),
       },
     ])
-    // Advance start time for next item
-    const [h, m] = startTime.split(':').map(Number)
-    const next = addMinutes(new Date(2000, 0, 1, h, m), selectedService.duration_minutes)
-    setStartTime(format(next, 'HH:mm'))
+    // Advance start time for next item — snap to slot grid so the value matches a select option.
+    setStartTime(advanceToNextSlot(startTime, selectedService.duration_minutes, slotMinutes))
     setServiceId('')
     setPrice('')
   }
