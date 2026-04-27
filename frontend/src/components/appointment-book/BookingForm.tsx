@@ -400,7 +400,8 @@ export default function BookingForm({
               <Button
                 disabled={items.length === 0 && (!serviceId || !providerId)}
                 onClick={() => {
-                  if (items.length === 0 && serviceId && providerId) addItem()
+                  // Auto-add a complete in-progress entry so users don't lose it by clicking Review.
+                  if (serviceId && providerId) addItem()
                   setStep('confirm')
                 }}
               >
