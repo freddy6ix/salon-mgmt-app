@@ -17,6 +17,7 @@ from app.confirmation_template import (
     build_default_subject,
 )
 from app.email import SmtpConfig, send_email
+from app.email_layout import wrap_branded
 from app.models.appointment import (
     Appointment,
     AppointmentItem,
@@ -783,8 +784,13 @@ async def send_confirmation(
         from_address=smtp_row.from_address,
     )
 
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.id == appt.tenant_id))
+    ).scalar_one()
+    branded_html = wrap_branded(html, tenant, subject=subject)
+
     try:
-        await send_email(smtp_cfg, client.email, subject, html)
+        await send_email(smtp_cfg, client.email, subject, branded_html)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
 

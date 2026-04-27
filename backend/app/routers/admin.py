@@ -16,6 +16,7 @@ from app.deps import AdminUser
 from app.email import SmtpConfig, send_email, send_welcome_email
 from app.models.client import Client
 from app.models.email_config import TenantEmailConfig
+from app.models.tenant import Tenant
 from app.models.user import PasswordResetToken, User, UserRole
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -159,7 +160,10 @@ async def create_user(
     await db.refresh(user)
 
     if reset_link and smtp_cfg:
-        await send_welcome_email(smtp_cfg, user.email, reset_link)
+        tenant = (
+            await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
+        ).scalar_one()
+        await send_welcome_email(smtp_cfg, tenant, user.email, reset_link)
 
     return await _user_out(user, db)
 
@@ -249,7 +253,10 @@ async def resend_welcome(
     raw = await _create_reset_token(user.id, db)
     await db.commit()
     reset_link = f"{settings.frontend_url}/reset-password?token={raw}"
-    await send_welcome_email(smtp_cfg, user.email, reset_link)
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
+    ).scalar_one()
+    await send_welcome_email(smtp_cfg, tenant, user.email, reset_link)
 
 
 # ── Email config ──────────────────────────────────────────────────────────────
@@ -358,13 +365,21 @@ async def test_email_config(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    from app.email_layout import wrap_branded
     smtp_cfg = await _get_smtp_config(current_user.tenant_id, db)
-    html = """
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-      <h2 style="margin-top:0;">Test email</h2>
-      <p>Your SMTP configuration is working correctly.</p>
-    </div>"""
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
+    ).scalar_one()
+    inner = """\
+<h2 style="margin:0 0 16px 0;font-family:Georgia,'Times New Roman',serif;font-weight:400;">
+  SMTP test
+</h2>
+<p style="margin:0;">
+  Your SMTP configuration is working. This is also a preview of the
+  branded layout used for confirmations, welcomes, and password resets.
+</p>"""
+    subject = f"{tenant.name} — SMTP test"
     try:
-        await send_email(smtp_cfg, body.to, "Salon Lyol — SMTP test", html)
+        await send_email(smtp_cfg, body.to, subject, wrap_branded(inner, tenant, subject=subject))
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

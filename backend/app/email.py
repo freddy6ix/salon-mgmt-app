@@ -5,6 +5,10 @@ import ssl
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.tenant import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -61,39 +65,52 @@ async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
     await asyncio.to_thread(_send_sync, cfg, to, subject, html)
 
 
-async def send_welcome_email(cfg: SmtpConfig, to: str, reset_link: str, salon_name: str = "Salon Lyol") -> None:
-    html = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-      <h2 style="margin-top:0;">Welcome to {salon_name}</h2>
-      <p>Your staff account has been created. Click below to set your password and get started.</p>
-      <p style="margin:32px 0;">
-        <a href="{reset_link}"
-           style="background:#18181b;color:#fff;padding:12px 24px;
-                  border-radius:6px;text-decoration:none;font-weight:600;">
-          Set my password
-        </a>
-      </p>
-      <p style="color:#71717a;font-size:14px;">
-        This link expires in 72 hours. If you didn't expect this email, you can ignore it.
-      </p>
-    </div>"""
-    await send_email(cfg, to, f"Welcome to {salon_name} — Set your password", html)
+def _cta_button(href: str, label: str, brand_color: str | None) -> str:
+    # Brand-aware CTA button. Computed text colour for legibility against the brand.
+    from app.email_layout import _readable_text_on, DEFAULT_BRAND  # local to avoid cycles
+    bg = brand_color or DEFAULT_BRAND
+    fg = _readable_text_on(bg)
+    return (
+        f'<a href="{href}" '
+        f'style="display:inline-block;background:{bg};color:{fg};padding:12px 28px;'
+        f'border-radius:4px;text-decoration:none;font-weight:600;letter-spacing:0.04em;">'
+        f'{label}</a>'
+    )
 
 
-async def send_password_reset_email(cfg: SmtpConfig, to: str, reset_link: str, salon_name: str = "Salon Lyol") -> None:
-    html = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-      <h2 style="margin-top:0;">Reset your password</h2>
-      <p>Click below to reset your {salon_name} password.</p>
-      <p style="margin:32px 0;">
-        <a href="{reset_link}"
-           style="background:#18181b;color:#fff;padding:12px 24px;
-                  border-radius:6px;text-decoration:none;font-weight:600;">
-          Reset my password
-        </a>
-      </p>
-      <p style="color:#71717a;font-size:14px;">
-        This link expires in 72 hours. If you didn't request this, you can ignore it.
-      </p>
-    </div>"""
-    await send_email(cfg, to, f"Reset your {salon_name} password", html)
+async def send_welcome_email(cfg: SmtpConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
+    from app.email_layout import wrap_branded
+    salon_name = tenant.name
+    cta = _cta_button(reset_link, "Set my password", tenant.brand_color)
+    inner = f"""\
+<h2 style="margin:0 0 16px 0;font-family:Georgia,'Times New Roman',serif;font-weight:400;">
+  Welcome to {salon_name}
+</h2>
+<p style="margin:0 0 16px 0;">
+  Your staff account has been created. Click below to set your password and get started.
+</p>
+<p style="margin:24px 0;">{cta}</p>
+<p style="margin:24px 0 0 0;color:#6b6b6b;font-size:13px;">
+  This link expires in 72 hours.
+</p>"""
+    subject = f"Welcome to {salon_name} — Set your password"
+    await send_email(cfg, to, subject, wrap_branded(inner, tenant, subject=subject))
+
+
+async def send_password_reset_email(cfg: SmtpConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
+    from app.email_layout import wrap_branded
+    salon_name = tenant.name
+    cta = _cta_button(reset_link, "Reset my password", tenant.brand_color)
+    inner = f"""\
+<h2 style="margin:0 0 16px 0;font-family:Georgia,'Times New Roman',serif;font-weight:400;">
+  Reset your password
+</h2>
+<p style="margin:0 0 16px 0;">
+  Click below to reset your {salon_name} password.
+</p>
+<p style="margin:24px 0;">{cta}</p>
+<p style="margin:24px 0 0 0;color:#6b6b6b;font-size:13px;">
+  This link expires in 72 hours. If you didn't request this, you can ignore it.
+</p>"""
+    subject = f"Reset your {salon_name} password"
+    await send_email(cfg, to, subject, wrap_branded(inner, tenant, subject=subject))

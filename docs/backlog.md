@@ -354,3 +354,19 @@ The P2-2 confirmation dialog (and any future tenant-facing email composer) curre
 **Out of scope for v1:** images, inline styles, custom fonts, source-HTML toggle, merge-tag insertion (e.g. `{{client.first_name}}`). Those land alongside tenant-customizable templates if/when that feature ships.
 
 **Depends on:** P2-2 (already shipped — endpoints accept arbitrary HTML body).
+
+### P2-18 · Tenant contact details (address, phone, hours)
+
+`tenants` currently has `name`, `logo_url`, `brand_color`. It's missing the contact info needed to render a real footer on emails (P2-16 omits address for v1) and a public-facing "how to reach us" section on the landing page (which currently hardcodes "1452 Yonge Street").
+
+**Schema additions on `tenants`:**
+- `address_line1`, `address_line2`, `city`, `region`, `postal_code`, `country` — stored as discrete fields, not a free-text blob, so we can format per locale and link to maps.
+- `phone` (E.164 string).
+- `hours_summary` — a short human string like "Tue–Sat · 9–6", because per-day hours already live on `TenantOperatingHours` and don't need a second source of truth. Just a display caption.
+
+**Wire-up:**
+- Settings → Branding form gets a "Contact" section (address fields + phone + hours summary).
+- Landing page reads from the tenant API (no more hardcoded address).
+- Email footer (P2-16 layout) gains an address line + phone when set; falls back to name-only when blank.
+
+**Out of scope for v1:** geo-coding, multiple locations per tenant, opening-hours overrides for holidays.
