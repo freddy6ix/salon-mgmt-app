@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import CheckoutPanel from '@/components/appointment-book/CheckoutPanel'
 import SaleSummary from '@/components/appointment-book/SaleSummary'
+import ConfirmationDialog from '@/components/appointment-book/ConfirmationDialog'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending: 'secondary',
@@ -69,6 +70,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
 
   const clientId = appointment?.client.id ?? null
 
@@ -394,6 +396,15 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
               </p>
             )}
 
+            {apptStatus !== 'cancelled' && (
+              <ConfirmationStatusRow
+                status={appointment.confirmation_status}
+                sentAt={appointment.confirmation_sent_at}
+                hasEmail={!!client.email}
+                onOpen={() => setConfirmationOpen(true)}
+              />
+            )}
+
             {apptStatus === 'confirmed' && (
               <div className="flex gap-2 pt-1 flex-wrap">
                 <Button
@@ -535,6 +546,63 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
         onCompleted={() => { setCheckoutOpen(false); onClose() }}
       />
     )}
+
+    {appointment && (
+      <ConfirmationDialog
+        appointmentId={appointment.id}
+        appointmentDate={appointment.appointment_date}
+        open={confirmationOpen}
+        recipientEmail={client.email ?? null}
+        onClose={() => setConfirmationOpen(false)}
+      />
+    )}
     </>
+  )
+}
+
+interface ConfirmationStatusRowProps {
+  status: 'not_sent' | 'draft' | 'sent' | 'skipped'
+  sentAt: string | null
+  hasEmail: boolean
+  onOpen: () => void
+}
+
+function ConfirmationStatusRow({ status, sentAt, hasEmail, onOpen }: ConfirmationStatusRowProps) {
+  let label: string
+  let buttonLabel: string
+  let tone: string
+
+  switch (status) {
+    case 'sent':
+      label = `Confirmation sent${sentAt ? ` ${new Date(sentAt).toLocaleDateString()}` : ''}`
+      buttonLabel = 'View'
+      tone = 'text-green-700'
+      break
+    case 'draft':
+      label = 'Draft saved'
+      buttonLabel = 'Open draft'
+      tone = 'text-amber-700'
+      break
+    case 'skipped':
+      label = 'Confirmation skipped'
+      buttonLabel = 'Send anyway'
+      tone = 'text-muted-foreground'
+      break
+    default:
+      label = hasEmail ? 'No confirmation sent' : 'No confirmation sent (no client email)'
+      buttonLabel = 'Send confirmation'
+      tone = 'text-muted-foreground'
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2">
+      <span className={`text-xs ${tone}`}>{label}</span>
+      <button
+        onClick={onOpen}
+        className="text-xs font-medium text-foreground hover:underline underline-offset-4"
+      >
+        {buttonLabel}
+      </button>
+    </div>
   )
 }

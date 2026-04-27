@@ -11,6 +11,12 @@ from fastapi import Depends
 
 from app.database import get_db
 from app.deps import CurrentUser, StaffUser
+from app.confirmation_template import (
+    TemplateItem,
+    build_default_body,
+    build_default_subject,
+)
+from app.email import SmtpConfig, send_email
 from app.models.appointment import (
     Appointment,
     AppointmentItem,
@@ -18,10 +24,13 @@ from app.models.appointment import (
     AppointmentRequestItem,
     AppointmentSource,
     AppointmentStatus,
+    ConfirmationStatus,
 )
 from app.models.client import Client
+from app.models.email_config import TenantEmailConfig
 from app.models.provider import Provider
 from app.models.service import Service
+from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -53,6 +62,7 @@ class ClientSummary(BaseModel):
     first_name: str
     last_name: str
     cell_phone: str | None
+    email: str | None
     special_instructions: str | None
 
     model_config = {"from_attributes": True}
@@ -80,6 +90,8 @@ class AppointmentOut(BaseModel):
     notes: str | None
     client: ClientSummary
     items: list[AppointmentItemOut]
+    confirmation_status: str
+    confirmation_sent_at: datetime | None
 
 
 # ── Create schemas ───────────────────────────────────────────────────────────
@@ -185,9 +197,12 @@ async def _load_appointment_out(appt: Appointment, db: AsyncSession) -> Appointm
             first_name=client.first_name,
             last_name=client.last_name,
             cell_phone=client.cell_phone,
+            email=client.email,
             special_instructions=client.special_instructions,
         ),
         items=items_out,
+        confirmation_status=appt.confirmation_status.value,
+        confirmation_sent_at=appt.confirmation_sent_at,
     )
 
 
@@ -584,3 +599,236 @@ async def remove_appointment_item(
     await db.commit()
     await db.refresh(appt)
     return await _load_appointment_out(appt, db)
+
+
+# ── Confirmation email ──────────────────────────────────────────────────────
+
+
+class ConfirmationOut(BaseModel):
+    status: str  # ConfirmationStatus value
+    subject: str
+    body: str
+    sent_at: datetime | None
+    is_default: bool  # true when subject/body are the unsaved template
+
+
+class ConfirmationDraftIn(BaseModel):
+    subject: str
+    body: str
+
+
+class ConfirmationSendIn(BaseModel):
+    # Optional: caller may send tweaked subject/body without first saving as draft.
+    subject: str | None = None
+    body: str | None = None
+
+
+async def _build_default_template(appt: Appointment, db: AsyncSession) -> tuple[str, str]:
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.id == appt.tenant_id))
+    ).scalar_one()
+    client = (
+        await db.execute(select(Client).where(Client.id == appt.client_id))
+    ).scalar_one()
+    items_rows = (
+        await db.execute(
+            select(AppointmentItem)
+            .where(AppointmentItem.appointment_id == appt.id)
+            .order_by(AppointmentItem.start_time)
+        )
+    ).scalars().all()
+    if not items_rows:
+        return (
+            build_default_subject(tenant.name, appt.appointment_date),
+            f"<p>Hi {client.first_name},</p><p>Your appointment at {tenant.name} is confirmed.</p>",
+        )
+    service_ids = {i.service_id for i in items_rows}
+    provider_ids = {i.provider_id for i in items_rows}
+    services = {
+        r.id: r
+        for r in (await db.execute(select(Service).where(Service.id.in_(service_ids)))).scalars().all()
+    }
+    providers = {
+        r.id: r
+        for r in (await db.execute(select(Provider).where(Provider.id.in_(provider_ids)))).scalars().all()
+    }
+    template_items = [
+        TemplateItem(
+            service_name=services[i.service_id].name,
+            provider_name=providers[i.provider_id].display_name,
+            start_time=i.start_time,
+            duration_minutes=i.duration_minutes,
+        )
+        for i in items_rows
+    ]
+    return (
+        build_default_subject(tenant.name, appt.appointment_date),
+        build_default_body(tenant.name, client.first_name, appt.appointment_date, template_items),
+    )
+
+
+async def _get_appt_or_404(appointment_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> Appointment:
+    appt = (
+        await db.execute(
+            select(Appointment).where(
+                Appointment.id == uuid.UUID(appointment_id),
+                Appointment.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if appt is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    return appt
+
+
+@router.get("/{appointment_id}/confirmation", response_model=ConfirmationOut)
+async def get_confirmation(
+    appointment_id: str,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConfirmationOut:
+    appt = await _get_appt_or_404(appointment_id, current_user.tenant_id, db)
+    if appt.confirmation_draft_subject is not None and appt.confirmation_draft_body is not None:
+        return ConfirmationOut(
+            status=appt.confirmation_status.value,
+            subject=appt.confirmation_draft_subject,
+            body=appt.confirmation_draft_body,
+            sent_at=appt.confirmation_sent_at,
+            is_default=False,
+        )
+    subject, body = await _build_default_template(appt, db)
+    return ConfirmationOut(
+        status=appt.confirmation_status.value,
+        subject=subject,
+        body=body,
+        sent_at=appt.confirmation_sent_at,
+        is_default=True,
+    )
+
+
+@router.put("/{appointment_id}/confirmation", response_model=ConfirmationOut)
+async def save_confirmation_draft(
+    appointment_id: str,
+    body: ConfirmationDraftIn,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConfirmationOut:
+    appt = await _get_appt_or_404(appointment_id, current_user.tenant_id, db)
+    if appt.confirmation_status == ConfirmationStatus.sent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Confirmation already sent — cannot edit a sent confirmation",
+        )
+    appt.confirmation_draft_subject = body.subject.strip()
+    appt.confirmation_draft_body = body.body
+    appt.confirmation_status = ConfirmationStatus.draft
+    await db.commit()
+    await db.refresh(appt)
+    return ConfirmationOut(
+        status=appt.confirmation_status.value,
+        subject=appt.confirmation_draft_subject,
+        body=appt.confirmation_draft_body,
+        sent_at=appt.confirmation_sent_at,
+        is_default=False,
+    )
+
+
+@router.post("/{appointment_id}/confirmation/send", response_model=ConfirmationOut)
+async def send_confirmation(
+    appointment_id: str,
+    body: ConfirmationSendIn,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConfirmationOut:
+    appt = await _get_appt_or_404(appointment_id, current_user.tenant_id, db)
+    if appt.confirmation_status == ConfirmationStatus.sent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Confirmation already sent",
+        )
+
+    client = (
+        await db.execute(select(Client).where(Client.id == appt.client_id))
+    ).scalar_one()
+    if not client.email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Client has no email address on file",
+        )
+
+    # Resolve subject/body — caller-supplied wins, then saved draft, then default template.
+    if body.subject is not None and body.body is not None:
+        subject, html = body.subject.strip(), body.body
+    elif appt.confirmation_draft_subject is not None and appt.confirmation_draft_body is not None:
+        subject, html = appt.confirmation_draft_subject, appt.confirmation_draft_body
+    else:
+        subject, html = await _build_default_template(appt, db)
+
+    smtp_row = (
+        await db.execute(
+            select(TenantEmailConfig).where(TenantEmailConfig.tenant_id == current_user.tenant_id)
+        )
+    ).scalar_one_or_none()
+    if smtp_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email not configured — set up SMTP in Settings → Email first",
+        )
+    smtp_cfg = SmtpConfig(
+        host=smtp_row.smtp_host,
+        port=smtp_row.smtp_port,
+        username=smtp_row.smtp_username,
+        password=smtp_row.smtp_password,
+        use_tls=smtp_row.smtp_use_tls,
+        from_address=smtp_row.from_address,
+    )
+
+    try:
+        await send_email(smtp_cfg, client.email, subject, html)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+    appt.confirmation_draft_subject = subject
+    appt.confirmation_draft_body = html
+    appt.confirmation_status = ConfirmationStatus.sent
+    appt.confirmation_sent_at = datetime.now(timezone.utc)
+    appt.confirmation_sent_by_user_id = current_user.id
+    await db.commit()
+    await db.refresh(appt)
+    return ConfirmationOut(
+        status=appt.confirmation_status.value,
+        subject=subject,
+        body=html,
+        sent_at=appt.confirmation_sent_at,
+        is_default=False,
+    )
+
+
+@router.post("/{appointment_id}/confirmation/skip", response_model=ConfirmationOut)
+async def skip_confirmation(
+    appointment_id: str,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConfirmationOut:
+    appt = await _get_appt_or_404(appointment_id, current_user.tenant_id, db)
+    if appt.confirmation_status == ConfirmationStatus.sent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Confirmation already sent — cannot mark a sent confirmation as skipped",
+        )
+    appt.confirmation_status = ConfirmationStatus.skipped
+    await db.commit()
+    await db.refresh(appt)
+    if appt.confirmation_draft_subject is not None and appt.confirmation_draft_body is not None:
+        subject, body_text = appt.confirmation_draft_subject, appt.confirmation_draft_body
+        is_default = False
+    else:
+        subject, body_text = await _build_default_template(appt, db)
+        is_default = True
+    return ConfirmationOut(
+        status=appt.confirmation_status.value,
+        subject=subject,
+        body=body_text,
+        sent_at=appt.confirmation_sent_at,
+        is_default=is_default,
+    )

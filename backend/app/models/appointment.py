@@ -33,6 +33,13 @@ class AppointmentRequestStatus(str, enum.Enum):
     declined = "declined"
 
 
+class ConfirmationStatus(str, enum.Enum):
+    not_sent = "not_sent"
+    draft = "draft"
+    sent = "sent"
+    skipped = "skipped"
+
+
 class AppointmentItemStatus(str, enum.Enum):
     pending = "pending"
     in_progress = "in_progress"
@@ -126,6 +133,15 @@ class Appointment(TenantScopedBase):
     is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     recurring_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmation_status: Mapped[ConfirmationStatus] = mapped_column(
+        Enum(ConfirmationStatus), nullable=False, default=ConfirmationStatus.not_sent
+    )
+    confirmation_draft_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmation_draft_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmation_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmation_sent_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
 
 class AppointmentItem(TenantScopedBase):

@@ -20,6 +20,7 @@ export interface ClientSummary {
   first_name: string
   last_name: string
   cell_phone: string | null
+  email: string | null
   special_instructions: string | null
 }
 
@@ -37,6 +38,8 @@ export interface AppointmentItem {
   notes: string | null
 }
 
+export type ConfirmationStatus = 'not_sent' | 'draft' | 'sent' | 'skipped'
+
 export interface Appointment {
   id: string
   appointment_date: string
@@ -45,6 +48,39 @@ export interface Appointment {
   notes: string | null
   client: ClientSummary
   items: AppointmentItem[]
+  confirmation_status: ConfirmationStatus
+  confirmation_sent_at: string | null
+}
+
+export interface Confirmation {
+  status: ConfirmationStatus
+  subject: string
+  body: string
+  sent_at: string | null
+  is_default: boolean
+}
+
+export function getConfirmation(appointmentId: string): Promise<Confirmation> {
+  return api.get<Confirmation>(`/appointments/${appointmentId}/confirmation`)
+}
+
+export function saveConfirmationDraft(
+  appointmentId: string,
+  subject: string,
+  body: string,
+): Promise<Confirmation> {
+  return api.put<Confirmation>(`/appointments/${appointmentId}/confirmation`, { subject, body })
+}
+
+export function sendConfirmation(
+  appointmentId: string,
+  override?: { subject: string; body: string },
+): Promise<Confirmation> {
+  return api.post<Confirmation>(`/appointments/${appointmentId}/confirmation/send`, override ?? {})
+}
+
+export function skipConfirmation(appointmentId: string): Promise<Confirmation> {
+  return api.post<Confirmation>(`/appointments/${appointmentId}/confirmation/skip`, {})
 }
 
 export function listAppointments(date: string): Promise<Appointment[]> {
