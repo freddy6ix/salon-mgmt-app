@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Save } from 'lucide-react'
-import { getBranding, updateBranding, type BrandingSettings, type SlotMinutes, SLOT_OPTIONS } from '@/api/settings'
+import {
+  getBranding,
+  updateBranding,
+  type BrandingSettings,
+  type SlotMinutes,
+  SLOT_OPTIONS,
+  getOperatingHours,
+  updateOperatingHours,
+  type OperatingHoursDay,
+} from '@/api/settings'
 import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
 import {
   listPaymentMethods,
@@ -155,41 +164,44 @@ export default function SettingsPage() {
 
         {/* Scheduling tab */}
         {tab === 'scheduling' && (
-          <section className="border rounded-lg p-5 space-y-5 bg-white">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Appointment book granularity</label>
-              <div className="flex gap-2">
-                {SLOT_OPTIONS.map(opt => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setSlotMinutes(opt)}
-                    className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
-                      slotMinutes === opt
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-input bg-background hover:bg-muted/50'
-                    }`}
-                  >
-                    {opt} min
-                  </button>
-                ))}
+          <>
+            <OperatingHoursSection isAdmin={isAdmin} />
+            <section className="border rounded-lg p-5 space-y-5 bg-white">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Appointment book granularity</label>
+                <div className="flex gap-2">
+                  {SLOT_OPTIONS.map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setSlotMinutes(opt)}
+                      className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
+                        slotMinutes === opt
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-input bg-background hover:bg-muted/50'
+                      }`}
+                    >
+                      {opt} min
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Controls the time slot grid resolution and snaps new appointment start times to these intervals.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Controls the time slot grid resolution and snaps new appointment start times to these intervals.
-              </p>
-            </div>
 
-            {brandingMutation.isError && (
-              <p className="text-xs text-destructive">
-                {brandingMutation.error instanceof Error ? brandingMutation.error.message : 'Save failed'}
-              </p>
-            )}
+              {brandingMutation.isError && (
+                <p className="text-xs text-destructive">
+                  {brandingMutation.error instanceof Error ? brandingMutation.error.message : 'Save failed'}
+                </p>
+              )}
 
-            <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
-              <Save size={14} className="mr-1.5" />
-              {brandingMutation.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </section>
+              <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
+                <Save size={14} className="mr-1.5" />
+                {brandingMutation.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </section>
+          </>
         )}
 
         {/* Payment methods tab — admin only */}
@@ -199,6 +211,112 @@ export default function SettingsPage() {
         {tab === 'email' && isAdmin && <EmailSection />}
       </div>
     </div>
+  )
+}
+
+const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['operating-hours'],
+    queryFn: getOperatingHours,
+  })
+
+  const [days, setDays] = useState<OperatingHoursDay[]>([])
+  const [dirty, setDirty] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (data) {
+      setDays(data.map(d => ({ ...d })))
+      setDirty(false)
+    }
+  }, [data])
+
+  function update(dow: number, patch: Partial<OperatingHoursDay>) {
+    setDays(prev => prev.map(d => d.day_of_week === dow ? { ...d, ...patch } : d))
+    setDirty(true)
+    setError(null)
+  }
+
+  function toggleOpen(dow: number, open: boolean) {
+    if (open) {
+      update(dow, { is_open: true, open_time: '09:00', close_time: '18:00' })
+    } else {
+      update(dow, { is_open: false, open_time: null, close_time: null })
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => updateOperatingHours(days),
+    onSuccess: updated => {
+      qc.setQueryData(['operating-hours'], updated)
+      setDirty(false)
+      setError(null)
+    },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
+  })
+
+  if (isLoading) return null
+
+  return (
+    <section className="border rounded-lg p-5 space-y-4 bg-white">
+      <div>
+        <h2 className="text-base font-medium">Operating hours</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Days the salon is open and the hours within which providers can be scheduled.
+          {!isAdmin && ' Read-only — only admins can edit.'}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        {days.map(d => (
+          <div key={d.day_of_week} className="flex items-center gap-3 text-sm">
+            <label className="flex items-center gap-2 w-32 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={d.is_open}
+                onChange={e => toggleOpen(d.day_of_week, e.target.checked)}
+                disabled={!isAdmin}
+                className="accent-primary"
+              />
+              <span>{DAY_LABELS[d.day_of_week]}</span>
+            </label>
+            {d.is_open ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="time"
+                  value={d.open_time ?? ''}
+                  onChange={e => update(d.day_of_week, { open_time: e.target.value })}
+                  disabled={!isAdmin}
+                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[90px]"
+                />
+                <span className="text-xs text-muted-foreground">–</span>
+                <input
+                  type="time"
+                  value={d.close_time ?? ''}
+                  onChange={e => update(d.day_of_week, { close_time: e.target.value })}
+                  disabled={!isAdmin}
+                  className="border border-input rounded px-2 py-1 text-sm bg-background w-[90px]"
+                />
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">Closed</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {isAdmin && (
+        <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
+          <Save size={14} className="mr-1.5" />
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      )}
+    </section>
   )
 }
 

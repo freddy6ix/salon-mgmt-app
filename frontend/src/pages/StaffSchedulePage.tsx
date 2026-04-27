@@ -3,20 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getWeeklySchedules, setWeeklySchedule, type ProviderWeeklyHours, type DayHours } from '@/api/schedules'
+import { getOperatingHours, type OperatingHoursDay } from '@/api/settings'
 import { Button } from '@/components/ui/button'
 
 const TODAY = format(new Date(), 'yyyy-MM-dd')
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-const SALON_HOURS: Record<number, { open: string; close: string } | null> = {
-  0: null,
-  1: { open: '09:00', close: '18:00' },
-  2: { open: '09:00', close: '20:00' },
-  3: { open: '09:00', close: '20:00' },
-  4: { open: '09:00', close: '18:00' },
-  5: { open: '09:00', close: '17:00' },
-  6: null,
+type SalonHoursMap = Record<number, { open: string; close: string } | null>
+
+function buildSalonHours(rows: OperatingHoursDay[]): SalonHoursMap {
+  const map: SalonHoursMap = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null }
+  for (const r of rows) {
+    map[r.day_of_week] = r.is_open && r.open_time && r.close_time
+      ? { open: r.open_time, close: r.close_time }
+      : null
+  }
+  return map
 }
 
 function clamp(value: string, min: string, max: string): string {
@@ -27,11 +30,12 @@ function clamp(value: string, min: string, max: string): string {
 
 interface RowProps {
   provider: ProviderWeeklyHours
+  salonHours: SalonHoursMap
   onSave: (provider_id: string, days: DayHours[], effective_from: string) => void
   saving: boolean
 }
 
-function ProviderRow({ provider, onSave, saving }: RowProps) {
+function ProviderRow({ provider, salonHours, onSave, saving }: RowProps) {
   const [days, setDays] = useState<DayHours[]>(() =>
     provider.days.map((d) => ({ ...d }))
   )
@@ -44,7 +48,7 @@ function ProviderRow({ provider, onSave, saving }: RowProps) {
   }
 
   function toggleWorking(dow: number, isWorking: boolean) {
-    const salon = SALON_HOURS[dow]
+    const salon = salonHours[dow]
     if (isWorking && salon) {
       updateDay(dow, { is_working: true, start_time: salon.open, end_time: salon.close })
     } else {
@@ -56,7 +60,7 @@ function ProviderRow({ provider, onSave, saving }: RowProps) {
     <tr className="border-b last:border-0">
       <td className="py-3 pr-4 font-medium text-sm w-28 align-middle">{provider.display_name}</td>
       {days.map((day) => {
-        const salon = SALON_HOURS[day.day_of_week]
+        const salon = salonHours[day.day_of_week]
         const salonClosed = salon === null
         return (
           <td key={day.day_of_week} className="px-2 py-2 align-middle">
@@ -142,6 +146,13 @@ export default function StaffSchedulePage() {
     queryFn: getWeeklySchedules,
   })
 
+  const { data: operatingHours = [], isLoading: hoursLoading } = useQuery({
+    queryKey: ['operating-hours'],
+    queryFn: getOperatingHours,
+  })
+
+  const salonHours = buildSalonHours(operatingHours)
+
   const mutation = useMutation({
     mutationFn: ({ provider_id, days, effective_from }: { provider_id: string; days: DayHours[]; effective_from: string }) =>
       setWeeklySchedule(provider_id, days, effective_from),
@@ -162,7 +173,7 @@ export default function StaffSchedulePage() {
 
       <main className="p-6">
         <div className="bg-white border rounded-lg overflow-auto">
-          {isLoading ? (
+          {isLoading || hoursLoading ? (
             <p className="p-6 text-sm text-muted-foreground">Loading…</p>
           ) : (
             <table className="w-full text-sm">
@@ -180,6 +191,7 @@ export default function StaffSchedulePage() {
                   <ProviderRow
                     key={p.provider_id}
                     provider={p}
+                    salonHours={salonHours}
                     saving={savingId === p.provider_id}
                     onSave={(id, days, effective_from) => mutation.mutate({ provider_id: id, days, effective_from })}
                   />
@@ -189,7 +201,8 @@ export default function StaffSchedulePage() {
           )}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Provider hours must fall within salon hours. Use the "From" date to schedule a change in advance — past schedules are locked and preserved as history.
+          Provider hours must fall within salon hours. Salon hours are configured under Settings → Scheduling.
+          Use the "From" date to schedule a change in advance — past schedules are locked and preserved as history.
         </p>
       </main>
     </div>

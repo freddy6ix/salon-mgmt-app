@@ -19,3 +19,18 @@ export function updateBranding(
 ): Promise<BrandingSettings> {
   return api.patch<BrandingSettings>('/settings/branding', patch)
 }
+
+export interface OperatingHoursDay {
+  day_of_week: number  // 0=Mon … 6=Sun
+  is_open: boolean
+  open_time: string | null  // "HH:MM"
+  close_time: string | null
+}
+
+export function getOperatingHours(): Promise<OperatingHoursDay[]> {
+  return api.get<OperatingHoursDay[]>('/settings/operating-hours')
+}
+
+export function updateOperatingHours(days: OperatingHoursDay[]): Promise<OperatingHoursDay[]> {
+  return api.put<OperatingHoursDay[]>('/settings/operating-hours', { days })
+}
