@@ -378,3 +378,55 @@ When an appointment is cancelled from the client card (Clients → client → Ap
 **Likely fix:** the cancel mutation in `ClientsPage`'s `VisitHistory` invalidates `['client-history', clientId]` but not `['appointments', date]` — add the second invalidation (or all-dates: `['appointments']`). Same pattern that other appointment-mutating callers already follow. Verify in the browser after the patch.
 
 **Why it matters:** day-of-day book hygiene — staff who triage a no-show via the client card will still see the appointment as live on the grid and might double-book or get confused.
+
+---
+
+## Data Import (Migration from existing systems)
+
+### P2-20 · Import client data (with history and future appointments)
+
+Bulk import client records from a CSV or Excel export of Milano (or other salon software), including appointment history and any future bookings.
+
+**Scope:**
+- CSV/Excel upload via an admin-only import page
+- Client fields: first name, last name, cell phone, email, pronouns, special instructions, VIP flag, no-show count, late cancellation count
+- Appointment history: date, services, provider, price, status — imported as read-only `completed` appointment records for reporting continuity
+- Future appointments: imported as `confirmed` appointments and shown on the book — staff review and adjust times/providers as needed
+- Deduplication: match on (email OR phone) before creating a new client; prompt staff to confirm merge or create new when a potential match is found
+- Dry-run mode: show a preview of what would be created/merged before committing
+
+**Out of scope for v1:** colour notes import, no-show date details (just counts), payment history.
+
+**Why this matters:** without client history, the appointment book starts cold and staff lose the institutional memory of client preferences, formulas, and no-show patterns that Milano holds.
+
+### P2-21 · Import retail inventory
+
+Bulk import the retail product catalog (and optionally opening stock counts) from a CSV/Excel export.
+
+**Scope:**
+- Fields: SKU (optional), name, description, category, default price, default cost, GST exempt flag, PST exempt flag
+- Optional opening stock column — if provided, creates a `RetailStockMovement` with `kind=receive` for each row
+- Duplicate detection on SKU (if provided) or name+category match
+- Dry-run preview before commit
+
+**Depends on:** P2-12 (Retail items catalog must exist first).
+
+### P2-22 · Import staff (provider) data
+
+Bulk import provider profiles and their default weekly schedules from a CSV/Excel export.
+
+**Scope:**
+- Fields: display name, provider type (stylist/colourist/dualist), booking order, has_appointments flag
+- Optional schedule columns: Mon–Sun working flag, start time, end time (same format as the staff schedules page)
+- Duplicate detection on display name (exact match, case-insensitive)
+
+### P2-23 · Import services data
+
+Bulk import the service catalog from a CSV/Excel export, including per-provider pricing overrides.
+
+**Scope:**
+- Fields: category, service name, code, default price, default duration (minutes), processing offset + duration (for colour), haircut type, GST/PST exempt flags, is_active
+- Optional provider-price sheet: provider name, service name, price, duration override — maps to `ProviderServicePrice`
+- Duplicate detection on (category + name)
+
+**Why import order matters:** P2-22 (staff) and P2-23 (services) should be imported before P2-20 (clients + appointments) so that appointment history can correctly reference existing providers and services.
