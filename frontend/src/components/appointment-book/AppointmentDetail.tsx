@@ -232,7 +232,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'notes' ? 'Client notes' : t === 'history' ? 'History' : 'Appointment'}
+              {t === 'notes' ? 'Client notes' : t === 'history' ? 'Appointments' : 'Appointment'}
             </button>
           ))}
         </div>
