@@ -52,18 +52,22 @@ def _format_address(tenant: Tenant) -> str | None:
 
 def _header_html(tenant: Tenant, brand_color: str, on_brand: str) -> str:
     name = escape(tenant.name)
-    if tenant.logo_url:
-        # Logo art on the brand band. Cap height for predictability across clients.
-        return (
-            f'<img src="{escape(tenant.logo_url)}" alt="{name}" '
-            f'height="44" style="display:block;height:44px;width:auto;border:0;outline:none;'
-            f'text-decoration:none;max-height:44px;">'
-        )
-    # No logo set — wordmark in readable text colour against the brand band.
-    return (
-        f'<span style="font-family:Georgia,\'Times New Roman\',serif;font-size:22px;'
-        f'letter-spacing:0.08em;color:{on_brand};">{name}</span>'
+    # Always render the salon name as styled text so the header looks correct
+    # even if the logo image URL is inaccessible or fails to load.
+    wordmark = (
+        f'<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:26px;'
+        f'letter-spacing:0.10em;color:{on_brand};margin-top:8px;">{name}</div>'
     )
+    if tenant.logo_url and tenant.logo_url.startswith("http"):
+        # Show logo image above the wordmark only when the URL is absolute
+        # (relative paths like /icon.png are inaccessible to email clients).
+        logo = (
+            f'<img src="{escape(tenant.logo_url)}" alt="{name}" '
+            f'height="48" style="display:block;height:48px;width:auto;border:0;outline:none;'
+            f'text-decoration:none;max-height:48px;margin-bottom:8px;">'
+        )
+        return logo + wordmark
+    return wordmark
 
 
 def wrap_branded(inner_html: str, tenant: Tenant, *, subject: str | None = None) -> str:
