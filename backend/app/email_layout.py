@@ -52,22 +52,15 @@ def _format_address(tenant: Tenant) -> str | None:
 
 def _header_html(tenant: Tenant, brand_color: str, on_brand: str) -> str:
     name = escape(tenant.name)
-    # Always render the salon name as styled text so the header looks correct
-    # even if the logo image URL is inaccessible or fails to load.
-    wordmark = (
-        f'<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:26px;'
-        f'letter-spacing:0.10em;color:{on_brand};margin-top:8px;">{name}</div>'
+    # Styled wordmark — always rendered as text so the header is guaranteed
+    # to look correct regardless of whether the logo URL is accessible.
+    # Logo images are intentionally omitted from email: they require an
+    # externally-hosted URL and often fail silently, producing a broken-image
+    # placeholder next to the fallback text.
+    return (
+        f'<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:28px;'
+        f'font-weight:400;letter-spacing:0.12em;color:{on_brand};">{name}</div>'
     )
-    if tenant.logo_url and tenant.logo_url.startswith("http"):
-        # Show logo image above the wordmark only when the URL is absolute
-        # (relative paths like /icon.png are inaccessible to email clients).
-        logo = (
-            f'<img src="{escape(tenant.logo_url)}" alt="{name}" '
-            f'height="48" style="display:block;height:48px;width:auto;border:0;outline:none;'
-            f'text-decoration:none;max-height:48px;margin-bottom:8px;">'
-        )
-        return logo + wordmark
-    return wordmark
 
 
 def wrap_branded(inner_html: str, tenant: Tenant, *, subject: str | None = None) -> str:
