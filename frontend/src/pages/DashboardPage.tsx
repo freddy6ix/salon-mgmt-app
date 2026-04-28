@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { useTimeFormat } from '@/lib/timeFormat'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'

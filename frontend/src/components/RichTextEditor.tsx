@@ -66,7 +66,7 @@ export default function RichTextEditor({ value, onChange, disabled }: Props) {
   useEffect(() => {
     if (!editor) return
     if (editor.getHTML() !== value) {
-      editor.commands.setContent(value, false)
+      editor.commands.setContent(value, false, { preserveWhitespace: 'full' })
     }
   }, [value, editor])
 
@@ -82,9 +82,9 @@ export default function RichTextEditor({ value, onChange, disabled }: Props) {
     const url = window.prompt('URL', prev ?? 'https://')
     if (url === null) return
     if (url === '') {
-      editor.chain().focus().extendMarkToLink().unsetLink().run()
+      editor.chain().focus().unsetLink().run()
     } else {
-      editor.chain().focus().extendMarkToLink().setLink({ href: url }).run()
+      editor.chain().focus().setLink({ href: url }).run()
     }
   }
 
