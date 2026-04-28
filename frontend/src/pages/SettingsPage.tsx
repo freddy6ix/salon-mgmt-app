@@ -24,7 +24,7 @@ import {
   type PaymentMethod,
   type PaymentMethodKind,
 } from '@/api/paymentMethods'
-import { listPromotions, createPromotion, updatePromotion, type Promotion, type PromotionKind } from '@/api/promotions'
+import { listPromotions, createPromotion, updatePromotion, type PromotionKind } from '@/api/promotions'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
