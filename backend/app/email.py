@@ -42,17 +42,19 @@ def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
     context = ssl.create_default_context()
     try:
         if cfg.use_tls:
-            with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as smtp:
+            with smtplib.SMTP(cfg.host, cfg.port, timeout=30) as smtp:
                 smtp.ehlo()
                 smtp.starttls(context=context)
                 smtp.login(cfg.username, cfg.password)
                 smtp.send_message(msg)
         else:
-            with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=10) as smtp:
+            with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=30) as smtp:
                 smtp.login(cfg.username, cfg.password)
                 smtp.send_message(msg)
     except smtplib.SMTPAuthenticationError as e:
         raise RuntimeError(f"Authentication failed — check username and app password. ({e.smtp_code}: {e.smtp_error.decode()})")
+    except smtplib.SMTPServerDisconnected as e:
+        raise RuntimeError(f"SMTP connection dropped — try again or check your SMTP settings. ({e})")
     except smtplib.SMTPConnectError as e:
         raise RuntimeError(f"Could not connect to {cfg.host}:{cfg.port}. ({e})")
     except smtplib.SMTPException as e:
