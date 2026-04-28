@@ -258,7 +258,10 @@ function VisitHistory({ clientId }: { clientId: string }) {
 
   const { mutate: cancelAppt } = useMutation({
     mutationFn: (appointmentId: string) => updateAppointmentStatus(appointmentId, 'cancelled'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['client-history', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client-history', clientId] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
   })
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>

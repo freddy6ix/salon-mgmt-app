@@ -109,7 +109,10 @@ export default function ClientCard({ clientId, onClose }: Props) {
 
   const cancelAppt = useMutation({
     mutationFn: (appointmentId: string) => updateAppointmentStatus(appointmentId, 'cancelled'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['client-history', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client-history', clientId] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
   })
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
