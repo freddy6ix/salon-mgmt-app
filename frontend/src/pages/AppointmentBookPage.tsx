@@ -14,6 +14,7 @@ import BookingForm from '@/components/appointment-book/BookingForm'
 import TimeBlockEditDialog from '@/components/appointment-book/TimeBlockEditDialog'
 import ClientCard from '@/components/ClientCard'
 import ConvertRequestPanel from '@/components/ConvertRequestPanel'
+import ConfirmationDialog from '@/components/appointment-book/ConfirmationDialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eye, EyeOff } from 'lucide-react'
@@ -31,6 +32,9 @@ export default function AppointmentBookPage() {
   const { data: branding } = useQuery({ queryKey: ['branding'], queryFn: getBranding })
   const slotMinutes: SlotMinutes = (branding?.slot_minutes ?? 10) as SlotMinutes
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    id: string; appointment_date: string; clientEmail: string | null
+  } | null>(null)
   const [showCancelled, setShowCancelled] = useState(() =>
     localStorage.getItem('showCancelled') === 'true'
   )
@@ -160,7 +164,7 @@ export default function AppointmentBookPage() {
         providerHours={schedules}
         slotMinutes={slotMinutes}
         onClose={() => setBooking(null)}
-        onSaved={() => setBooking(null)}
+        onSaved={(appt) => { setBooking(null); setPendingConfirmation(appt) }}
       />
 
       <TimeBlockEditDialog
@@ -186,6 +190,16 @@ export default function AppointmentBookPage() {
             setDate(apptDate)
             navigate('/appointments')
           }}
+        />
+      )}
+
+      {pendingConfirmation && (
+        <ConfirmationDialog
+          appointmentId={pendingConfirmation.id}
+          appointmentDate={pendingConfirmation.appointment_date}
+          open={true}
+          recipientEmail={pendingConfirmation.clientEmail}
+          onClose={() => setPendingConfirmation(null)}
         />
       )}
     </div>

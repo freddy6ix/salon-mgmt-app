@@ -24,7 +24,7 @@ interface Props {
   providerHours?: ProviderWorkStatus[]
   slotMinutes?: number
   onClose: () => void
-  onSaved: () => void
+  onSaved: (appt: { id: string; appointment_date: string; clientEmail: string | null }) => void
 }
 
 function snapToSlot(time: string, slotMinutes: number): string {
@@ -154,7 +154,7 @@ export default function BookingForm({
   // ── Save
   const mutation = useMutation({
     mutationFn: () =>
-      api.post('/appointments', {
+      api.post<{ id: string; appointment_date: string; client: { email: string | null } }>('/appointments', {
         client_id: selectedClient!.id,
         appointment_date: date,
         source: 'staff_entered',
@@ -172,9 +172,9 @@ export default function BookingForm({
           }
         }),
       }),
-    onSuccess: () => {
+    onSuccess: (appt) => {
       qc.invalidateQueries({ queryKey: ['appointments', date] })
-      onSaved()
+      onSaved({ id: appt.id, appointment_date: appt.appointment_date, clientEmail: appt.client.email })
     },
   })
 

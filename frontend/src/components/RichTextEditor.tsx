@@ -122,7 +122,7 @@ export default function RichTextEditor({ value, onChange, disabled }: Props) {
       )}
       <EditorContent
         editor={editor}
-        className="px-4 py-3 text-sm min-h-[220px] max-h-[400px] overflow-y-auto bg-white prose prose-sm max-w-none focus-within:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[180px]"
+        className="px-4 py-3 text-sm min-h-[220px] max-h-[400px] overflow-y-auto bg-white focus-within:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[180px] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-5 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-5 [&_.ProseMirror_li]:my-0.5 [&_.ProseMirror_p]:my-1 [&_.ProseMirror_a]:underline [&_.ProseMirror_a]:text-primary"
       />
     </div>
   )
