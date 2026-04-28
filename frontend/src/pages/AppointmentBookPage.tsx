@@ -53,16 +53,6 @@ export default function AppointmentBookPage() {
     }
   }, [convertRequest?.id])
 
-  // Auto-open appointment detail when navigated here with ?appointment=ID
-  useEffect(() => {
-    if (!highlightApptId || appointments.length === 0) return
-    const appt = appointments.find(a => a.id === highlightApptId)
-    if (appt && appt.items.length > 0) {
-      setSelected({ item: appt.items[0], appt })
-      navigate('/appointments', { replace: true })
-    }
-  }, [highlightApptId, appointments])
-
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],
     queryFn: listProviders,
@@ -72,6 +62,16 @@ export default function AppointmentBookPage() {
     queryKey: ['appointments', date],
     queryFn: () => listAppointments(date),
   })
+
+  // Auto-open appointment detail when navigated here with ?appointment=ID
+  useEffect(() => {
+    if (!highlightApptId || appointments.length === 0) return
+    const appt = appointments.find(a => a.id === highlightApptId)
+    if (appt && appt.items.length > 0) {
+      setSelected({ item: appt.items[0], appt })
+      navigate('/appointments', { replace: true })
+    }
+  }, [highlightApptId, appointments])
 
   const { data: schedules = [] } = useQuery({
     queryKey: ['schedules', date],
