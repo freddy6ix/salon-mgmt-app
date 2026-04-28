@@ -144,6 +144,21 @@ async def create_psp(
     prov, svc = await _validate_provider_and_service(
         uuid.UUID(body.provider_id), uuid.UUID(body.service_id), tid, db,
     )
+    existing = (
+        await db.execute(
+            select(ProviderServicePrice).where(
+                ProviderServicePrice.tenant_id == tid,
+                ProviderServicePrice.provider_id == prov.id,
+                ProviderServicePrice.service_id == svc.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That provider already has a price for this service",
+        )
+
     psp = ProviderServicePrice(
         tenant_id=tid,
         provider_id=prov.id,
@@ -165,7 +180,7 @@ async def create_psp(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="That provider already has an active price for this service",
+            detail="That provider already has a price for this service",
         )
     await db.refresh(psp)
     return _serialize(psp, prov.display_name, svc.name)

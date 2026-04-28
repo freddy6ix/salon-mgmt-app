@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import {
   listServicesFull,
   createService,
@@ -641,8 +641,11 @@ function ProviderMatrixRow({
     else if (!checked && existing) deleteMut.mutate()
   }
 
-  const dirty = existing && (
-    parseFloat(price || '0') !== parseFloat(existing.price) ||
+  const parsedPrice = parseFloat(price)
+  const priceValid = !isNaN(parsedPrice) && parsedPrice >= 0
+
+  const dirty = existing && priceValid && (
+    parsedPrice !== parseFloat(existing.price) ||
     intOrNull(duration) !== existing.duration_minutes ||
     intOrNull(procOffset) !== existing.processing_offset_minutes ||
     intOrNull(procDuration) !== existing.processing_duration_minutes
@@ -665,8 +668,8 @@ function ProviderMatrixRow({
             <input
               type="text" inputMode="decimal"
               value={price}
-              onChange={e => setPrice(e.target.value)}
-              className="w-20 border border-input rounded px-2 py-1 text-sm bg-background"
+              onChange={e => { setPrice(e.target.value); setError(null) }}
+              className={`w-20 border rounded px-2 py-1 text-sm bg-background ${!priceValid && price !== '' ? 'border-destructive' : 'border-input'}`}
             />
           </Field>
           <Field label="min" title="Duration override (blank = use service default)" trailing>
@@ -703,7 +706,7 @@ function ProviderMatrixRow({
           )}
         </>
       )}
-      {error && <X size={14} className="text-destructive" aria-label={error} />}
+      {error && <p className="w-full text-xs text-destructive">{error}</p>}
     </div>
   )
 }
