@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Visit,
@@ -197,10 +197,16 @@ const VISIT_STATUS_LABEL: Record<string, string> = {
 function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const { formatTime: ft } = useTimeFormat()
+  const navigate = useNavigate()
   const todayStr = new Date().toISOString().slice(0, 10)
   const isUpcoming = visit.date >= todayStr
+  const isNavigable = visit.status !== 'cancelled' && visit.status !== 'no_show'
+
   return (
-    <li className="rounded-md border p-3 text-sm space-y-1">
+    <li
+      className={`rounded-md border p-3 text-sm space-y-1 ${isNavigable ? 'cursor-pointer hover:bg-muted/30 transition-colors' : ''}`}
+      onClick={() => { if (isNavigable) navigate(`/appointments?date=${visit.date}&appointment=${visit.appointment_id}`) }}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">
           {new Date(visit.date + 'T00:00:00').toLocaleDateString('en-CA', {
@@ -213,7 +219,7 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
           </span>
           {isUpcoming && visit.status === 'confirmed' && onCancel && (
             confirmCancel ? (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                 <span className="text-xs text-muted-foreground">Sure?</span>
                 <button onClick={() => { onCancel(visit.appointment_id); setConfirmCancel(false) }}
                   className="text-xs text-destructive hover:underline">Yes</button>
@@ -221,7 +227,7 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
                   className="text-xs text-muted-foreground hover:underline">No</button>
               </span>
             ) : (
-              <button onClick={() => setConfirmCancel(true)}
+              <button onClick={e => { e.stopPropagation(); setConfirmCancel(true) }}
                 className="text-xs text-destructive hover:underline">Cancel</button>
             )
           )}
