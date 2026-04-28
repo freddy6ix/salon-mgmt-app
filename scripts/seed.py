@@ -332,10 +332,212 @@ async def seed():
                         ))
         print("Provider weekly schedules seeded")
 
+        # ── Provider Service Prices ──────────────────────────────────────────
+        # Source: Google Sheet shared by owner (2026-04-28).
+        #
+        # Omissions (not in the sheet — need owner input):
+        #   CCAMO  Camo Colour            — no per-provider pricing provided
+        #   CFC    Color Full Color       — no per-provider pricing provided
+        #   "Additional colour $25"       — in sheet but no service code in catalog
+        #
+        # By-request / n/a entries (no PSP row created):
+        #   JJ:    Updo, Hair Botox       — "by request"
+        #   JJ:    all colour services    — not listed (colour by request)
+        #   Asami: Updo                   — "n/a"
+        #   Becky, Antonella              — on maternity leave, not listed
+        PSP_DATA: list[tuple[str, str, float]] = [
+            # ── JJ (styling only) ─────────────────────────────────────────
+            ("JJ", "BLD",  70),
+            ("JJ", "ST1",  80),
+            ("JJ", "ST2",  125),
+            ("JJ", "ST2P", 150),
+            ("JJ", "HTF",  10),
+            ("JJ", "FRG",  20),
+            ("JJ", "MLB",  100),
+            ("JJ", "MLBA", 65),
+
+            # ── Gumi (dualist) ─────────────────────────────────────────────
+            ("GUMI", "BLD",  60),
+            ("GUMI", "ST1",  65),
+            ("GUMI", "ST2",  100),
+            ("GUMI", "ST2P", 125),
+            ("GUMI", "HTF",  10),
+            ("GUMI", "FRG",  20),
+            ("GUMI", "UPD",  150),
+            ("GUMI", "MLB",  100),
+            ("GUMI", "MLBA", 65),
+            ("GUMI", "BOT",  400),
+            ("GUMI", "RTO",  90),
+            ("GUMI", "RTOB", 100),
+            ("GUMI", "ACC",  100),
+            ("GUMI", "PHL",  130),
+            ("GUMI", "FHL",  170),
+            ("GUMI", "BLT",  190),
+            ("GUMI", "BLY",  240),
+            ("GUMI", "CCR",  100),
+            ("GUMI", "TNR",  85),
+            ("GUMI", "REF",  50),
+            ("GUMI", "TNRA", 50),
+            ("GUMI", "MDO",  35),
+
+            # ── Asami (stylist only) ───────────────────────────────────────
+            ("ASAMI", "BLD",  55),
+            ("ASAMI", "ST1",  60),
+            ("ASAMI", "ST2",  90),
+            ("ASAMI", "ST2P", 115),
+            ("ASAMI", "HTF",  10),
+            ("ASAMI", "FRG",  20),
+            ("ASAMI", "MLB",  100),
+            ("ASAMI", "MLBA", 65),
+            ("ASAMI", "BOT",  400),
+
+            # ── Mayumi (dualist) ───────────────────────────────────────────
+            ("MAYUMI", "BLD",  55),
+            ("MAYUMI", "ST1",  55),
+            ("MAYUMI", "ST2",  90),
+            ("MAYUMI", "ST2P", 115),
+            ("MAYUMI", "HTF",  10),
+            ("MAYUMI", "FRG",  20),
+            ("MAYUMI", "UPD",  140),
+            ("MAYUMI", "MLB",  100),
+            ("MAYUMI", "MLBA", 65),
+            ("MAYUMI", "BOT",  400),
+            ("MAYUMI", "RTO",  90),
+            ("MAYUMI", "RTOB", 100),
+            ("MAYUMI", "ACC",  100),
+            ("MAYUMI", "PHL",  130),
+            ("MAYUMI", "FHL",  170),
+            ("MAYUMI", "BLT",  190),
+            ("MAYUMI", "BLY",  240),
+            ("MAYUMI", "CCR",  100),
+            ("MAYUMI", "TNR",  85),
+            ("MAYUMI", "REF",  50),
+            ("MAYUMI", "TNRA", 50),
+            ("MAYUMI", "MDO",  35),
+
+            # ── Olga (dualist) ─────────────────────────────────────────────
+            ("OLGA", "BLD",  55),
+            ("OLGA", "ST1",  55),
+            ("OLGA", "ST2",  90),
+            ("OLGA", "ST2P", 115),
+            ("OLGA", "HTF",  10),
+            ("OLGA", "FRG",  20),
+            ("OLGA", "UPD",  140),
+            ("OLGA", "MLB",  100),
+            ("OLGA", "MLBA", 65),
+            ("OLGA", "BOT",  400),
+            ("OLGA", "RTO",  90),
+            ("OLGA", "RTOB", 100),
+            ("OLGA", "ACC",  100),
+            ("OLGA", "PHL",  130),
+            ("OLGA", "FHL",  170),
+            ("OLGA", "BLT",  190),
+            ("OLGA", "BLY",  240),
+            ("OLGA", "CCR",  100),
+            ("OLGA", "TNR",  85),
+            ("OLGA", "REF",  50),
+            ("OLGA", "TNRA", 50),
+            ("OLGA", "MDO",  35),
+
+            # ── Ryan (dualist) ─────────────────────────────────────────────
+            ("RYAN", "BLD",  60),
+            ("RYAN", "ST1",  65),
+            ("RYAN", "ST2",  100),
+            ("RYAN", "ST2P", 125),
+            ("RYAN", "HTF",  10),
+            ("RYAN", "FRG",  20),
+            ("RYAN", "UPD",  150),
+            ("RYAN", "MLB",  100),
+            ("RYAN", "MLBA", 65),
+            ("RYAN", "BOT",  400),
+            ("RYAN", "RTO",  90),
+            ("RYAN", "RTOB", 100),
+            ("RYAN", "ACC",  100),
+            ("RYAN", "PHL",  130),
+            ("RYAN", "FHL",  170),
+            ("RYAN", "BLT",  190),
+            ("RYAN", "BLY",  240),
+            ("RYAN", "CCR",  100),
+            ("RYAN", "TNR",  85),
+            ("RYAN", "REF",  50),
+            ("RYAN", "TNRA", 50),
+            ("RYAN", "MDO",  35),
+
+            # ── Joanne (colourist) ─────────────────────────────────────────
+            ("JOANNE", "RTO",  90),
+            ("JOANNE", "RTOB", 100),
+            ("JOANNE", "ACC",  120),
+            ("JOANNE", "PHL",  150),
+            ("JOANNE", "FHL",  190),
+            ("JOANNE", "BLT",  210),
+            ("JOANNE", "BLY",  260),
+            ("JOANNE", "CCR",  120),
+            ("JOANNE", "TNR",  85),
+            ("JOANNE", "MLB",  100),
+            ("JOANNE", "BOT",  400),
+            ("JOANNE", "REF",  50),
+            ("JOANNE", "TNRA", 50),
+            ("JOANNE", "MLBA", 65),
+            ("JOANNE", "MDO",  35),
+
+            # ── Sarah (colourist) ──────────────────────────────────────────
+            ("SARAH", "RTO",  90),
+            ("SARAH", "RTOB", 100),
+            ("SARAH", "ACC",  100),
+            ("SARAH", "PHL",  130),
+            ("SARAH", "FHL",  170),
+            ("SARAH", "BLT",  190),
+            ("SARAH", "BLY",  240),
+            ("SARAH", "CCR",  100),
+            ("SARAH", "TNR",  85),
+            ("SARAH", "MLB",  100),
+            ("SARAH", "BOT",  400),
+            ("SARAH", "REF",  50),
+            ("SARAH", "TNRA", 50),
+            ("SARAH", "MLBA", 65),
+            ("SARAH", "MDO",  35),
+        ]
+
+        psp_count = 0
+        for milano_code, svc_code, price in PSP_DATA:
+            prov = providers.get(milano_code)
+            svc  = services.get(svc_code)
+            if prov is None or svc is None:
+                print(f"  WARN: skipping PSP ({milano_code}, {svc_code}) — not found")
+                continue
+            existing_psp = (
+                await db.execute(
+                    select(ProviderServicePrice).where(
+                        ProviderServicePrice.tenant_id == tid,
+                        ProviderServicePrice.provider_id == prov.id,
+                        ProviderServicePrice.service_id == svc.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing_psp is None:
+                db.add(ProviderServicePrice(
+                    tenant_id=tid,
+                    provider_id=prov.id,
+                    service_id=svc.id,
+                    price=price,
+                    effective_from=date(2000, 1, 1),
+                    is_active=True,
+                ))
+                psp_count += 1
+            elif float(existing_psp.price) != price:
+                existing_psp.price = price
+                psp_count += 1
+        print(f"Provider service prices: {psp_count} created/updated")
+
         await db.commit()
         print("\nSeed complete.")
         print(f"  Tenant ID : {tenant.id}")
         print(f"  Login     : jj@salonlyol.ca / changeme123")
+        print()
+        print("NOTE — prices not yet seeded (not in sheet):")
+        print("  CCAMO  Camo Colour       — needs per-provider pricing")
+        print("  CFC    Color Full Color  — needs per-provider pricing")
+        print("  'Additional colour $25'  — needs a service code in catalog")
 
 
 if __name__ == "__main__":
