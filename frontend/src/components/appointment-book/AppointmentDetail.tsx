@@ -215,9 +215,10 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
           </DialogTitle>
         </DialogHeader>
 
-        {client.cell_phone && (
-          <p className="text-sm text-muted-foreground -mt-2">{client.cell_phone}</p>
-        )}
+        <p className="text-sm text-muted-foreground -mt-2">
+          {format(parseISO(appointment.appointment_date.split('T')[0] + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
+          {client.cell_phone && <> · {client.cell_phone}</>}
+        </p>
 
         {/* Tabs */}
         <div className="flex gap-1 border-b">
