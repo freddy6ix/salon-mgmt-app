@@ -39,6 +39,7 @@ export interface SaleItemIn {
   appointment_item_id: string
   unit_price: string
   discount_amount: string
+  promotion_id?: string | null
 }
 
 export interface SalePaymentIn {

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Appointment } from '@/api/appointments'
 import { createSale, sendReceipt, type Sale } from '@/api/sales'
 import { listPaymentMethods } from '@/api/paymentMethods'
+import { listPromotions, applyPromotion, type Promotion } from '@/api/promotions'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -19,6 +20,7 @@ interface ItemDraft {
   providerName: string
   unitPrice: string
   discount: string
+  promotionId: string | null
 }
 
 interface PaymentDraft {
@@ -50,6 +52,11 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     queryFn: () => listPaymentMethods(true),
   })
 
+  const { data: promotions = [] } = useQuery({
+    queryKey: ['promotions', 'active'],
+    queryFn: () => listPromotions(true),
+  })
+
   const [items, setItems] = useState<ItemDraft[]>(() =>
     appointment.items.map(it => ({
       appointment_item_id: it.id,
@@ -57,6 +64,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       providerName: it.provider.display_name,
       unitPrice: it.price.toFixed(2),
       discount: '0.00',
+      promotionId: null,
     }))
   )
   const [notes, setNotes] = useState('')
@@ -102,6 +110,15 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
   }
 
+  function applyPromotionToItem(idx: number, promo: Promotion | null) {
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it
+      if (!promo) return { ...it, promotionId: null, discount: '0.00' }
+      const discountAmt = applyPromotion(promo, toMoney(it.unitPrice))
+      return { ...it, promotionId: promo.id, discount: fmt(discountAmt) }
+    }))
+  }
+
   function updatePayment(idx: number, patch: Partial<PaymentDraft>) {
     setPayments(prev => prev.map((p, i) => {
       if (i !== idx) return p
@@ -144,6 +161,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         appointment_item_id: i.appointment_item_id,
         unit_price: fmt(toMoney(i.unitPrice)),
         discount_amount: fmt(toMoney(i.discount)),
+        promotion_id: i.promotionId ?? null,
       })),
       payments: payments.map(p => ({
         payment_method_id: p.payment_method_id,
@@ -210,6 +228,26 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
               <div key={it.appointment_item_id} className="rounded-md border p-3 space-y-2">
                 <p className="text-sm font-medium">{it.description}</p>
                 <p className="text-xs text-muted-foreground">{it.providerName}</p>
+                {promotions.length > 0 && (
+                  <div>
+                    <label className="text-xs text-muted-foreground">Promotion</label>
+                    <select
+                      value={it.promotionId ?? ''}
+                      onChange={e => {
+                        const promo = promotions.find(p => p.id === e.target.value) ?? null
+                        applyPromotionToItem(idx, promo)
+                      }}
+                      className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                    >
+                      <option value="">— none —</option>
+                      {promotions.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.label} ({p.kind === 'percent' ? `${p.value}%` : `$${p.value}`} off)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="text-xs text-muted-foreground">Price ($)</label>
@@ -217,7 +255,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
                       type="text"
                       inputMode="decimal"
                       value={it.unitPrice}
-                      onChange={e => updateItem(idx, { unitPrice: e.target.value })}
+                      onChange={e => updateItem(idx, { unitPrice: e.target.value, promotionId: null })}
                       className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                     />
                   </div>
@@ -227,7 +265,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
                       type="text"
                       inputMode="decimal"
                       value={it.discount}
-                      onChange={e => updateItem(idx, { discount: e.target.value })}
+                      onChange={e => updateItem(idx, { discount: e.target.value, promotionId: null })}
                       className={`w-full border rounded-md px-2 py-1.5 text-sm bg-background mt-0.5 ${
                         overDiscount ? 'border-destructive' : 'border-input'
                       }`}

@@ -24,6 +24,7 @@ import {
   type PaymentMethod,
   type PaymentMethodKind,
 } from '@/api/paymentMethods'
+import { listPromotions, createPromotion, updatePromotion, type Promotion, type PromotionKind } from '@/api/promotions'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,7 +89,7 @@ export default function SettingsPage() {
     },
   })
 
-  const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'email'>('branding')
+  const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'promotions' | 'email'>('branding')
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
 
@@ -96,6 +97,7 @@ export default function SettingsPage() {
     { id: 'branding', label: 'Branding' },
     { id: 'scheduling', label: 'Scheduling' },
     ...(isAdmin ? [{ id: 'payment-methods', label: 'Payment methods' }] : []),
+    ...(isAdmin ? [{ id: 'promotions', label: 'Promotions' }] : []),
     ...(isAdmin ? [{ id: 'email', label: 'Email' }] : []),
   ] as const
 
@@ -342,6 +344,9 @@ export default function SettingsPage() {
 
         {/* Payment methods tab — admin only */}
         {tab === 'payment-methods' && isAdmin && <PaymentMethodsSection />}
+
+        {/* Promotions tab — admin only */}
+        {tab === 'promotions' && isAdmin && <PromotionsSection />}
 
         {/* Email tab — admin only */}
         {tab === 'email' && isAdmin && (
@@ -630,6 +635,134 @@ function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onS
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
+  )
+}
+
+function PromotionsSection() {
+  const qc = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const [newCode, setNewCode] = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [newKind, setNewKind] = useState<PromotionKind>('percent')
+  const [newValue, setNewValue] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const { data: promos = [], isLoading } = useQuery({
+    queryKey: ['promotions'],
+    queryFn: () => listPromotions(false),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () => createPromotion({
+      code: newCode.trim(), label: newLabel.trim(),
+      kind: newKind, value: newValue,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['promotions'] })
+      setAdding(false)
+      setNewCode(''); setNewLabel(''); setNewValue(''); setFormError(null)
+    },
+    onError: (e: Error) => setFormError(e.message),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      updatePromotion(id, { is_active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['promotions'] }),
+  })
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError(null)
+    if (!newCode.trim() || !newLabel.trim() || !newValue) {
+      setFormError('All fields required')
+      return
+    }
+    createMutation.mutate()
+  }
+
+  return (
+    <section className="border rounded-lg bg-white overflow-hidden">
+      <div className="px-5 py-3 border-b bg-muted/30 flex items-center justify-between">
+        <h2 className="text-sm font-medium">Promotions</h2>
+        {!adding && (
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>+ Add</Button>
+        )}
+      </div>
+      <div className="p-5 space-y-4">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : promos.length === 0 && !adding ? (
+          <p className="text-sm text-muted-foreground">No promotions yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {promos.map(p => (
+              <li key={p.id} className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${!p.is_active ? 'opacity-50' : ''}`}>
+                <div>
+                  <span className="font-medium">{p.label}</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {p.kind === 'percent' ? `${p.value}% off` : `$${p.value} off`} · code: {p.code}
+                  </span>
+                </div>
+                <button
+                  onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {p.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {adding && (
+          <form onSubmit={handleAdd} className="space-y-3 border rounded-md p-3 bg-muted/20">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Label</Label>
+                <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Senior Tuesday" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Code</Label>
+                <Input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="SENIOR_TUE" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <select
+                  value={newKind}
+                  onChange={e => setNewKind(e.target.value as PromotionKind)}
+                  className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+                >
+                  <option value="percent">Percent (%)</option>
+                  <option value="amount">Fixed amount ($)</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Value</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={newValue}
+                  onChange={e => setNewValue(e.target.value)}
+                  placeholder={newKind === 'percent' ? '10' : '5.00'}
+                />
+              </div>
+            </div>
+            {formError && <p className="text-xs text-destructive">{formError}</p>}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Saving…' : 'Save'}
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setAdding(false); setFormError(null) }}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </section>
   )
 }
 

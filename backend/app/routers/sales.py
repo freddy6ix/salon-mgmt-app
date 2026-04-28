@@ -22,6 +22,7 @@ from app.email import send_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
 from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
+from app.models.promotion import TenantPromotion
 from app.models.sale import Payment, Sale, SaleItem, SaleStatus
 from app.models.service import Service
 from app.models.tenant import Tenant
@@ -43,6 +44,7 @@ class SaleItemIn(BaseModel):
     appointment_item_id: str
     unit_price: Decimal
     discount_amount: Decimal = Decimal("0")
+    promotion_id: str | None = None
 
 
 class PaymentIn(BaseModel):
@@ -66,6 +68,8 @@ class SaleItemOut(BaseModel):
     unit_price: str
     discount_amount: str
     line_total: str
+    promotion_id: str | None
+    promotion_label: str | None
 
 
 class PaymentOut(BaseModel):
@@ -98,7 +102,9 @@ def _serialize(
     items: list[SaleItem],
     payments: list[Payment],
     methods_by_id: dict[uuid.UUID, TenantPaymentMethod],
+    promos_by_id: dict[uuid.UUID, TenantPromotion] | None = None,
 ) -> SaleOut:
+    pb = promos_by_id or {}
     return SaleOut(
         id=str(sale.id),
         appointment_id=str(sale.appointment_id),
@@ -120,6 +126,8 @@ def _serialize(
                 unit_price=str(it.unit_price),
                 discount_amount=str(it.discount_amount),
                 line_total=str(it.line_total),
+                promotion_id=str(it.promotion_id) if it.promotion_id else None,
+                promotion_label=pb[it.promotion_id].label if it.promotion_id and it.promotion_id in pb else None,
             )
             for it in items
         ],
@@ -301,15 +309,31 @@ async def create_sale(
     ).scalars().all()
     service_names = {s.id: s.name for s in services}
 
+    # Validate promotion IDs if supplied
+    promo_ids = {uuid.UUID(it.promotion_id) for it in body.items if it.promotion_id}
+    promos_by_id: dict[uuid.UUID, TenantPromotion] = {}
+    if promo_ids:
+        promos = (
+            await db.execute(
+                select(TenantPromotion).where(
+                    TenantPromotion.id.in_(promo_ids),
+                    TenantPromotion.tenant_id == tid,
+                )
+            )
+        ).scalars().all()
+        promos_by_id = {p.id: p for p in promos}
+
     sale_items: list[SaleItem] = []
     for in_item, line_total in line_records:
         ai = appt_item_map[in_item.appointment_item_id]
+        promo_uuid = uuid.UUID(in_item.promotion_id) if in_item.promotion_id else None
         si = SaleItem(
             tenant_id=tid,
             sale_id=sale.id,
             appointment_item_id=ai.id,
             description=service_names.get(ai.service_id, "Service"),
             provider_id=ai.provider_id,
+            promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
             sequence=ai.sequence,
             unit_price=_money(in_item.unit_price),
             discount_amount=_money(in_item.discount_amount),
@@ -334,7 +358,7 @@ async def create_sale(
 
     await db.commit()
     await db.refresh(sale)
-    return _serialize(sale, sale_items, sale_payments, methods_by_id)
+    return _serialize(sale, sale_items, sale_payments, methods_by_id, promos_by_id)
 
 
 # ── GET /sales/by-appointment/{appointment_id} ────────────────────────────────

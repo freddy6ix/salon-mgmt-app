@@ -20,3 +20,4 @@ from app.models.payment_method import TenantPaymentMethod, PaymentMethodKind  # 
 from app.models.sale import Sale, SaleItem, Payment, SaleStatus  # noqa: F401
 from app.models.time_block import TimeBlock  # noqa: F401
 from app.models.cash_reconciliation import CashReconciliation, PettyCashEntry, ReconciliationStatus  # noqa: F401
+from app.models.promotion import TenantPromotion, PromotionKind  # noqa: F401
