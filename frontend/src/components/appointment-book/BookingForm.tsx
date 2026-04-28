@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
+import { useTimeFormat } from '@/lib/timeFormat'
 import { searchClients, createClient, type Client } from '@/api/clients'
 import { listServices, type Service } from '@/api/services'
 import { type Provider } from '@/api/providers'
@@ -69,6 +70,7 @@ export default function BookingForm({
   const qc = useQueryClient()
 
   // ── Step: 'client' | 'items' | 'confirm'
+  const { formatTime: ft } = useTimeFormat()
   const [step, setStep] = useState<'client' | 'items' | 'confirm'>('client')
 
   // ── Client search
@@ -292,7 +294,7 @@ export default function BookingForm({
                 {items.map((item, idx) => (
                   <li key={idx} className="flex items-center justify-between text-sm border rounded-md px-3 py-1.5">
                     <span>
-                      <span className="font-medium">{item.startTime}</span>
+                      <span className="font-medium">{ft(item.startTime)}</span>
                       <span className="mx-1 text-muted-foreground">·</span>
                       {item.service.name}
                       <span className="mx-1 text-muted-foreground">·</span>
@@ -356,8 +358,7 @@ export default function BookingForm({
                       const h = Math.floor(totalMins / 60)
                       const m = totalMins % 60
                       const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-                      const label = `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                      return <option key={val} value={val}>{label}</option>
+                      return <option key={val} value={val}>{ft(val)}</option>
                     })}
                   </select>
                 </div>
@@ -420,7 +421,7 @@ export default function BookingForm({
               </p>
               {items.map((item, idx) => (
                 <p key={idx} className="text-sm text-muted-foreground">
-                  {item.startTime} · {item.service.name} · {item.provider.display_name} · <span className="text-foreground">${item.price.toFixed(2)}</span>
+                  {ft(item.startTime)} · {item.service.name} · {item.provider.display_name} · <span className="text-foreground">${item.price.toFixed(2)}</span>
                 </p>
               ))}
               {notes && <p className="text-xs text-muted-foreground italic mt-1">{notes}</p>}

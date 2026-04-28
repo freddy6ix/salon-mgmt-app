@@ -7,6 +7,7 @@ import {
   type BrandingSettings,
   type ContactDetails,
   type SlotMinutes,
+  type TimeFormat,
   SLOT_OPTIONS,
   getOperatingHours,
   updateOperatingHours,
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [brandColor, setBrandColor] = useState('#18181b')
   const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(10)
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>('12h')
   const EMPTY_CONTACT: ContactDetails = {
     address_line1: null, address_line2: null, city: null, region: null,
     postal_code: null, country: null, phone: null, hours_summary: null,
@@ -53,6 +55,7 @@ export default function SettingsPage() {
       setLogoUrl(branding.logo_url ?? '')
       setBrandColor(branding.brand_color ?? '#18181b')
       setSlotMinutes((branding.slot_minutes ?? 10) as SlotMinutes)
+      setTimeFormat(branding.time_format ?? '12h')
       setContact({
         address_line1: branding.address_line1,
         address_line2: branding.address_line2,
@@ -75,6 +78,7 @@ export default function SettingsPage() {
       logo_url: logoUrl || null,
       brand_color: brandColor,
       slot_minutes: slotMinutes,
+      time_format: timeFormat,
       ...contact,
     }),
     onSuccess: (updated: BrandingSettings) => {
@@ -296,6 +300,29 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Controls the time slot grid resolution and snaps new appointment start times to these intervals.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Time format</label>
+                <div className="flex gap-2">
+                  {(['12h', '24h'] as TimeFormat[]).map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setTimeFormat(opt)}
+                      className={`px-3 py-1.5 rounded-md border text-sm transition-colors ${
+                        timeFormat === opt
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-input bg-background hover:bg-muted/50'
+                      }`}
+                    >
+                      {opt === '12h' ? '12-hour (9:00 AM)' : '24-hour (09:00)'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Affects how times are displayed throughout the app.
                 </p>
               </div>
 

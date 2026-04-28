@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { useTimeFormat } from '@/lib/timeFormat'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'
 import { type AppointmentRequest, listAllRequests } from '@/api/appointmentRequests'
@@ -25,6 +25,7 @@ const APPT_STATUS_DOT: Record<Appointment['status'], string> = {
 
 function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
   const navigate = useNavigate()
+  const { formatTime: ft } = useTimeFormat()
 
   const active = appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
 
@@ -53,9 +54,8 @@ function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
               onClick={() => navigate('/appointments')}
               className="w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors flex items-center gap-3"
             >
-              <div className="w-16 flex-shrink-0 text-right">
-                <span className="text-sm font-medium tabular-nums">{format(start, 'h:mm')}</span>
-                <span className="text-xs text-muted-foreground ml-0.5">{format(start, 'a')}</span>
+              <div className="w-20 flex-shrink-0 text-right">
+                <span className="text-sm font-medium tabular-nums">{ft(start)}</span>
               </div>
               <div
                 className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${APPT_STATUS_DOT[appt.status]}`}
@@ -66,7 +66,7 @@ function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {item.service.name} · {item.provider.display_name}
-                  {' · '}{format(start, 'h:mm')}–{format(end, 'h:mm a')}
+                  {' · '}{ft(start)}–{ft(end)}
                 </p>
               </div>
               <ArrowRight size={14} className="text-muted-foreground flex-shrink-0" />

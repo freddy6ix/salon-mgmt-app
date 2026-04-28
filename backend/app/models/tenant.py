@@ -21,6 +21,7 @@ class Tenant(Base):
     logo_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
     slot_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    time_format: Mapped[str] = mapped_column(String(3), nullable=False, default="12h")
     request_notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True
     )

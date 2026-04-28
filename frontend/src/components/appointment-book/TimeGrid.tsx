@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 import { format } from 'date-fns'
+import { useTimeFormat } from '@/lib/timeFormat'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Appointment, AppointmentItem } from '@/api/appointments'
 import { patchAppointmentItem } from '@/api/appointments'
@@ -197,17 +198,18 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
     return map
   }, [activeProviders, timeBlocks, SLOT_MINUTES])
 
+  const { formatTime: ft } = useTimeFormat()
   const timeLabels = useMemo(() => {
     const labels: { label: string; topPx: number }[] = []
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
       const totalMins = START_HOUR * 60 + slot * SLOT_MINUTES
       if (totalMins % 60 === 0) {
         const d = new Date(2000, 0, 1, Math.floor(totalMins / 60), 0)
-        labels.push({ label: format(d, 'h a'), topPx: slot * SLOT_HEIGHT })
+        labels.push({ label: ft(d, { hourOnly: true }), topPx: slot * SLOT_HEIGHT })
       }
     }
     return labels
-  }, [SLOT_MINUTES, TOTAL_SLOTS])
+  }, [SLOT_MINUTES, TOTAL_SLOTS, ft])
 
   const hourLines = useMemo(() => timeLabels.map((l) => l.topPx), [timeLabels])
 

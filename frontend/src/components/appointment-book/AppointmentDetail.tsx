@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { useTimeFormat } from '@/lib/timeFormat'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -55,6 +56,7 @@ interface AddItemForm {
 export default function AppointmentDetail({ item, appointment, date, onClose }: Props) {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const { formatTime: ft } = useTimeFormat()
   const [tab, setTab] = useState<Tab>('appointment')
   const [notesValue, setNotesValue] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -259,7 +261,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                       <div>
                         <p className="font-medium text-sm">{apptItem.service.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(startTime, 'h:mm a')} – {format(endTime, 'h:mm a')} · {effectiveDuration} min
+                          {ft(startTime)} – {ft(endTime)} · {effectiveDuration} min
                         </p>
                         <p className="text-xs text-muted-foreground">
                           with {apptItem.provider.display_name}

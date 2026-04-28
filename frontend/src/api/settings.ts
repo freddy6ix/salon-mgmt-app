@@ -3,6 +3,8 @@ import { api } from './client'
 export const SLOT_OPTIONS = [5, 10, 15, 20, 30] as const
 export type SlotMinutes = typeof SLOT_OPTIONS[number]
 
+export type TimeFormat = '12h' | '24h'
+
 export interface ContactDetails {
   address_line1: string | null
   address_line2: string | null
@@ -19,6 +21,7 @@ export interface BrandingSettings extends ContactDetails {
   logo_url: string | null
   brand_color: string | null
   slot_minutes: SlotMinutes
+  time_format: TimeFormat
 }
 
 export function getBranding(): Promise<BrandingSettings> {
@@ -26,7 +29,7 @@ export function getBranding(): Promise<BrandingSettings> {
 }
 
 type BrandingPatchable = Partial<Pick<BrandingSettings,
-  'logo_url' | 'brand_color' | 'slot_minutes'
+  'logo_url' | 'brand_color' | 'slot_minutes' | 'time_format'
 > & ContactDetails>
 
 export function updateBranding(patch: BrandingPatchable): Promise<BrandingSettings> {

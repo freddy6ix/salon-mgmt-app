@@ -16,6 +16,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 VALID_SLOT_MINUTES = {5, 10, 15, 20, 30}
+VALID_TIME_FORMATS = {"12h", "24h"}
 
 
 CONTACT_FIELDS = (
@@ -29,6 +30,7 @@ class BrandingOut(BaseModel):
     logo_url: str | None
     brand_color: str | None
     slot_minutes: int
+    time_format: str
     address_line1: str | None
     address_line2: str | None
     city: str | None
@@ -43,6 +45,7 @@ class BrandingPatch(BaseModel):
     logo_url: str | None = None
     brand_color: str | None = None
     slot_minutes: int | None = None
+    time_format: str | None = None
     address_line1: str | None = None
     address_line2: str | None = None
     city: str | None = None
@@ -65,6 +68,7 @@ def _branding_out(tenant: Tenant) -> BrandingOut:
         logo_url=tenant.logo_url,
         brand_color=tenant.brand_color,
         slot_minutes=tenant.slot_minutes,
+        time_format=tenant.time_format,
         address_line1=tenant.address_line1,
         address_line2=tenant.address_line2,
         city=tenant.city,
@@ -99,6 +103,11 @@ async def update_branding(
                 raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     detail=f"slot_minutes must be one of {sorted(VALID_SLOT_MINUTES)}")
             tenant.slot_minutes = value
+        elif field == 'time_format':
+            if value not in VALID_TIME_FORMATS:
+                raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail="time_format must be '12h' or '24h'")
+            tenant.time_format = value
         elif field in CONTACT_FIELDS:
             cleaned = value.strip() if isinstance(value, str) else value
             setattr(tenant, field, cleaned or None)

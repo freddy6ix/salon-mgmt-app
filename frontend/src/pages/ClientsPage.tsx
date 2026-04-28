@@ -14,6 +14,7 @@ import {
   deleteClient,
 } from '@/api/clients'
 import { updateAppointmentStatus } from '@/api/appointments'
+import { useTimeFormat } from '@/lib/timeFormat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -195,6 +196,7 @@ const VISIT_STATUS_LABEL: Record<string, string> = {
 
 function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const { formatTime: ft } = useTimeFormat()
   const todayStr = new Date().toISOString().slice(0, 10)
   const isUpcoming = visit.date >= todayStr
   return (
@@ -229,9 +231,7 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
         {visit.items.map((item, i) => (
           <li key={i} className="text-muted-foreground text-xs">
             <span className="tabular-nums text-foreground">
-              {new Date(item.start_time).toLocaleTimeString('en-CA', {
-                hour: 'numeric', minute: '2-digit', hour12: true,
-              })}
+              {ft(item.start_time)}
             </span>
             {' · '}{item.service_name} — {item.provider_name}
             {' · '}${item.price.toFixed(2)}
