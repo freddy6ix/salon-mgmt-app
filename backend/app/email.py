@@ -42,13 +42,13 @@ def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
     context = ssl.create_default_context()
     try:
         if cfg.use_tls:
-            with smtplib.SMTP(cfg.host, cfg.port, timeout=30) as smtp:
+            with smtplib.SMTP(cfg.host, cfg.port, timeout=15) as smtp:
                 smtp.ehlo()
                 smtp.starttls(context=context)
                 smtp.login(cfg.username, cfg.password)
                 smtp.send_message(msg)
         else:
-            with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=30) as smtp:
+            with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=15) as smtp:
                 smtp.login(cfg.username, cfg.password)
                 smtp.send_message(msg)
     except smtplib.SMTPAuthenticationError as e:
@@ -63,7 +63,7 @@ def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
         raise RuntimeError(f"Connection error to {cfg.host}:{cfg.port} — {e}")
 
 
-async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str, retries: int = 2) -> None:
+async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str, retries: int = 3) -> None:
     """Send an email, retrying on transient connection drops (SMTPServerDisconnected)."""
     last_err: Exception | None = None
     for attempt in range(retries):

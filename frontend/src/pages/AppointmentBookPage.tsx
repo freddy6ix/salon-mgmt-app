@@ -46,6 +46,12 @@ export default function AppointmentBookPage() {
     enabled: !!requestId,
   })
 
+  // Sync date from URL ?date= param (e.g. when navigating from client card history)
+  useEffect(() => {
+    const urlDate = searchParams.get('date')
+    if (urlDate && urlDate !== date) setDate(urlDate)
+  }, [searchParams.get('date')])
+
   // Auto-jump to the requested date when the request loads
   useEffect(() => {
     if (convertRequest) {
