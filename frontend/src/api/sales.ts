@@ -36,10 +36,13 @@ export interface Sale {
 }
 
 export interface SaleItemIn {
-  appointment_item_id: string
+  appointment_item_id?: string | null
+  retail_item_id?: string | null
   unit_price: string
   discount_amount: string
   promotion_id?: string | null
+  is_gst_exempt?: boolean
+  is_pst_exempt?: boolean
 }
 
 export interface SalePaymentIn {
