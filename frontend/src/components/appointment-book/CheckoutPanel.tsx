@@ -4,6 +4,7 @@ import type { Appointment } from '@/api/appointments'
 import { createSale, sendReceipt, type Sale } from '@/api/sales'
 import { listPaymentMethods } from '@/api/paymentMethods'
 import { listPromotions, applyPromotion, type Promotion } from '@/api/promotions'
+import { listRetailItems, type RetailItem } from '@/api/retailItems'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -15,12 +16,16 @@ interface Props {
 }
 
 interface ItemDraft {
-  appointment_item_id: string
+  kind: 'service' | 'retail'
+  appointment_item_id: string | null
+  retail_item_id: string | null
   description: string
   providerName: string
   unitPrice: string
   discount: string
   promotionId: string | null
+  isGstExempt: boolean
+  isPstExempt: boolean
 }
 
 interface PaymentDraft {
@@ -57,14 +62,23 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
     queryFn: () => listPromotions(true),
   })
 
+  const { data: retailCatalog = [] } = useQuery({
+    queryKey: ['retail-items', 'active'],
+    queryFn: () => listRetailItems(true),
+  })
+
   const [items, setItems] = useState<ItemDraft[]>(() =>
     appointment.items.map(it => ({
+      kind: 'service' as const,
       appointment_item_id: it.id,
+      retail_item_id: null,
       description: it.service.name,
       providerName: it.provider.display_name,
       unitPrice: it.price.toFixed(2),
       discount: '0.00',
       promotionId: null,
+      isGstExempt: false,
+      isPstExempt: false,
     }))
   )
   const [notes, setNotes] = useState('')
@@ -87,8 +101,14 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       0,
     )
     const discountTotal = items.reduce((sum, i) => sum + toMoney(i.discount), 0)
-    const gst = Math.round(subtotal * GST_RATE * 100) / 100
-    const pst = Math.round(subtotal * PST_RATE * 100) / 100
+    const gstTaxable = items.reduce(
+      (sum, i) => !i.isGstExempt ? sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)) : sum, 0
+    )
+    const pstTaxable = items.reduce(
+      (sum, i) => !i.isPstExempt ? sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)) : sum, 0
+    )
+    const gst = Math.round(gstTaxable * GST_RATE * 100) / 100
+    const pst = Math.round(pstTaxable * PST_RATE * 100) / 100
     const total = Math.round((subtotal + gst + pst) * 100) / 100
     const applied = payments.reduce(
       (sum, p) => sum + toMoney(p.amount) - toMoney(p.cashback),
@@ -108,6 +128,25 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
 
   function updateItem(idx: number, patch: Partial<ItemDraft>) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
+  }
+
+  function addRetailItem(ri: RetailItem) {
+    setItems(prev => [...prev, {
+      kind: 'retail' as const,
+      appointment_item_id: null,
+      retail_item_id: ri.id,
+      description: ri.name,
+      providerName: '',
+      unitPrice: parseFloat(ri.default_price).toFixed(2),
+      discount: '0.00',
+      promotionId: null,
+      isGstExempt: ri.is_gst_exempt,
+      isPstExempt: ri.is_pst_exempt,
+    }])
+  }
+
+  function removeItem(idx: number) {
+    setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
   function applyPromotionToItem(idx: number, promo: Promotion | null) {
@@ -158,10 +197,13 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       appointment_id: appointment.id,
       notes: notes.trim() || null,
       items: items.map(i => ({
-        appointment_item_id: i.appointment_item_id,
+        appointment_item_id: i.appointment_item_id ?? null,
+        retail_item_id: i.retail_item_id ?? null,
         unit_price: fmt(toMoney(i.unitPrice)),
         discount_amount: fmt(toMoney(i.discount)),
         promotion_id: i.promotionId ?? null,
+        is_gst_exempt: i.isGstExempt,
+        is_pst_exempt: i.isPstExempt,
       })),
       payments: payments.map(p => ({
         payment_method_id: p.payment_method_id,
@@ -220,14 +262,45 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
 
         {/* Items */}
         <div className="space-y-2">
-          <Label>Items</Label>
+          <div className="flex items-center justify-between">
+            <Label>Items</Label>
+            {retailCatalog.length > 0 && (
+              <select
+                className="text-xs border border-input rounded-md px-2 py-1 bg-background"
+                value=""
+                onChange={e => {
+                  const ri = retailCatalog.find(r => r.id === e.target.value)
+                  if (ri) addRetailItem(ri)
+                }}
+              >
+                <option value="">+ Add retail item</option>
+                {retailCatalog.map(r => (
+                  <option key={r.id} value={r.id}>{r.name} (${parseFloat(r.default_price).toFixed(2)})</option>
+                ))}
+              </select>
+            )}
+          </div>
           {items.map((it, idx) => {
             const lineTotal = Math.max(0, toMoney(it.unitPrice) - toMoney(it.discount))
             const overDiscount = toMoney(it.discount) > toMoney(it.unitPrice)
             return (
-              <div key={it.appointment_item_id} className="rounded-md border p-3 space-y-2">
-                <p className="text-sm font-medium">{it.description}</p>
-                <p className="text-xs text-muted-foreground">{it.providerName}</p>
+              <div key={idx} className="rounded-md border p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">{it.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {it.kind === 'retail' ? 'Retail' : it.providerName}
+                      {(it.isGstExempt || it.isPstExempt) && (
+                        <span className="ml-1 text-amber-600">
+                          ({[it.isGstExempt && 'GST', it.isPstExempt && 'PST'].filter(Boolean).join('+')} exempt)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {it.kind === 'retail' && (
+                    <button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive text-lg leading-none">×</button>
+                  )}
+                </div>
                 {promotions.length > 0 && (
                   <div>
                     <label className="text-xs text-muted-foreground">Promotion</label>

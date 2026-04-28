@@ -23,7 +23,8 @@ from app.models.appointment import Appointment, AppointmentItem, AppointmentStat
 from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
 from app.models.promotion import TenantPromotion
-from app.models.sale import Payment, Sale, SaleItem, SaleStatus
+from app.models.retail import RetailItem
+from app.models.sale import Payment, Sale, SaleItem, SaleItemKind, SaleStatus
 from app.models.service import Service
 from app.models.tenant import Tenant
 
@@ -41,10 +42,15 @@ def _money(value: Decimal | float | int | str) -> Decimal:
 # ── Request/response models ──────────────────────────────────────────────────
 
 class SaleItemIn(BaseModel):
-    appointment_item_id: str
+    # Exactly one of appointment_item_id or retail_item_id must be set
+    appointment_item_id: str | None = None
+    retail_item_id: str | None = None
     unit_price: Decimal
     discount_amount: Decimal = Decimal("0")
     promotion_id: str | None = None
+    # Tax flags (passed from frontend; validated against retail item on backend for retail lines)
+    is_gst_exempt: bool = False
+    is_pst_exempt: bool = False
 
 
 class PaymentIn(BaseModel):
@@ -62,8 +68,9 @@ class SaleIn(BaseModel):
 
 class SaleItemOut(BaseModel):
     id: str
+    kind: str
     description: str
-    provider_id: str
+    provider_id: str | None
     sequence: int
     unit_price: str
     discount_amount: str
@@ -120,8 +127,9 @@ def _serialize(
         items=[
             SaleItemOut(
                 id=str(it.id),
+                kind=it.kind.value,
                 description=it.description,
-                provider_id=str(it.provider_id),
+                provider_id=str(it.provider_id) if it.provider_id else None,
                 sequence=it.sequence,
                 unit_price=str(it.unit_price),
                 discount_amount=str(it.discount_amount),
@@ -188,7 +196,11 @@ async def create_sale(
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This appointment already has a completed sale")
 
-    # Load all appointment items, validate item set
+    # Separate service vs retail items
+    service_item_ids = [it.appointment_item_id for it in body.items if it.appointment_item_id]
+    retail_item_ids_in = [it.retail_item_id for it in body.items if it.retail_item_id]
+
+    # Load all appointment items; validate that all appt items are present (R8)
     appt_items = (
         await db.execute(
             select(AppointmentItem).where(
@@ -199,12 +211,24 @@ async def create_sale(
     ).scalars().all()
     appt_item_map = {str(ai.id): ai for ai in appt_items}
 
-    body_item_ids = [it.appointment_item_id for it in body.items]
-    if set(body_item_ids) != set(appt_item_map.keys()):  # R8
+    if set(service_item_ids) != set(appt_item_map.keys()):  # R8
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Sale must include exactly the appointment's items (no missing or extra)",
+            detail="Sale must include exactly the appointment's service items (no missing or extra)",
         )
+
+    # Load retail items
+    retail_item_map: dict[str, RetailItem] = {}
+    if retail_item_ids_in:
+        retail_rows = (
+            await db.execute(
+                select(RetailItem).where(
+                    RetailItem.id.in_([uuid.UUID(rid) for rid in retail_item_ids_in]),
+                    RetailItem.tenant_id == tid,
+                )
+            )
+        ).scalars().all()
+        retail_item_map = {str(r.id): r for r in retail_rows}
 
     # Validate per-line discount and price
     for in_item in body.items:
@@ -216,22 +240,36 @@ async def create_sale(
                 detail="discount_amount must be between 0 and unit_price",
             )
 
-    # Compute totals server-side (R11–R16). No tip — see P2-9 in docs/backlog.md.
+    # Compute totals server-side with per-item tax flags (R11–R16). No tip — see P2-9.
     subtotal = Decimal("0")
     discount_total = Decimal("0")
-    line_records: list[tuple[SaleItemIn, Decimal]] = []  # (input, line_total)
+    gst_taxable = Decimal("0")
+    pst_taxable = Decimal("0")
+    line_records: list[tuple[SaleItemIn, Decimal]] = []
+
     for in_item in body.items:
         unit = _money(in_item.unit_price)
         disc = _money(in_item.discount_amount)
         line_total = _money(unit - disc)
         subtotal += line_total
         discount_total += disc
+        # Retail: use item's own tax flags. Service: always taxable.
+        if in_item.retail_item_id and in_item.retail_item_id in retail_item_map:
+            ri = retail_item_map[in_item.retail_item_id]
+            if not ri.is_gst_exempt:
+                gst_taxable += line_total
+            if not ri.is_pst_exempt:
+                pst_taxable += line_total
+        else:
+            # Service items always taxable
+            gst_taxable += line_total
+            pst_taxable += line_total
         line_records.append((in_item, line_total))
 
     subtotal = _money(subtotal)
     discount_total = _money(discount_total)
-    gst = _money(subtotal * GST_RATE)
-    pst = _money(subtotal * PST_RATE)
+    gst = _money(gst_taxable * GST_RATE)
+    pst = _money(pst_taxable * PST_RATE)
     total = _money(subtotal + gst + pst)
 
     # R18 — (amount − cashback) summed across all payments must equal sale total.
@@ -324,23 +362,44 @@ async def create_sale(
         promos_by_id = {p.id: p for p in promos}
 
     sale_items: list[SaleItem] = []
+    seq = 1
     for in_item, line_total in line_records:
-        ai = appt_item_map[in_item.appointment_item_id]
         promo_uuid = uuid.UUID(in_item.promotion_id) if in_item.promotion_id else None
-        si = SaleItem(
-            tenant_id=tid,
-            sale_id=sale.id,
-            appointment_item_id=ai.id,
-            description=service_names.get(ai.service_id, "Service"),
-            provider_id=ai.provider_id,
-            promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
-            sequence=ai.sequence,
-            unit_price=_money(in_item.unit_price),
-            discount_amount=_money(in_item.discount_amount),
-            line_total=line_total,
-        )
+
+        if in_item.appointment_item_id:
+            ai = appt_item_map[in_item.appointment_item_id]
+            si = SaleItem(
+                tenant_id=tid,
+                sale_id=sale.id,
+                kind=SaleItemKind.service,
+                appointment_item_id=ai.id,
+                description=service_names.get(ai.service_id, "Service"),
+                provider_id=ai.provider_id,
+                promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
+                sequence=seq,
+                unit_price=_money(in_item.unit_price),
+                discount_amount=_money(in_item.discount_amount),
+                line_total=line_total,
+            )
+        else:
+            ri = retail_item_map.get(in_item.retail_item_id or "")
+            si = SaleItem(
+                tenant_id=tid,
+                sale_id=sale.id,
+                kind=SaleItemKind.retail,
+                retail_item_id=uuid.UUID(in_item.retail_item_id) if in_item.retail_item_id else None,
+                retail_item_name=ri.name if ri else "Retail item",
+                description=ri.name if ri else "Retail item",
+                provider_id=None,
+                promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
+                sequence=seq,
+                unit_price=_money(in_item.unit_price),
+                discount_amount=_money(in_item.discount_amount),
+                line_total=line_total,
+            )
         db.add(si)
         sale_items.append(si)
+        seq += 1
 
     sale_payments: list[Payment] = []
     for in_pay in body.payments:

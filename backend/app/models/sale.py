@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Enum as SQLEnum, ForeignKey, Integer, Numeric, Text, UniqueConstraint
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import DateTime
@@ -13,6 +13,11 @@ from app.models.base import TenantScopedBase
 
 class SaleStatus(str, enum.Enum):
     pending = "pending"
+
+
+class SaleItemKind(str, enum.Enum):
+    service = "service"
+    retail = "retail"
     completed = "completed"
 
 
@@ -53,9 +58,17 @@ class SaleItem(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("appointment_items.id"), nullable=True
     )
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    provider_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False
+    provider_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("providers.id"), nullable=True
     )
+    kind: Mapped[SaleItemKind] = mapped_column(
+        SQLEnum(SaleItemKind, name="sale_item_kind"), nullable=False, default=SaleItemKind.service
+    )
+    retail_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("retail_items.id"), nullable=True
+    )
+    # Snapshot of retail item name (in case the catalog changes later)
+    retail_item_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     promotion_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tenant_promotions.id"), nullable=True
     )
