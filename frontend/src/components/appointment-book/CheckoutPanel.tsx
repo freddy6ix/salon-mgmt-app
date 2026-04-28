@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Appointment } from '@/api/appointments'
-import { createSale } from '@/api/sales'
+import { createSale, sendReceipt, type Sale } from '@/api/sales'
 import { listPaymentMethods } from '@/api/paymentMethods'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -62,6 +62,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   const [notes, setNotes] = useState('')
   const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null)
 
   // Initialise payment row once methods are loaded (default: first method, $0, no cashback).
   useEffect(() => {
@@ -150,9 +151,9 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         cashback_amount: fmt(toMoney(p.cashback)),
       })),
     }),
-    onSuccess: () => {
+    onSuccess: (sale) => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
-      onCompleted()
+      setCompletedSale(sale)
     },
     onError: (err: unknown) => setError((err as Error).message ?? 'Checkout failed'),
   })
@@ -169,6 +170,18 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       if (cb > toMoney(p.amount)) { setError('Cashback cannot exceed payment amount'); return }
     }
     mutation.mutate()
+  }
+
+  if (completedSale) {
+    return (
+      <ReceiptPanel
+        sale={completedSale}
+        clientEmail={appointment.client.email ?? null}
+        clientName={`${appointment.client.first_name} ${appointment.client.last_name}`}
+        methods={methods}
+        onDone={onCompleted}
+      />
+    )
   }
 
   return (
@@ -355,6 +368,135 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
         >
           {mutation.isPending ? 'Processing…' : `Complete checkout · $${fmt(totals.total)}`}
         </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Receipt panel ─────────────────────────────────────────────────────────────
+
+import type { PaymentMethod } from '@/api/paymentMethods'
+
+function ReceiptPanel({
+  sale, clientEmail, clientName, methods, onDone,
+}: {
+  sale: Sale
+  clientEmail: string | null
+  clientName: string
+  methods: PaymentMethod[]
+  onDone: () => void
+}) {
+  const methodsById = Object.fromEntries(methods.map(m => [m.id, m]))
+  const [emailTo, setEmailTo] = useState(clientEmail ?? '')
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+
+  const emailMutation = useMutation({
+    mutationFn: () => sendReceipt(sale.id, emailTo.trim()),
+    onSuccess: () => { setEmailSent(true); setEmailError(null) },
+    onError: (e: Error) => setEmailError(e.message ?? 'Failed to send'),
+  })
+
+  function handlePrint() {
+    const w = window.open('', '_blank', 'width=400,height=600')
+    if (!w) return
+    const itemRows = sale.items.map(it =>
+      `<tr><td>${it.description}</td><td style="text-align:right">$${parseFloat(it.line_total).toFixed(2)}</td></tr>`
+    ).join('')
+    const payRows = sale.payments.map(p => {
+      const label = methodsById[p.payment_method_id]?.label ?? p.payment_method_label ?? '—'
+      return `<tr><td>${label}</td><td style="text-align:right">$${parseFloat(p.amount).toFixed(2)}</td></tr>`
+    }).join('')
+    w.document.write(`
+      <html><head><title>Receipt</title>
+      <style>body{font-family:sans-serif;font-size:13px;padding:16px}
+      table{width:100%;border-collapse:collapse}td{padding:3px 0}
+      hr{border:none;border-top:1px solid #ccc;margin:8px 0}
+      .total{font-weight:bold}</style></head>
+      <body>
+        <h3 style="margin:0 0 4px">${clientName}</h3>
+        <p style="margin:0 0 12px;color:#555">${sale.completed_at ? new Date(sale.completed_at).toLocaleDateString() : ''}</p>
+        <table>${itemRows}</table>
+        <hr/>
+        <table>
+          <tr><td>Subtotal</td><td style="text-align:right">$${parseFloat(sale.subtotal).toFixed(2)}</td></tr>
+          <tr><td>GST (5%)</td><td style="text-align:right">$${parseFloat(sale.gst_amount).toFixed(2)}</td></tr>
+          <tr><td>PST (8%)</td><td style="text-align:right">$${parseFloat(sale.pst_amount).toFixed(2)}</td></tr>
+          <tr class="total"><td>Total</td><td style="text-align:right">$${parseFloat(sale.total).toFixed(2)}</td></tr>
+        </table>
+        <hr/>
+        <table>${payRows}</table>
+      </body></html>`)
+    w.document.close()
+    w.print()
+  }
+
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 w-[440px] bg-white shadow-2xl flex flex-col border-l">
+      <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+        <div>
+          <h2 className="text-base font-semibold">Receipt</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{clientName} · ${parseFloat(sale.total).toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Summary */}
+        <div className="rounded-md bg-muted/30 p-3 space-y-1 text-sm">
+          {sale.items.map(it => (
+            <div key={it.id} className="flex justify-between">
+              <span className="text-muted-foreground">{it.description}</span>
+              <span>${parseFloat(it.line_total).toFixed(2)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between border-t pt-1 mt-1 text-muted-foreground text-xs">
+            <span>GST + PST</span>
+            <span>${(parseFloat(sale.gst_amount) + parseFloat(sale.pst_amount)).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>${parseFloat(sale.total).toFixed(2)}</span>
+          </div>
+          <div className="border-t pt-1 mt-1 space-y-0.5">
+            {sale.payments.map(p => (
+              <div key={p.id} className="flex justify-between text-xs text-muted-foreground">
+                <span>{methodsById[p.payment_method_id]?.label ?? p.payment_method_label}</span>
+                <span>${parseFloat(p.amount).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Print */}
+        <Button variant="outline" className="w-full" onClick={handlePrint}>
+          Print receipt
+        </Button>
+
+        {/* Email */}
+        <div className="space-y-2">
+          <Label>Email receipt</Label>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={emailTo}
+              onChange={e => setEmailTo(e.target.value)}
+              placeholder="client@example.com"
+              className="flex-1 border border-input rounded-md px-3 py-1.5 text-sm bg-background"
+            />
+            <Button
+              variant="outline"
+              onClick={() => emailMutation.mutate()}
+              disabled={!emailTo.trim() || emailMutation.isPending || emailSent}
+            >
+              {emailMutation.isPending ? 'Sending…' : emailSent ? 'Sent ✓' : 'Send'}
+            </Button>
+          </div>
+          {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+        </div>
+      </div>
+
+      <div className="border-t px-5 py-4 flex-shrink-0">
+        <Button className="w-full" onClick={onDone}>Done</Button>
       </div>
     </div>
   )

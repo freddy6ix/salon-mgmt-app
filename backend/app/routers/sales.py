@@ -18,10 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import StaffUser
+from app.email import send_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
+from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
 from app.models.sale import Payment, Sale, SaleItem, SaleStatus
 from app.models.service import Service
+from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -364,3 +367,97 @@ async def get_sale_by_appointment(
     ).scalars().all() if method_ids else []
     methods_by_id = {m.id: m for m in methods}
     return _serialize(sale, list(items), list(payments), methods_by_id)
+
+
+# ── POST /sales/{sale_id}/send-receipt ────────────────────────────────────────
+
+class SendReceiptIn(BaseModel):
+    to: str  # recipient email
+
+
+@router.post("/{sale_id}/send-receipt", status_code=status.HTTP_204_NO_CONTENT)
+async def send_receipt(
+    sale_id: str,
+    body: SendReceiptIn,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    tid = current_user.tenant_id
+
+    sale = (
+        await db.execute(
+            select(Sale).where(Sale.id == uuid.UUID(sale_id), Sale.tenant_id == tid)
+        )
+    ).scalar_one_or_none()
+    if sale is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+
+    items = (
+        await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id).order_by(SaleItem.sequence))
+    ).scalars().all()
+
+    payments = (
+        await db.execute(select(Payment).where(Payment.sale_id == sale.id))
+    ).scalars().all()
+    method_ids = {p.payment_method_id for p in payments}
+    methods = (
+        await db.execute(select(TenantPaymentMethod).where(TenantPaymentMethod.id.in_(method_ids)))
+    ).scalars().all() if method_ids else []
+    methods_by_id = {m.id: m for m in methods}
+
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tid))).scalar_one()
+
+    cfg_row = (
+        await db.execute(select(TenantEmailConfig).where(TenantEmailConfig.tenant_id == tid))
+    ).scalar_one_or_none()
+    if cfg_row is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Email not configured — set up SMTP in Settings → Email first")
+
+    from app.email import SmtpConfig
+    smtp = SmtpConfig(
+        host=cfg_row.smtp_host, port=cfg_row.smtp_port,
+        username=cfg_row.smtp_username, password=cfg_row.smtp_password,
+        use_tls=cfg_row.smtp_use_tls, from_address=cfg_row.from_address,
+    )
+
+    items_html = "".join(
+        f"<tr><td style='padding:4px 0;'>{it.description}</td>"
+        f"<td style='padding:4px 0;text-align:right;'>${it.line_total}</td></tr>"
+        for it in items
+    )
+    payments_html = "".join(
+        f"<tr><td style='padding:4px 0;color:#555;'>{methods_by_id[p.payment_method_id].label}</td>"
+        f"<td style='padding:4px 0;text-align:right;'>${p.amount}</td></tr>"
+        for p in payments if p.payment_method_id in methods_by_id
+    )
+    sale_date = sale.completed_at.strftime("%B %d, %Y") if sale.completed_at else ""
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="margin-top:0;">{tenant.name}</h2>
+      <p style="color:#555;margin-top:0;">{sale_date}</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        {items_html}
+        <tr><td colspan="2" style="border-top:1px solid #eee;padding:4px 0;"></td></tr>
+        <tr><td style="padding:4px 0;color:#555;">Subtotal</td>
+            <td style="padding:4px 0;text-align:right;">${sale.subtotal}</td></tr>
+        <tr><td style="padding:4px 0;color:#555;">GST (5%)</td>
+            <td style="padding:4px 0;text-align:right;">${sale.gst_amount}</td></tr>
+        <tr><td style="padding:4px 0;color:#555;">PST (8%)</td>
+            <td style="padding:4px 0;text-align:right;">${sale.pst_amount}</td></tr>
+        <tr style="font-weight:600;">
+            <td style="padding:8px 0;border-top:1px solid #eee;">Total</td>
+            <td style="padding:8px 0;border-top:1px solid #eee;text-align:right;">${sale.total}</td></tr>
+      </table>
+      <p style="color:#555;font-size:14px;">Paid by:</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+        {payments_html}
+      </table>
+      <p style="color:#aaa;font-size:12px;">Thank you for visiting {tenant.name}.</p>
+    </div>"""
+
+    try:
+        await send_email(smtp, body.to, f"Your receipt from {tenant.name}", html)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

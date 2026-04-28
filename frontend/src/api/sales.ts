@@ -58,6 +58,10 @@ export function createSale(body: SaleIn): Promise<Sale> {
   return api.post<Sale>('/sales', body)
 }
 
+export function sendReceipt(saleId: string, to: string): Promise<void> {
+  return api.post<void>(`/sales/${saleId}/send-receipt`, { to })
+}
+
 export function getSaleByAppointment(appointmentId: string): Promise<Sale> {
   return api.get<Sale>(`/sales/by-appointment/${appointmentId}`)
 }
