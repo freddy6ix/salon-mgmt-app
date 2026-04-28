@@ -197,7 +197,9 @@ async def seed():
             dict(category="Styling", service_code="FRG", name="Fringe/Bang Cut", duration_minutes=15, default_price=20, ),
             dict(category="Styling", service_code="HTF", name="Heat Tool Finish", duration_minutes=15, default_price=10, ),
             dict(category="Styling", service_code="UPD", name="Special Updo", duration_minutes=90, default_price=145),
-            dict(category="Styling", service_code="BOT", name="Hair Botox", duration_minutes=180, default_price=400),
+            dict(category="Styling", service_code="BOT", name="Hair Botox (with home care)", duration_minutes=180, default_price=400),
+            dict(category="Styling", service_code="BOTNHC", name="Hair Botox (without home care)", duration_minutes=180, default_price=350),
+            dict(category="Styling", service_code="BOTEXP", name="Hair Botox Express", duration_minutes=90, default_price=150),
             dict(category="Styling", service_code="MLB", name="Milbon Treatment", duration_minutes=60, default_price=100),
             dict(category="Styling", service_code="MLBA", name="Milbon Treatment (add-on)", duration_minutes=30, default_price=65, ),
             # Colouring
@@ -217,10 +219,12 @@ async def seed():
                  processing_offset_minutes=90, processing_duration_minutes=40),
             dict(category="Colouring", service_code="BLY", name="Full Balayage", duration_minutes=180, default_price=250,
                  processing_offset_minutes=100, processing_duration_minutes=45),
-            dict(category="Colouring", service_code="CFC", name="Color Full Color", duration_minutes=90, default_price=100,
+            dict(category="Colouring", service_code="CFC", name="Color Full Color", duration_minutes=90, default_price=140,
                  processing_offset_minutes=15, processing_duration_minutes=40),
-            dict(category="Colouring", service_code="CCR", name="Colour Correction", duration_minutes=240, default_price=110,
+            dict(category="Colouring", service_code="CCR", name="Colour Correction", duration_minutes=240, default_price=100,
                  pricing_type=PricingType.hourly),
+            dict(category="Colouring", service_code="CVC", name="Vivid Color", duration_minutes=90, default_price=100,
+                 processing_offset_minutes=15, processing_duration_minutes=40),
             dict(category="Colouring", service_code="TNR", name="Toner/Gloss", duration_minutes=45, default_price=85,
                  processing_offset_minutes=5, processing_duration_minutes=20),
             dict(category="Colouring", service_code="TNRA", name="Toner/Gloss (add-on)", duration_minutes=30, default_price=50,
@@ -249,6 +253,9 @@ async def seed():
                 )
                 db.add(svc)
                 await db.flush()
+            else:
+                if svc.default_price != s.get("default_price"):
+                    svc.default_price = s.get("default_price")
             services[s["service_code"]] = svc
         print(f"Services: {len(services)} created/existing")
 
@@ -333,24 +340,27 @@ async def seed():
         print("Provider weekly schedules seeded")
 
         # ── Provider Service Prices ──────────────────────────────────────────
-        # Source: Google Sheet shared by owner (2026-04-28).
+        # Source: docs/seed-data/Service Price List.xls (system of record, 2026-04-28).
+        # Google Sheet used as supplement for colour services where XLS has no
+        # per-provider row (meaning all charge the service default price).
         #
-        # Omissions (not in the sheet — need owner input):
-        #   CCAMO  Camo Colour            — no per-provider pricing provided
-        #   CFC    Color Full Color       — no per-provider pricing provided
-        #   "Additional colour $25"       — in sheet but no service code in catalog
+        # Omissions / unknowns:
+        #   CCAMO  Camo Colour       — no per-provider entries in XLS
+        #   BOTNHC / BOTEXP          — new services added from XLS; no per-provider rows
+        #   "Additional colour $25"  — XLS code CAC, no equivalent service in catalog
+        #   Becky, Antonella         — on maternity leave, not in XLS
         #
-        # By-request / n/a entries (no PSP row created):
-        #   JJ:    Updo, Hair Botox       — "by request"
-        #   JJ:    all colour services    — not listed (colour by request)
-        #   Asami: Updo                   — "n/a"
-        #   Becky, Antonella              — on maternity leave, not listed
+        # Skipped (no standard price):
+        #   JJ:   colour services    — not listed in XLS (by request)
+        #   JJ:   BOT                — "by request" per Google Sheet, not in XLS per-provider
+        #   RYAN: UPD                — $0 in XLS (deleted below if previously seeded)
         PSP_DATA: list[tuple[str, str, float]] = [
             # ── JJ (styling only) ─────────────────────────────────────────
             ("JJ", "BLD",  70),
             ("JJ", "ST1",  80),
             ("JJ", "ST2",  125),
             ("JJ", "ST2P", 150),
+            ("JJ", "UPD",  200),   # XLS: SUD/JJ = 200 (Google Sheet said "by request")
             ("JJ", "HTF",  10),
             ("JJ", "FRG",  20),
             ("JJ", "MLB",  100),
@@ -361,9 +371,9 @@ async def seed():
             ("GUMI", "ST1",  65),
             ("GUMI", "ST2",  100),
             ("GUMI", "ST2P", 125),
+            ("GUMI", "UPD",  150),
             ("GUMI", "HTF",  10),
             ("GUMI", "FRG",  20),
-            ("GUMI", "UPD",  150),
             ("GUMI", "MLB",  100),
             ("GUMI", "MLBA", 65),
             ("GUMI", "BOT",  400),
@@ -380,11 +390,12 @@ async def seed():
             ("GUMI", "TNRA", 50),
             ("GUMI", "MDO",  35),
 
-            # ── Asami (stylist only) ───────────────────────────────────────
+            # ── Asami (stylist) ────────────────────────────────────────────
             ("ASAMI", "BLD",  55),
             ("ASAMI", "ST1",  60),
             ("ASAMI", "ST2",  90),
             ("ASAMI", "ST2P", 115),
+            ("ASAMI", "UPD",  140),  # XLS: SUD/ASAMI = 140 (Google Sheet said "n/a")
             ("ASAMI", "HTF",  10),
             ("ASAMI", "FRG",  20),
             ("ASAMI", "MLB",  100),
@@ -396,9 +407,9 @@ async def seed():
             ("MAYUMI", "ST1",  55),
             ("MAYUMI", "ST2",  90),
             ("MAYUMI", "ST2P", 115),
+            ("MAYUMI", "UPD",  140),
             ("MAYUMI", "HTF",  10),
             ("MAYUMI", "FRG",  20),
-            ("MAYUMI", "UPD",  140),
             ("MAYUMI", "MLB",  100),
             ("MAYUMI", "MLBA", 65),
             ("MAYUMI", "BOT",  400),
@@ -420,9 +431,9 @@ async def seed():
             ("OLGA", "ST1",  55),
             ("OLGA", "ST2",  90),
             ("OLGA", "ST2P", 115),
+            ("OLGA", "UPD",  140),
             ("OLGA", "HTF",  10),
             ("OLGA", "FRG",  20),
-            ("OLGA", "UPD",  140),
             ("OLGA", "MLB",  100),
             ("OLGA", "MLBA", 65),
             ("OLGA", "BOT",  400),
@@ -439,14 +450,13 @@ async def seed():
             ("OLGA", "TNRA", 50),
             ("OLGA", "MDO",  35),
 
-            # ── Ryan (dualist) ─────────────────────────────────────────────
+            # ── Ryan (dualist — no Updo, see deletion below) ───────────────
             ("RYAN", "BLD",  60),
             ("RYAN", "ST1",  65),
             ("RYAN", "ST2",  100),
             ("RYAN", "ST2P", 125),
             ("RYAN", "HTF",  10),
             ("RYAN", "FRG",  20),
-            ("RYAN", "UPD",  150),
             ("RYAN", "MLB",  100),
             ("RYAN", "MLBA", 65),
             ("RYAN", "BOT",  400),
@@ -464,14 +474,15 @@ async def seed():
             ("RYAN", "MDO",  35),
 
             # ── Joanne (colourist) ─────────────────────────────────────────
+            ("JOANNE", "BLD",  50),    # XLS: SBD/JOANNE = 50 (not in Google Sheet)
             ("JOANNE", "RTO",  90),
             ("JOANNE", "RTOB", 100),
-            ("JOANNE", "ACC",  120),
-            ("JOANNE", "PHL",  150),
-            ("JOANNE", "FHL",  190),
-            ("JOANNE", "BLT",  210),
-            ("JOANNE", "BLY",  260),
-            ("JOANNE", "CCR",  120),
+            ("JOANNE", "ACC",  120),   # XLS: CAHL/JOANNE = 120
+            ("JOANNE", "PHL",  150),   # XLS: CPHHL/JOANNE = 150
+            ("JOANNE", "FHL",  190),   # XLS: CFHHL/JOANNE = 190
+            ("JOANNE", "BLT",  210),   # XLS: CBT/JOANNE = 210
+            ("JOANNE", "BLY",  260),   # XLS: CB/JOANNE = 260
+            ("JOANNE", "CCR",  120),   # XLS: CCO default + Google Sheet Joanne=120/hr
             ("JOANNE", "TNR",  85),
             ("JOANNE", "MLB",  100),
             ("JOANNE", "BOT",  400),
@@ -480,14 +491,18 @@ async def seed():
             ("JOANNE", "MLBA", 65),
             ("JOANNE", "MDO",  35),
 
-            # ── Sarah (colourist) ──────────────────────────────────────────
-            ("SARAH", "RTO",  90),
+            # ── Sarah (dualist, mainly colour) ─────────────────────────────
+            ("SARAH", "BLD",  50),     # XLS: SBD/SARAH = 50 (not in Google Sheet)
+            ("SARAH", "ST2",  90),     # XLS: ST2H/SARAH = 90 (not in Google Sheet)
+            ("SARAH", "ST2P", 115),    # XLS: ST2H+/SARAH = 115 (not in Google Sheet)
+            ("SARAH", "RTO",  90),     # XLS: CRTU/SARAH = 90
             ("SARAH", "RTOB", 100),
             ("SARAH", "ACC",  100),
             ("SARAH", "PHL",  130),
             ("SARAH", "FHL",  170),
-            ("SARAH", "BLT",  190),
-            ("SARAH", "BLY",  240),
+            ("SARAH", "BLT",  190),    # XLS: CBT/SARAH = 190
+            ("SARAH", "BLY",  240),    # XLS: CB/SARAH = 240
+            ("SARAH", "CVC",  100),    # XLS: CVC/SARAH = 100 (new service)
             ("SARAH", "CCR",  100),
             ("SARAH", "TNR",  85),
             ("SARAH", "MLB",  100),
@@ -497,6 +512,19 @@ async def seed():
             ("SARAH", "MLBA", 65),
             ("SARAH", "MDO",  35),
         ]
+
+        # Delete PSPs that should not exist per the XLS system of record.
+        # Ryan's Updo was previously seeded from Google Sheet ($150) but XLS has $0.
+        ryan = providers.get("RYAN")
+        upd_svc = services.get("UPD")
+        if ryan and upd_svc:
+            await db.execute(
+                delete(ProviderServicePrice).where(
+                    ProviderServicePrice.tenant_id == tid,
+                    ProviderServicePrice.provider_id == ryan.id,
+                    ProviderServicePrice.service_id == upd_svc.id,
+                )
+            )
 
         psp_count = 0
         for milano_code, svc_code, price in PSP_DATA:
@@ -534,10 +562,11 @@ async def seed():
         print(f"  Tenant ID : {tenant.id}")
         print(f"  Login     : jj@salonlyol.ca / changeme123")
         print()
-        print("NOTE — prices not yet seeded (not in sheet):")
-        print("  CCAMO  Camo Colour       — needs per-provider pricing")
-        print("  CFC    Color Full Color  — needs per-provider pricing")
-        print("  'Additional colour $25'  — needs a service code in catalog")
+        print("NOTE — needs owner input:")
+        print("  CCAMO  Camo Colour        — in catalog, no per-provider pricing in XLS")
+        print("  BOTNHC / BOTEXP           — new services added; durations need review")
+        print("  CAC 'Additional colour'   — in XLS at $25, no service code in catalog yet")
+        print("  CVC Vivid Color           — seeded for Sarah only; other providers unknown")
 
 
 if __name__ == "__main__":
