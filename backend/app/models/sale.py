@@ -13,12 +13,12 @@ from app.models.base import TenantScopedBase
 
 class SaleStatus(str, enum.Enum):
     pending = "pending"
+    completed = "completed"
 
 
 class SaleItemKind(str, enum.Enum):
     service = "service"
     retail = "retail"
-    completed = "completed"
 
 
 class Sale(TenantScopedBase):
@@ -73,6 +73,7 @@ class SaleItem(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("tenant_promotions.id"), nullable=True
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("0"))
     line_total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)

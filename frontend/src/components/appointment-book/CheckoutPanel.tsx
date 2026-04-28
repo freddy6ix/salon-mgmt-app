@@ -21,6 +21,7 @@ interface ItemDraft {
   retail_item_id: string | null
   description: string
   providerName: string
+  quantity: number
   unitPrice: string
   discount: string
   promotionId: string | null
@@ -74,6 +75,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       retail_item_id: null,
       description: it.service.name,
       providerName: it.provider.display_name,
+      quantity: 1,
       unitPrice: it.price.toFixed(2),
       discount: '0.00',
       promotionId: null,
@@ -97,15 +99,15 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
   // Bill is covered when sum(amount - cashback) across payments equals total.
   const totals = useMemo(() => {
     const subtotal = items.reduce(
-      (sum, i) => sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)),
+      (sum, i) => sum + Math.max(0, (toMoney(i.unitPrice) - toMoney(i.discount)) * i.quantity),
       0,
     )
-    const discountTotal = items.reduce((sum, i) => sum + toMoney(i.discount), 0)
+    const discountTotal = items.reduce((sum, i) => sum + toMoney(i.discount) * i.quantity, 0)
     const gstTaxable = items.reduce(
-      (sum, i) => !i.isGstExempt ? sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)) : sum, 0
+      (sum, i) => !i.isGstExempt ? sum + Math.max(0, (toMoney(i.unitPrice) - toMoney(i.discount)) * i.quantity) : sum, 0
     )
     const pstTaxable = items.reduce(
-      (sum, i) => !i.isPstExempt ? sum + Math.max(0, toMoney(i.unitPrice) - toMoney(i.discount)) : sum, 0
+      (sum, i) => !i.isPstExempt ? sum + Math.max(0, (toMoney(i.unitPrice) - toMoney(i.discount)) * i.quantity) : sum, 0
     )
     const gst = Math.round(gstTaxable * GST_RATE * 100) / 100
     const pst = Math.round(pstTaxable * PST_RATE * 100) / 100
@@ -137,6 +139,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       retail_item_id: ri.id,
       description: ri.name,
       providerName: '',
+      quantity: 1,
       unitPrice: parseFloat(ri.default_price).toFixed(2),
       discount: '0.00',
       promotionId: null,
@@ -199,6 +202,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       items: items.map(i => ({
         appointment_item_id: i.appointment_item_id ?? null,
         retail_item_id: i.retail_item_id ?? null,
+        quantity: i.quantity,
         unit_price: fmt(toMoney(i.unitPrice)),
         discount_amount: fmt(toMoney(i.discount)),
         promotion_id: i.promotionId ?? null,
@@ -281,7 +285,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
             )}
           </div>
           {items.map((it, idx) => {
-            const lineTotal = Math.max(0, toMoney(it.unitPrice) - toMoney(it.discount))
+            const lineTotal = Math.max(0, (toMoney(it.unitPrice) - toMoney(it.discount)) * it.quantity)
             const overDiscount = toMoney(it.discount) > toMoney(it.unitPrice)
             return (
               <div key={idx} className="rounded-md border p-3 space-y-2">
@@ -321,7 +325,19 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
                     </select>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-2">
+                <div className={`grid gap-2 ${it.kind === 'retail' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                  {it.kind === 'retail' && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Qty</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={it.quantity}
+                        onChange={e => updateItem(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="text-xs text-muted-foreground">Price ($)</label>
                     <input

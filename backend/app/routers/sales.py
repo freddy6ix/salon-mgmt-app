@@ -45,6 +45,7 @@ class SaleItemIn(BaseModel):
     # Exactly one of appointment_item_id or retail_item_id must be set
     appointment_item_id: str | None = None
     retail_item_id: str | None = None
+    quantity: int = 1          # for retail items; always 1 for service items
     unit_price: Decimal
     discount_amount: Decimal = Decimal("0")
     promotion_id: str | None = None
@@ -72,6 +73,7 @@ class SaleItemOut(BaseModel):
     description: str
     provider_id: str | None
     sequence: int
+    quantity: int
     unit_price: str
     discount_amount: str
     line_total: str
@@ -131,6 +133,7 @@ def _serialize(
                 description=it.description,
                 provider_id=str(it.provider_id) if it.provider_id else None,
                 sequence=it.sequence,
+                quantity=it.quantity,
                 unit_price=str(it.unit_price),
                 discount_amount=str(it.discount_amount),
                 line_total=str(it.line_total),
@@ -248,11 +251,12 @@ async def create_sale(
     line_records: list[tuple[SaleItemIn, Decimal]] = []
 
     for in_item in body.items:
+        qty = max(1, in_item.quantity)
         unit = _money(in_item.unit_price)
         disc = _money(in_item.discount_amount)
-        line_total = _money(unit - disc)
+        line_total = _money((unit - disc) * qty)
         subtotal += line_total
-        discount_total += disc
+        discount_total += _money(disc * qty)
         # Retail: use item's own tax flags. Service: always taxable.
         if in_item.retail_item_id and in_item.retail_item_id in retail_item_map:
             ri = retail_item_map[in_item.retail_item_id]
@@ -366,6 +370,7 @@ async def create_sale(
     for in_item, line_total in line_records:
         promo_uuid = uuid.UUID(in_item.promotion_id) if in_item.promotion_id else None
 
+        qty = max(1, in_item.quantity)
         if in_item.appointment_item_id:
             ai = appt_item_map[in_item.appointment_item_id]
             si = SaleItem(
@@ -377,22 +382,27 @@ async def create_sale(
                 provider_id=ai.provider_id,
                 promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
                 sequence=seq,
+                quantity=1,
                 unit_price=_money(in_item.unit_price),
                 discount_amount=_money(in_item.discount_amount),
                 line_total=line_total,
             )
         else:
             ri = retail_item_map.get(in_item.retail_item_id or "")
+            desc = ri.name if ri else "Retail item"
+            if qty > 1:
+                desc = f"{desc} ×{qty}"
             si = SaleItem(
                 tenant_id=tid,
                 sale_id=sale.id,
                 kind=SaleItemKind.retail,
                 retail_item_id=uuid.UUID(in_item.retail_item_id) if in_item.retail_item_id else None,
                 retail_item_name=ri.name if ri else "Retail item",
-                description=ri.name if ri else "Retail item",
+                description=desc,
                 provider_id=None,
                 promotion_id=promo_uuid if promo_uuid and promo_uuid in promos_by_id else None,
                 sequence=seq,
+                quantity=qty,
                 unit_price=_money(in_item.unit_price),
                 discount_amount=_money(in_item.discount_amount),
                 line_total=line_total,

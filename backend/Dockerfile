@@ -9,10 +9,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --frozen
 
-# Application code, migrations, and Alembic config
+# Application code, migrations, Alembic config, and seed script
 COPY backend/app/ app/
 COPY migrations/ migrations/
 COPY alembic.ini .
+COPY scripts/seed.py scripts/seed.py
 
 ENV PATH="/app/.venv/bin:$PATH"
 
