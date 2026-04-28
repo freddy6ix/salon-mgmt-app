@@ -15,6 +15,7 @@ import {
   skipConfirmation,
   type Confirmation,
 } from '@/api/appointments'
+import RichTextEditor from '@/components/RichTextEditor'
 
 interface Props {
   appointmentId: string
@@ -118,15 +119,14 @@ export default function ConfirmationDialog({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">Preview</label>
-                <div
-                  className="w-full min-h-[260px] border border-input rounded-md px-4 py-3 text-sm bg-white prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: body }}
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {readOnly ? 'Body' : 'Body'}
+                </label>
+                <RichTextEditor
+                  value={body}
+                  onChange={(html) => { setBody(html); setDirty(true) }}
+                  disabled={readOnly}
                 />
-                <p className="text-xs text-muted-foreground italic">
-                  Body is generated from the appointment details.
-                  {!readOnly && ' You can edit the subject above; rich-text body editing is coming soon.'}
-                </p>
               </div>
             </div>
 
