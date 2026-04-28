@@ -23,8 +23,9 @@ export default function AppointmentBookPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestId = searchParams.get('request')
+  const highlightApptId = searchParams.get('appointment')
 
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [date, setDate] = useState(() => searchParams.get('date') ?? format(new Date(), 'yyyy-MM-dd'))
   const [selected, setSelected] = useState<{ item: AppointmentItem; appt: Appointment } | null>(null)
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null)
@@ -51,6 +52,16 @@ export default function AppointmentBookPage() {
       setDate(convertRequest.desired_date)
     }
   }, [convertRequest?.id])
+
+  // Auto-open appointment detail when navigated here with ?appointment=ID
+  useEffect(() => {
+    if (!highlightApptId || appointments.length === 0) return
+    const appt = appointments.find(a => a.id === highlightApptId)
+    if (appt && appt.items.length > 0) {
+      setSelected({ item: appt.items[0], appt })
+      navigate('/appointments', { replace: true })
+    }
+  }, [highlightApptId, appointments])
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: ['providers'],

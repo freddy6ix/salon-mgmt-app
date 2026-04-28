@@ -509,24 +509,35 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             ) : history.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No previous visits</p>
             ) : (
-              history.map((visit) => (
-                <div key={visit.appointment_id} className="border rounded-md px-3 py-2 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {format(parseISO(visit.date), 'MMM d, yyyy')}
-                    </span>
-                    <span className={`text-xs capitalize ${VISIT_STATUS_COLOR[visit.status] ?? ''}`}>
-                      {visit.status.replace('_', ' ')}
-                    </span>
+              history.map((visit) => {
+                const isNavigable = visit.status !== 'cancelled' && visit.status !== 'no_show'
+                return (
+                  <div
+                    key={visit.appointment_id}
+                    className={`border rounded-md px-3 py-2 space-y-1 ${isNavigable ? 'cursor-pointer hover:bg-muted/30 transition-colors' : ''}`}
+                    onClick={() => {
+                      if (!isNavigable) return
+                      onClose()
+                      navigate(`/appointments?date=${visit.date}&appointment=${visit.appointment_id}`)
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {format(parseISO(visit.date), 'MMM d, yyyy')}
+                      </span>
+                      <span className={`text-xs capitalize ${VISIT_STATUS_COLOR[visit.status] ?? ''}`}>
+                        {visit.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {visit.items.map((vi, i) => (
+                      <p key={i} className="text-xs text-muted-foreground">
+                        {vi.service_name} · {vi.provider_name}
+                        <span className="ml-1 text-foreground">${vi.price.toFixed(2)}</span>
+                      </p>
+                    ))}
                   </div>
-                  {visit.items.map((vi, i) => (
-                    <p key={i} className="text-xs text-muted-foreground">
-                      {vi.service_name} · {vi.provider_name}
-                      <span className="ml-1 text-foreground">${vi.price.toFixed(2)}</span>
-                    </p>
-                  ))}
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         )}

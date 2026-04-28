@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getClient, getClientHistory, updateClient, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
@@ -298,7 +299,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                         Upcoming
                       </h3>
                       {upcoming.map(visit => (
-                        <VisitRow key={visit.appointment_id} visit={visit} onCancel={id => cancelAppt.mutate(id)} />
+                        <VisitRow key={visit.appointment_id} visit={visit} onCancel={id => cancelAppt.mutate(id)} onClose={onClose} />
                       ))}
                     </div>
                   )}
@@ -311,7 +312,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                         History
                       </h3>
                       {past.map(visit => (
-                        <VisitRow key={visit.appointment_id} visit={visit} />
+                        <VisitRow key={visit.appointment_id} visit={visit} onClose={onClose} />
                       ))}
                     </div>
                   )}
@@ -415,15 +416,28 @@ export default function ClientCard({ clientId, onClose }: Props) {
   )
 }
 
-function VisitRow({ visit, onCancel }: {
+function VisitRow({ visit, onCancel, onClose }: {
   visit: { appointment_id: string; date: string; status: string; items: { service_name: string; provider_name: string; price: number }[] }
   onCancel?: (id: string) => void
+  onClose?: () => void
 }) {
+  const navigate = useNavigate()
   const [confirmCancel, setConfirmCancel] = useState(false)
   const dateObj = parseISO(visit.date + 'T12:00:00')
   const total = visit.items.reduce((sum, i) => sum + i.price, 0)
+  const isNavigable = visit.status !== 'cancelled' && visit.status !== 'no_show'
+
+  function handleNavigate() {
+    if (!isNavigable) return
+    onClose?.()
+    navigate(`/appointments?date=${visit.date}&appointment=${visit.appointment_id}`)
+  }
+
   return (
-    <div className="border rounded-md px-3 py-2 space-y-1">
+    <div
+      className={`border rounded-md px-3 py-2 space-y-1 ${isNavigable ? 'cursor-pointer hover:bg-muted/30 transition-colors' : ''}`}
+      onClick={handleNavigate}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">
           {isToday(dateObj) ? 'Today' : format(dateObj, 'MMM d, yyyy')}
@@ -435,7 +449,7 @@ function VisitRow({ visit, onCancel }: {
           </span>
           {onCancel && visit.status === 'confirmed' && (
             confirmCancel ? (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                 <span className="text-xs text-muted-foreground">Sure?</span>
                 <button onClick={() => { onCancel(visit.appointment_id); setConfirmCancel(false) }}
                   className="text-xs text-destructive hover:underline">Yes</button>
@@ -443,7 +457,7 @@ function VisitRow({ visit, onCancel }: {
                   className="text-xs text-muted-foreground hover:underline">No</button>
               </span>
             ) : (
-              <button onClick={() => setConfirmCancel(true)}
+              <button onClick={e => { e.stopPropagation(); setConfirmCancel(true) }}
                 className="text-xs text-destructive hover:underline">Cancel</button>
             )
           )}
