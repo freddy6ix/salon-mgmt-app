@@ -430,3 +430,39 @@ Bulk import the service catalog from a CSV/Excel export, including per-provider 
 - Duplicate detection on (category + name)
 
 **Why import order matters:** P2-22 (staff) and P2-23 (services) should be imported before P2-20 (clients + appointments) so that appointment history can correctly reference existing providers and services.
+
+### P2-24 · Edit user (role and display name)
+
+Staff and admin accounts can be updated by an admin: display name and role. Email address is not editable — it is the account identity and changing it would break login and any outbound email references.
+
+**Scope:**
+- Editable fields: `display_name` (if the `User` model carries one; otherwise first + last name), `role` (`staff` | `tenant_admin`)
+- Email shown as read-only for reference — not in the form, just displayed
+- Cannot demote the last admin on the tenant to staff (guard: count active admins before allowing role change)
+
+**Backend:** `PATCH /users/{id}` — accepts `{ role?, display_name? }`, scoped to current tenant, admin-only. Returns updated user.
+
+**Frontend:** "Edit" action on each row in the Users page; inline form or small dialog with the two editable fields + a read-only email label; Save / Cancel.
+
+### P2-25 · Hard-delete user
+
+Permanently removes a user account and all directly owned data from the database. Distinct from the existing soft-delete on `Client` records — this targets `User` rows (staff login accounts and guest accounts created at booking time).
+
+**What gets deleted (cascade):**
+- `User` row
+- Associated `Client` record (if the user is a guest account linked to a client)
+- `AppointmentRequest` rows submitted by that guest user
+- Linked `Provider` row if the user was a provider (only safe if the provider has no future confirmed/in-progress appointments — enforce this guard)
+- Auth tokens / sessions for that user
+
+**What is preserved:**
+- `Appointment` and `AppointmentItem` history where the provider or client still exists — soft-reference, the provider/client names are already denormalized into the appointment items
+- `Sale` records — financial history must survive for audit purposes
+
+**Guards (return 409 if violated):**
+- User has future confirmed or in-progress appointments as a provider → block with clear message
+- User is the last active admin on the tenant → block
+
+**Backend:** `DELETE /users/{id}` (admin-only, tenant-scoped) — runs all deletes in a transaction; returns 204 on success.
+
+**Frontend:** "Delete" action on each row in the Users page (separate from Edit); two-step confirmation dialog that names the user and warns about permanent deletion; on success removes the row from the list.
