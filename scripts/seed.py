@@ -21,6 +21,8 @@ from app.models.provider import Provider, ProviderType, OnlineBookingVisibility
 from app.models.service import ServiceCategory, Service, PricingType
 from app.models.provider_service_price import ProviderServicePrice
 from app.models.schedule import TenantOperatingHours, ProviderSchedule
+from app.models.retail import RetailItem
+from app.models.promotion import TenantPromotion, PromotionKind
 
 _url = settings.database_url
 # Cloud SQL Proxy via TCP doesn't support SSL negotiation — disable it.
@@ -556,6 +558,257 @@ async def seed():
                 existing_psp.price = price
                 psp_count += 1
         print(f"Provider service prices: {psp_count} created/updated")
+
+        # ── Retail Products ──────────────────────────────────────────────────
+        # Source: docs/seed-data/Retail Product Listing.xls
+        # Upsert on SKU; updates price/cost/active if changed.
+        # brand stored in description for staff reference (no brand column in model).
+        RETAIL_DATA = [
+            dict(sku='AGTOUSLTEX142', name='AG Tousled Texture 142g', brand='AG', default_price=32.0, default_cost=15.6, is_active=True),
+            dict(sku='FIG7', name='flat iron G7', brand=None, default_price=150.0, default_cost=None, is_active=True),
+            dict(sku='GHD DRYER', name='ghd helios dryer', brand=None, default_price=350.0, default_cost=None, is_active=True),
+            dict(sku='KMML150ML', name='KM Motion lotion 150ml', brand='KM', default_price=39.0, default_cost=23.0, is_active=True),
+            dict(sku='LPMDADP500ML', name='MD Anti-deposit protector 500ml', brand='LOREAL', default_price=55.0, default_cost=26.20, is_active=False),
+            dict(sku='LPMDI50ML', name='metal detox oil 50ml', brand='LOREAL', default_price=50.0, default_cost=26.01, is_active=True),
+            dict(sku='LPMDLAMM100ML', name='MD leave-in Anti-Metal Moisture 100ml', brand='LOREAL', default_price=48.0, default_cost=27.0, is_active=True),
+            dict(sku='LPMDM75ML', name='metal detox mask 75ml', brand='LOREAL', default_price=14.8, default_cost=7.2, is_active=False),
+            dict(sku='LPMDMASK250ML', name='metal detox mask 250ml', brand='LOREAL', default_price=59.0, default_cost=27.15, is_active=True),
+            dict(sku='LPMDS500ML', name='metal detox shampoo 500ml', brand='LOREAL', default_price=57.0, default_cost=34.2, is_active=False),
+            dict(sku='LPMDSH300ML', name='metal detox shampoo 300ml', brand='LOREAL', default_price=43.0, default_cost=23.7, is_active=True),
+            dict(sku='LPSADENSER9O', name='SA Denser hair 90ml', brand='LOREAL', default_price=74.0, default_cost=37.26, is_active=True),
+            dict(sku='LPSADP500ML', name='SA dermo-purifier shampoo 500ml', brand='LOREAL', default_price=57.0, default_cost=33.0, is_active=True),
+            dict(sku='LPSADRSES500ML', name='SA dermo regulator shampoo 500ml', brand='LOREAL', default_price=57.0, default_cost=33.0, is_active=True),
+            dict(sku='LPSADS500ML', name='SA densifying shampoo 500ml', brand='LOREAL', default_price=57.0, default_cost=33.0, is_active=True),
+            dict(sku='LPSAIS200ML', name='SA intense Soother 200ml', brand='LOREAL', default_price=45.0, default_cost=23.4, is_active=True),
+            dict(sku='LPTA6F250ML', name='TA 6-Fix pure 250ml', brand='LOREAL', default_price=37.0, default_cost=18.49, is_active=True),
+            dict(sku='LPTAAI1190ML', name='LP TA All in 1 Performer 190ml', brand='LOREAL', default_price=38.0, default_cost=22.8, is_active=True),
+            dict(sku='LPTABT150ML', name='TA Bouncy and Tender 150ml', brand='LOREAL', default_price=37.0, default_cost=19.66, is_active=True),
+            dict(sku='LPTABW150ML', name='TA beach waves 150ml', brand='LOREAL', default_price=37.0, default_cost=19.11, is_active=True),
+            dict(sku='LPTAC150ML', name='TA Constructor 150ml', brand='LOREAL', default_price=37.0, default_cost=16.2, is_active=True),
+            dict(sku='LPTAD100ML', name='LP depolish 100ml', brand='LOREAL', default_price=37.0, default_cost=16.17, is_active=True),
+            dict(sku='LPTADM100ML', name='TA Density Material 100ml', brand='LOREAL', default_price=37.0, default_cost=16.32, is_active=True),
+            dict(sku='LPTAEL6289G', name='LP TA Extreme Lacquer 289g', brand='LOREAL', default_price=37.0, default_cost=22.2, is_active=True),
+            dict(sku='LPTAES150ML', name='TA extreme splash 150ml', brand='LOREAL', default_price=37.0, default_cost=16.25, is_active=True),
+            dict(sku='LPTAFB150ML', name='LP TA Flex Blowdry 150ml', brand='LOREAL', default_price=38.0, default_cost=22.8, is_active=True),
+            dict(sku='LPTAFCB200ML', name='LP TA Flex curl bounce 200ml', brand='LOREAL', default_price=38.0, default_cost=22.8, is_active=True),
+            dict(sku='LPTAFD200ML', name='TA Fix Design 200ml', brand='LOREAL', default_price=37.0, default_cost=17.26, is_active=True),
+            dict(sku='LPTAFI3289GAFP', name='TA Fix Infinium 3 289g', brand='LOREAL', default_price=38.0, default_cost=18.46, is_active=True),
+            dict(sku='LPTAFI4289G', name='TA Fix Infinium 4 289g', brand='LOREAL', default_price=38.0, default_cost=18.56, is_active=True),
+            dict(sku='LPTAFIP75ML', name='TA Fix Polish 75ml', brand='LOREAL', default_price=37.0, default_cost=16.0, is_active=True),
+            dict(sku='LPTAFM200ML', name='TA fix max 200ml', brand='LOREAL', default_price=37.0, default_cost=16.5, is_active=True),
+            dict(sku='LPTAFP75ML', name='LP TA Fix Paste 75ml', brand='LOREAL', default_price=37.0, default_cost=22.2, is_active=True),
+            dict(sku='LPTAFVE250ML', name='TA full volume extra 250ml', brand='LOREAL', default_price=38.0, default_cost=15.5, is_active=True),
+            dict(sku='LPTALC150ML', name='TA Liss Control 150ml', brand='LOREAL', default_price=37.0, default_cost=15.0, is_active=True),
+            dict(sku='LPTALCP150ML', name='TA Liss Control Plus 150ml', brand='LOREAL', default_price=37.0, default_cost=19.80, is_active=True),
+            dict(sku='LPTAMDUST200M', name='TA morning Dust 200ml', brand='LOREAL', default_price=37.0, default_cost=18.78, is_active=True),
+            dict(sku='LPTAP190ML', name='TA Pli 190ml', brand='LOREAL', default_price=38.0, default_cost=17.36, is_active=True),
+            dict(sku='LPTARING150ML', name='TA ringlight 150ml', brand='LOREAL', default_price=37.0, default_cost=17.34, is_active=True),
+            dict(sku='LPTASD7', name='TA SuperDust 7g', brand='LOREAL', default_price=37.0, default_cost=18.67, is_active=True),
+            dict(sku='LPTASQ200ML', name='TA spiral queen 200ml', brand='LOREAL', default_price=37.0, default_cost=17.78, is_active=True),
+            dict(sku='LPTASW150ML', name='TA siren waves 150ml', brand='LOREAL', default_price=37.0, default_cost=19.04, is_active=True),
+            dict(sku='LPTATFTGEL150', name='TA TransFormer gel 150ml', brand='LOREAL', default_price=37.0, default_cost=20.10, is_active=True),
+            dict(sku='LPTATFTL150ML', name='TA TransFormer liqui 150ml', brand='LOREAL', default_price=37.0, default_cost=19.63, is_active=True),
+            dict(sku='LPTAWEB150ML', name='TA web 150ml', brand='LOREAL', default_price=37.0, default_cost=19.8, is_active=True),
+            dict(sku='MADSH200ML', name='Milbon Anti-frizz shampoo 200ml', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MADT200G', name='Milbon Anti-frizz treatment 200g', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MAHBO120ML', name='Milbon Anti-Frizz Oil 120ml', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MBPNVSH200ML', name='Milbon Blonde + Nourish Violet shampoo 200ml', brand='MILBON', default_price=46.0, default_cost=22.0, is_active=True),
+            dict(sku='MBPNVT200G', name='Milbon Blonde + Nourish Violet treatment 200g', brand='MILBON', default_price=64.0, default_cost=31.0, is_active=True),
+            dict(sku='MCSBPO50ML', name='Milbon CS Brilliant polishing oil 50ml', brand='MILBON', default_price=52.0, default_cost=26.0, is_active=True),
+            dict(sku='MCSDTS4300ML', name='Milbon Dry Texturizing Spray 300g', brand='MILBON', default_price=52.0, default_cost=24.0, is_active=True),
+            dict(sku='MCSESHH10300ML', name='Milbon Extra Strong Hairspray 300ml', brand='MILBON', default_price=52.0, default_cost=24.0, is_active=True),
+            dict(sku='MCSMTP60G', name='Milbon Matte Paste 60g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSMW3100G', name='Milbon Molding Wax 3 100g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSMW5100G', name='Milbon CS molding wax 5 100g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSMW7100G', name='Milbon CS molding wax 7 100g', brand='MILBON', default_price=42.0, default_cost=None, is_active=True),
+            dict(sku='MCSRDS160G', name='Milbon Dry Shampoo 160g', brand='MILBON', default_price=54.0, default_cost=26.0, is_active=True),
+            dict(sku='MCSSHH7300ML', name='Milbon Strong Hold Hair Spray 300ml', brand='MILBON', default_price=52.0, default_cost=24.0, is_active=True),
+            dict(sku='MCSSTC360G', name='Milbon Satin Texturizing Cream 60g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSTM4190ML', name='Milbon Thickening Mist 190ml', brand='MILBON', default_price=47.0, default_cost=22.5, is_active=True),
+            dict(sku='MCSTSM3190ML', name='Milbon Texturizing Sea Mist 190ml', brand='MILBON', default_price=47.0, default_cost=22.5, is_active=True),
+            dict(sku='MCSWDC1120G', name='Milbon Wave Defining Cream 120g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSWEM4200G', name='Milbon Wave Enhancing Mousse 200g', brand='MILBON', default_price=50.0, default_cost=24.0, is_active=True),
+            dict(sku='MCSWSGC5150G', name='Milbon Wet Shine Gel Cream 5 150g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MCSWSGC8150G', name='Milbon Wet Shine Gel Cream 8 150g', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MFBF200G', name='Milbon Froth Blowout Foam 200g', brand='MILBON', default_price=60.0, default_cost=30.0, is_active=True),
+            dict(sku='MGBH', name='Milbon Gift Bag Heat', brand='MILBON', default_price=84.8, default_cost=None, is_active=True),
+            dict(sku='MGBR', name='Milbon Gift Bag Regular', brand='MILBON', default_price=76.8, default_cost=None, is_active=True),
+            dict(sku='MGBRE', name='Milbon Gift Bag ReAwaken', brand='MILBON', default_price=91.2, default_cost=None, is_active=True),
+            dict(sku='MISCRETAIL', name='misc retail', brand=None, default_price=0.0, default_cost=None, is_active=True),
+            dict(sku='MKAO50ML', name='MK Argan Oil 50ml', brand='MK', default_price=49.9, default_cost=24.95, is_active=True),
+            dict(sku='MKFBD150ML', name='MK Fast Blow-Dry 150ml', brand='MK', default_price=65.9, default_cost=29.95, is_active=True),
+            dict(sku='MKFE50ML', name='MK Frizz Ease 50ml', brand='MK', default_price=47.9, default_cost=23.95, is_active=True),
+            dict(sku='MKHM75ML', name='MK Hydro Mist 75ml', brand='MK', default_price=27.9, default_cost=None, is_active=True),
+            dict(sku='MKLI300ML', name='MK Leave-in 300ml', brand='MK', default_price=43.9, default_cost=21.95, is_active=True),
+            dict(sku='MKRC300ML', name='MK replenishing conditioner 300ml', brand='MK', default_price=37.9, default_cost=18.95, is_active=True),
+            dict(sku='MKRS300ML', name='MK replenishing shampoo 300ml', brand='MK', default_price=37.9, default_cost=18.95, is_active=True),
+            dict(sku='MKSC300ML', name='MK silver conditioner 300ml', brand='MK', default_price=37.9, default_cost=17.95, is_active=True),
+            dict(sku='MKSS300ML', name='MK Silver Shampoo 300ml', brand='MK', default_price=37.9, default_cost=17.95, is_active=True),
+            dict(sku='MKTM200ML', name='MK treatment mask 200ml', brand='MK', default_price=47.9, default_cost=21.95, is_active=True),
+            dict(sku='MMRSH200ML', name='Milbon Moisture Replenishing Shampoo 200ml', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MMRT255G', name='Milbon Moisture Replenishing Treatment 200g', brand='MILBON', default_price=58.0, default_cost=28.0, is_active=True),
+            dict(sku='MMWRM120ML', name='Milbon Weightless replenishing mist 120ml', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MPFP100G', name='Milbon Puff Finishing Paste 100g', brand='MILBON', default_price=56.0, default_cost=28.0, is_active=True),
+            dict(sku='MRHHPM120ML', name='Milbon Repair heat protective mist 120ml', brand='MILBON', default_price=62.0, default_cost=30.0, is_active=True),
+            dict(sku='MRHHPS200ML', name='Milbon Repair heat protective shampoo 200ml', brand='MILBON', default_price=46.0, default_cost=22.0, is_active=True),
+            dict(sku='MRHHPT200G', name='Milbon Repair heat protective treatment 200g', brand='MILBON', default_price=64.0, default_cost=31.0, is_active=True),
+            dict(sku='MRRBPC120G', name='Milbon Repair Primer Coarse 120g', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MRRBPF120G', name='Milbon Repair Primer Fine 120g', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MRRP120ML', name='Milbon Reawaken Renewing Primer 120ml', brand='MILBON', default_price=62.0, default_cost=30.0, is_active=True),
+            dict(sku='MRRS200ML', name='Milbon Repair Restorative shampoo 200ml', brand='MILBON', default_price=44.0, default_cost=20.0, is_active=True),
+            dict(sku='MRRSH200ML', name='Milbon Reawaken Renewing Shampoo 200ml', brand='MILBON', default_price=50.0, default_cost=24.0, is_active=True),
+            dict(sku='MRRT200G', name='Milbon Repair Restorative treatment 200g', brand='MILBON', default_price=60.0, default_cost=28.0, is_active=True),
+            dict(sku='MRRT_200G', name='Milbon Reawaken Renewing Treatment 200ml', brand='MILBON', default_price=68.0, default_cost=33.0, is_active=True),
+            dict(sku='MRSROS150G', name='Milbon Shine Renewing Oil Shampoo 150g', brand='MILBON', default_price=62.0, default_cost=30.0, is_active=True),
+            dict(sku='MSLBOF120ML', name='Milbon Smooth Oil fine 120ml', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MSLSOC120ML', name='Milbon Smooth Oil Coarse 120ml', brand='MILBON', default_price=59.0, default_cost=28.0, is_active=True),
+            dict(sku='MSSSC200ML', name='Milbon Smooth Shampoo Coarse 200ml', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MSSSF200ML', name='Milbon Smooth Shampoo Fine 200ml', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MSSSM200', name='Milbon Smooth Shampoo Medium 200ml', brand='MILBON', default_price=42.0, default_cost=20.0, is_active=True),
+            dict(sku='MSSTC200G', name='Milbon Smooth treatment Coarse 200g', brand='MILBON', default_price=58.0, default_cost=28.0, is_active=True),
+            dict(sku='MSSTF200G', name='Milbon Smooth treatment Fine 200g', brand='MILBON', default_price=58.0, default_cost=28.0, is_active=True),
+            dict(sku='MSSTM200G', name='Milbon Smooth treatment Medium 200g', brand='MILBON', default_price=58.0, default_cost=28.0, is_active=True),
+            dict(sku='MVTC100G', name='Milbon Velvet Texture Cream 100g', brand='MILBON', default_price=56.0, default_cost=28.0, is_active=True),
+            dict(sku='O3100ML', name='Olaplex 3 repair & strengthen 100ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O4CSH250LM', name='Olaplex 4 clarifying shampoo 250ml', brand='OLAPLEX', default_price=40.5, default_cost=20.25, is_active=True),
+            dict(sku='O4DSH178G', name='Olaplex dry shampoo 4 178g', brand='OLAPLEX', default_price=40.5, default_cost=20.25, is_active=True),
+            dict(sku='O4PSH250', name='Olaplex shampoo 4 purple 250ml', brand='OLAPLEX', default_price=40.5, default_cost=20.25, is_active=True),
+            dict(sku='O4SH250ML', name='Olaplex 4 shampoo 250ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O5CON250ML', name='Olaplex 5 conditioner 250ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O5COND2L', name='Olaplex 5 conditioner 2L', brand='OLAPLEX', default_price=0.0, default_cost=81.0, is_active=True),
+            dict(sku='O6100ML', name='Olaplex 6 bond smoother 100ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O7BO30ML', name='Olaplex 7 bonding oil 30ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O8100ML', name='Olaplex 8 bond intense moisture mask 100ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='O990ML', name='Olaplex 9 bond protector 90ml', brand='OLAPLEX', default_price=40.5, default_cost=18.9, is_active=True),
+            dict(sku='OG15', name='Olivia Garden barrel brush 15mm', brand='MISC', default_price=27.0, default_cost=13.5, is_active=True),
+            dict(sku='OG20', name='Olivia Garden ceramic+Ion 20mm', brand='MISC', default_price=27.0, default_cost=13.5, is_active=True),
+            dict(sku='OG25', name='Olivia Garden barrel brush 25mm', brand='MISC', default_price=27.98, default_cost=13.99, is_active=True),
+            dict(sku='OGFB', name='Olivia Garden flat brush', brand='MISC', default_price=20.0, default_cost=11.0, is_active=True),
+            dict(sku='OGSPEEDLX 35M', name='Olivia Garden brush speed 35mm', brand='MISC', default_price=33.18, default_cost=14.1, is_active=True),
+            dict(sku='OGSPEEDXL45MM', name='Olivia Garden brush speed 45mm', brand='MISC', default_price=39.9, default_cost=19.95, is_active=True),
+            dict(sku='OGSPEEDXL55MM', name='Olivia Garden brush speedxl 55mm', brand='MISC', default_price=40.98, default_cost=20.49, is_active=True),
+            dict(sku='POCF200ML', name='Pureology color fanatic 200ml', brand='PUREOLOGY', default_price=49.5, default_cost=19.8, is_active=True),
+            dict(sku='POCFM200ML', name='Pureology colour fanatic mask 200ml', brand='PUREOLOGY', default_price=36.0, default_cost=20.4, is_active=True),
+            dict(sku='POHCON250ML', name='Pureology hydrate conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=23.99, is_active=True),
+            dict(sku='POHGCO50ML', name='Pureology Glow Catcher Oil 50ml', brand='PUREOLOGY', default_price=55.0, default_cost=33.0, is_active=True),
+            dict(sku='POHM200ML', name='Pureology hydrate mask 200ml', brand='PUREOLOGY', default_price=42.0, default_cost=25.2, is_active=True),
+            dict(sku='POHSCON250ML', name='Pureology hydrate sheer conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=26.73, is_active=True),
+            dict(sku='POHSH250ML', name='Pureology hydrate shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=22.2, is_active=True),
+            dict(sku='POHSSH250ML', name='Pureology Hydrate sheer shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=27.0, is_active=True),
+            dict(sku='POLH312G', name='Pureology Lock it down hair spray 312g', brand='PUREOLOGY', default_price=42.0, default_cost=25.2, is_active=True),
+            dict(sku='PONWCON250ML', name='Pureology Nano Works conditioner 250ml', brand='PUREOLOGY', default_price=56.0, default_cost=33.58, is_active=True),
+            dict(sku='PONWSH250ML', name='Pureology Nano Works shampoo 250ml', brand='PUREOLOGY', default_price=55.0, default_cost=32.42, is_active=True),
+            dict(sku='POORM294G', name='Pureology Root mousse 294g', brand='PUREOLOGY', default_price=46.0, default_cost=25.2, is_active=True),
+            dict(sku='POPVCON250ML', name='Pureology pure volume conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=26.14, is_active=True),
+            dict(sku='POPVSH250ML', name='Pureology Pure Volume shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=25.68, is_active=True),
+            dict(sku='POSCBBMF145ML', name='Pureology SCBB miracle filler 145ml', brand='PUREOLOGY', default_price=34.0, default_cost=20.35, is_active=True),
+            dict(sku='POSCBCON250ML', name='Pureology Strength Cure Blonde conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=23.63, is_active=True),
+            dict(sku='POSCBSH250ML', name='Pureology Strength Cure Blonde shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=24.7, is_active=True),
+            dict(sku='POSCCON250ML', name='Pureology strength cure conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=27.0, is_active=True),
+            dict(sku='POSCM200ML', name='Pureology strength cure mask 200ml', brand='PUREOLOGY', default_price=42.0, default_cost=25.2, is_active=True),
+            dict(sku='POSCSH1000', name='Pureology strength cure shampoo 1L', brand='PUREOLOGY', default_price=99.0, default_cost=57.24, is_active=True),
+            dict(sku='POSCSH250ML', name='Pureology strength cure shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=26.92, is_active=True),
+            dict(sku='POSPC250ML', name='Pureology Smooth Perfection conditioner 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=24.57, is_active=True),
+            dict(sku='POSPL195ML', name='Pureology smooth perfection lotion 195ml', brand='PUREOLOGY', default_price=38.0, default_cost=22.8, is_active=True),
+            dict(sku='POSPSH1000', name='Pureology smooth perfection shampoo 1L', brand='PUREOLOGY', default_price=99.0, default_cost=55.8, is_active=True),
+            dict(sku='POSPSH250ML', name='Pureology Smooth Perfection shampoo 250ml', brand='PUREOLOGY', default_price=50.0, default_cost=21.6, is_active=True),
+            dict(sku='POWVM238G', name='Pureology weightless volume mousse 238g', brand='PUREOLOGY', default_price=46.0, default_cost=25.2, is_active=True),
+        ]
+
+        retail_count = 0
+        for r in RETAIL_DATA:
+            brand = r.pop('brand')
+            description = f"Brand: {brand}" if brand else None
+            existing_item = (
+                await db.execute(
+                    select(RetailItem).where(
+                        RetailItem.tenant_id == tid,
+                        RetailItem.sku == r['sku'],
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing_item is None:
+                db.add(RetailItem(
+                    tenant_id=tid,
+                    description=description,
+                    **r,
+                ))
+                retail_count += 1
+            else:
+                changed = False
+                if float(existing_item.default_price) != r['default_price']:
+                    existing_item.default_price = r['default_price']
+                    changed = True
+                if existing_item.is_active != r['is_active']:
+                    existing_item.is_active = r['is_active']
+                    changed = True
+                if changed:
+                    retail_count += 1
+        print(f"Retail items: {retail_count} created/updated")
+
+        # ── Promotions ───────────────────────────────────────────────────────
+        # Source: docs/seed-data/Promotion List.xls
+        # Upsert on code; sort_order follows list order.
+        PROMO_DATA = [
+            dict(code='DC $5',        label='DISCOUNT $5',         kind='amount',  value=5.0,   is_active=True),
+            dict(code='DC $10',       label='DISCOUNT $10',        kind='amount',  value=10.0,  is_active=True),
+            dict(code='DC $15',       label='DISCOUNT $15',        kind='amount',  value=15.0,  is_active=True),
+            dict(code='DC $20',       label='DISCOUNT $20',        kind='amount',  value=20.0,  is_active=True),
+            dict(code='DC $25',       label='DISCOUNT $25',        kind='amount',  value=25.0,  is_active=True),
+            dict(code='DC $30',       label='DISCOUNT $30',        kind='amount',  value=30.0,  is_active=True),
+            dict(code='DC $35',       label='DISCOUNT $35',        kind='amount',  value=35.0,  is_active=True),
+            dict(code='DC $40',       label='DISCOUNT $40',        kind='amount',  value=40.0,  is_active=True),
+            dict(code='DC $45',       label='DISCOUNT $45',        kind='amount',  value=45.0,  is_active=True),
+            dict(code='DC $50',       label='DISCOUNT $50',        kind='amount',  value=50.0,  is_active=True),
+            dict(code='DC $55',       label='DISCOUNT $55',        kind='amount',  value=55.0,  is_active=True),
+            dict(code='DC $60',       label='DISCOUNT $60',        kind='amount',  value=60.0,  is_active=True),
+            dict(code='REFERRAL $10', label='REFERRAL $10',        kind='amount',  value=10.0,  is_active=True),
+            dict(code='REFERRAL $20', label='REFERRAL $20',        kind='amount',  value=20.0,  is_active=True),
+            dict(code='REFILL 25%',   label='REFILL 25%',          kind='percent', value=25.0,  is_active=False),
+            dict(code='STAFF D/C',    label='STAFF PRODUCT D/C',   kind='percent', value=37.0,  is_active=True),
+            dict(code='VIP 5%',       label='VIP 5%',              kind='percent', value=5.0,   is_active=True),
+            dict(code='VIP 10%',      label='VIP 10%',             kind='percent', value=10.0,  is_active=True),
+            dict(code='VIP 15%',      label='VIP 15%',             kind='percent', value=15.0,  is_active=True),
+            dict(code='VIP 20%',      label='VIP 20%',             kind='percent', value=20.0,  is_active=True),
+            dict(code='VIP 25%',      label='VIP 25%',             kind='percent', value=25.0,  is_active=True),
+            dict(code='VIP 30%',      label='VIP 30%',             kind='percent', value=30.0,  is_active=True),
+            dict(code='VIP 50%',      label='VIP 50%',             kind='percent', value=50.0,  is_active=True),
+            dict(code='VIP 100%',     label='VIP 100%',            kind='percent', value=100.0, is_active=True),
+        ]
+
+        promo_count = 0
+        for sort_order, p in enumerate(PROMO_DATA):
+            existing_promo = (
+                await db.execute(
+                    select(TenantPromotion).where(
+                        TenantPromotion.tenant_id == tid,
+                        TenantPromotion.code == p['code'],
+                    )
+                )
+            ).scalar_one_or_none()
+            kind_enum = PromotionKind.percent if p['kind'] == 'percent' else PromotionKind.amount
+            if existing_promo is None:
+                db.add(TenantPromotion(
+                    tenant_id=tid,
+                    code=p['code'],
+                    label=p['label'],
+                    kind=kind_enum,
+                    value=p['value'],
+                    is_active=p['is_active'],
+                    sort_order=sort_order,
+                ))
+                promo_count += 1
+            else:
+                changed = False
+                if existing_promo.is_active != p['is_active']:
+                    existing_promo.is_active = p['is_active']
+                    changed = True
+                if float(existing_promo.value) != p['value']:
+                    existing_promo.value = p['value']
+                    changed = True
+                if changed:
+                    promo_count += 1
+        print(f"Promotions: {promo_count} created/updated")
 
         await db.commit()
         print("\nSeed complete.")
