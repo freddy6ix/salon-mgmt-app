@@ -63,8 +63,21 @@ def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
         raise RuntimeError(f"Connection error to {cfg.host}:{cfg.port} — {e}")
 
 
-async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
-    await asyncio.to_thread(_send_sync, cfg, to, subject, html)
+async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str, retries: int = 2) -> None:
+    """Send an email, retrying on transient connection drops (SMTPServerDisconnected)."""
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            await asyncio.to_thread(_send_sync, cfg, to, subject, html)
+            return
+        except RuntimeError as e:
+            last_err = e
+            if "connection dropped" not in str(e).lower() or attempt == retries - 1:
+                raise
+            logger.warning("SMTP connection dropped on attempt %d, retrying…", attempt + 1)
+            await asyncio.sleep(2)
+    if last_err:
+        raise last_err
 
 
 def _cta_button(href: str, label: str, brand_color: str | None) -> str:
