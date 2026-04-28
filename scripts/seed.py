@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from datetime import date, time as dtime
+from urllib.parse import quote_plus
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -24,10 +25,18 @@ from app.models.schedule import TenantOperatingHours, ProviderSchedule
 from app.models.retail import RetailItem
 from app.models.promotion import TenantPromotion, PromotionKind
 
-_url = settings.database_url
-# Cloud SQL Proxy via TCP doesn't support SSL negotiation — disable it.
-# Unix-socket connections (Cloud Run) are unaffected.
-_connect_args = {"ssl": False} if ("127.0.0.1" in _url or "localhost" in _url) else {}
+# Mirror the connection logic from app/database.py so the seed works both
+# locally (TCP to localhost) and on Cloud Run (Unix socket via Cloud SQL).
+if settings.cloud_sql_instance:
+    _socket_dir = f"/cloudsql/{settings.cloud_sql_instance}"
+    _url = (
+        f"postgresql+asyncpg://{settings.db_user}:{quote_plus(settings.db_password)}"
+        f"@/{settings.db_name}"
+    )
+    _connect_args: dict = {"host": _socket_dir}
+else:
+    _url = settings.database_url
+    _connect_args = {"ssl": False} if ("127.0.0.1" in _url or "localhost" in _url) else {}
 engine = create_async_engine(_url, connect_args=_connect_args)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
