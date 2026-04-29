@@ -799,7 +799,7 @@ function EmailSection() {
   const [useTls, setUseTls] = useState(true)
   // Shared
   const [fromAddress, setFromAddress] = useState('')
-  const [testTo, setTestTo] = useState(user?.email ?? '')
+  const [testTo, setTestTo] = useState('')
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [testMsg, setTestMsg] = useState<string | null>(null)
 
@@ -903,7 +903,7 @@ function EmailSection() {
               autoComplete="new-password"
             />
             <p className="text-xs text-muted-foreground">
-              Get your API key from <strong>resend.com</strong> → API Keys. Make sure your sending domain (<strong>salonlyol.ca</strong>) is verified there.
+              Get your API key from <strong>resend.com</strong> → API Keys. Make sure your sending domain is verified there.
             </p>
           </div>
         </div>
@@ -937,7 +937,7 @@ function EmailSection() {
               id="smtp-username"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="noreply@salonlyol.ca"
+              placeholder="noreply@yourdomain.com"
               autoComplete="off"
             />
           </div>
@@ -983,7 +983,7 @@ function EmailSection() {
           id="from-address"
           value={fromAddress}
           onChange={e => setFromAddress(e.target.value)}
-          placeholder="Salon Lyol <info@salonlyol.ca>"
+          placeholder="Salon Name <noreply@yourdomain.com>"
         />
         <p className="text-xs text-muted-foreground">
           Use the format <code className="bg-muted px-1 rounded">Name &lt;email@domain.com&gt;</code>
@@ -1112,7 +1112,7 @@ function RequestNotificationsSection() {
           value={recipientsText}
           onChange={e => { setRecipientsText(e.target.value); setDirty(true) }}
           rows={3}
-          placeholder="bookings@salonlyol.ca&#10;manager@salonlyol.ca"
+          placeholder="bookings@yourdomain.com&#10;manager@yourdomain.com"
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none font-mono"
         />
         <p className="text-xs text-muted-foreground">
