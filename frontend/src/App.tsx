@@ -34,14 +34,6 @@ function RequireGuest({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-      <p className="text-muted-foreground">Coming soon.</p>
-    </div>
-  )
-}
 
 export default function App() {
   return (

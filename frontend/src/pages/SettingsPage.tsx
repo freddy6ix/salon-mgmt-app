@@ -780,7 +780,6 @@ function PromotionsSection() {
 }
 
 function EmailSection() {
-  const { user } = useAuth()
   const qc = useQueryClient()
 
   const { data: cfg, isLoading } = useQuery({
