@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import hash_password
@@ -14,7 +14,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
-from app.models.appointment import Appointment
+from app.models.appointment import Appointment, AppointmentItem, AppointmentRequest, AppointmentStatus
 from app.models.client import Client
 from app.models.email_config import TenantEmailConfig
 from app.models.provider import Provider
@@ -243,7 +243,6 @@ async def delete_user(
     ).scalar_one_or_none()
     if provider is not None:
         from datetime import date
-        from app.models.appointment import AppointmentItem, AppointmentStatus
         future_appts = (
             await db.execute(
                 select(AppointmentItem).where(
@@ -280,7 +279,6 @@ async def delete_user(
     ).scalar_one_or_none()
     if client is not None:
         # Block if guest client has upcoming appointments
-        from app.models.appointment import AppointmentStatus
         upcoming = (
             await db.execute(
                 select(Appointment).where(
@@ -289,12 +287,25 @@ async def delete_user(
                 ).limit(1)
             )
         ).scalar_one_or_none()
+
         if upcoming is not None:
             raise HTTPException(status_code=409,
                                 detail="Cannot delete a user with upcoming appointments — cancel them first")
         client.user_id = None
 
-    # 2. Delete password reset tokens
+    # 2. Null out appointment_requests FK (submitted_by / reviewed_by reference users.id)
+    await db.execute(
+        update(AppointmentRequest)
+        .where(AppointmentRequest.submitted_by_user_id == user.id)
+        .values(submitted_by_user_id=None)
+    )
+    await db.execute(
+        update(AppointmentRequest)
+        .where(AppointmentRequest.reviewed_by_user_id == user.id)
+        .values(reviewed_by_user_id=None)
+    )
+
+    # 3. Delete password reset tokens
     tokens = (
         await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
     ).scalars().all()
