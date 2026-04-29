@@ -51,7 +51,7 @@ def _format_address(tenant: Tenant) -> str | None:
 
 
 def _header_html(tenant: Tenant, brand_color: str, on_brand: str) -> str:
-    name = escape(tenant.name)
+    name = escape(tenant.name.upper())
     # Styled wordmark — always rendered as text so the header is guaranteed
     # to look correct regardless of whether the logo URL is accessible.
     # Logo images are intentionally omitted from email: they require an

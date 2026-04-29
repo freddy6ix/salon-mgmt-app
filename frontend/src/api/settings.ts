@@ -29,7 +29,7 @@ export function getBranding(): Promise<BrandingSettings> {
 }
 
 type BrandingPatchable = Partial<Pick<BrandingSettings,
-  'logo_url' | 'brand_color' | 'slot_minutes' | 'time_format'
+  'salon_name' | 'logo_url' | 'brand_color' | 'slot_minutes' | 'time_format'
 > & ContactDetails>
 
 export function updateBranding(patch: BrandingPatchable): Promise<BrandingSettings> {

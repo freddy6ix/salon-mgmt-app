@@ -41,6 +41,7 @@ export default function SettingsPage() {
     queryFn: getBranding,
   })
 
+  const [salonName, setSalonName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [brandColor, setBrandColor] = useState('#18181b')
   const [slotMinutes, setSlotMinutes] = useState<SlotMinutes>(10)
@@ -53,6 +54,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (branding) {
+      setSalonName(branding.salon_name ?? '')
       setLogoUrl(branding.logo_url ?? '')
       setBrandColor(branding.brand_color ?? '#18181b')
       setSlotMinutes((branding.slot_minutes ?? 10) as SlotMinutes)
@@ -76,6 +78,7 @@ export default function SettingsPage() {
 
   const brandingMutation = useMutation({
     mutationFn: () => updateBranding({
+      salon_name: salonName.trim() || undefined,
       logo_url: logoUrl || null,
       brand_color: brandColor,
       slot_minutes: slotMinutes,
@@ -129,6 +132,16 @@ export default function SettingsPage() {
         {/* Branding tab */}
         {tab === 'branding' && (
           <section className="border rounded-lg p-5 space-y-5 bg-white">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Salon name</label>
+              <input
+                type="text"
+                value={salonName}
+                onChange={e => setSalonName(e.target.value)}
+                placeholder="Salon Lyol"
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Logo URL</label>
               <input

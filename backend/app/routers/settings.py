@@ -42,6 +42,7 @@ class BrandingOut(BaseModel):
 
 
 class BrandingPatch(BaseModel):
+    salon_name: str | None = None
     logo_url: str | None = None
     brand_color: str | None = None
     slot_minutes: int | None = None
@@ -98,7 +99,12 @@ async def update_branding(
     tenant = await _get_tenant(current_user.tenant_id, db)
     for field in body.model_fields_set:
         value = getattr(body, field)
-        if field == 'slot_minutes':
+        if field == 'salon_name':
+            if not value or not value.strip():
+                raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail="Salon name cannot be blank")
+            tenant.name = value.strip()
+        elif field == 'slot_minutes':
             if value not in VALID_SLOT_MINUTES:
                 raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     detail=f"slot_minutes must be one of {sorted(VALID_SLOT_MINUTES)}")
