@@ -165,6 +165,9 @@ Follow-up to P2-1 (deferred Q3 from `docs/specs/P2-1-checkout-payment.md`). When
 - Fetch the sale when the appointment status is `completed`; render under the existing "Checked out" indicator
 - Read-only view in v1 (editing/voiding deferred — see P2-1 spec Q1)
 
+**Milano receipt layout reference:** `docs/screenshots/receipt-layout.jpeg`
+Milano's receipt is structured in three zones: **Header** (logo image + salon name), **Body** (date/time; per-line service/retail amounts; summary block with Services, Retail, G/C, SubTotal, GST, PST), **Footer** (client first + last name, next appointment date, salon address, phone, email). Options include "Always Email eReceipt" and a default prompt (None / Receipt / eReceipt / Invoice). Our email receipt already covers the body/footer content; this screenshot is reference if we add a printable/PDF receipt in a future item.
+
 ### P2-7 · Edit a completed sale (correct payment methods / splits)
 
 Staff sometimes record the wrong payment method or a bad split (e.g., charged $50 to Visa when it was actually Mastercard). They need to correct the receipt without voiding and re-creating the sale.
@@ -193,6 +196,18 @@ Cash is the one payment method that has to physically match a count at the end o
 5. The closing balance becomes the next day's opening.
 
 **Why this matters:** without this, the P2-5 sales report can compute "cash sales" but no one can confirm the till matches. This is the linchpin of cash control and Milano had it.
+
+**Milano reference screenshots:** `docs/screenshots/daily reconciliation/`
+Four screenshots capture exactly how Milano implements this:
+- `E0221A0A` — Entry point: a date-range picker (From / To) before opening the reconciliation view. Suggests we should support running the reconciliation for any date, not just "today".
+- `156F71AD` — **Payment Type Reconciliation** main table: columns are Type, Counted (editable), Expected (system-computed), Difference. Payment types shown: AMEX, CASH, DEBIT, VISA. Totals row at bottom. "Post" button commits the count.
+- `6F3B6E33` — **Transaction drill-down** per payment type (shown for DEBIT): lists each individual sale by date and receipt number with its amount. Checkboxes to confirm individual receipts; "Total Confirmed Receipts" sums the ticked ones. This lets staff reconcile card batches against a terminal report. Lower priority for v1 but good to know it exists.
+- `DD144CF2` — **Cash Reconciliation** denomination dialog: staff enter the count of each denomination (100, 50, 20, 10, 5, 2, 1, 0.50, 0.25, 0.10, 0.05, 0.01); system multiplies and totals. Shows: Total Cash Counted, Less Opening Float, Net Cash Counted, Net Cash Expected, and Over/Under variance. "Print" and "Ok" buttons.
+
+Key design notes from Milano reference:
+1. Milano reconciles **all payment types** (not just cash), entering a "Counted" amount for each. Card types would be compared against terminal batch totals. For v1 we can scope to cash-only (since cards are self-reconciling) but the UI should be aware of the fuller model.
+2. The cash denomination grid is a nice-to-have — staff can count by denomination rather than entering a lump sum. Consider as an optional mode.
+3. The date-range entry suggests reconciliations can be run retroactively or across multiple days, not just end-of-today.
 
 **Depends on:**
 - P2-5 (monthly sales report) — shares the reconciliation period model and petty cash semantics.
@@ -430,6 +445,27 @@ Bulk import the service catalog from a CSV/Excel export, including per-provider 
 - Duplicate detection on (category + name)
 
 **Why import order matters:** P2-22 (staff) and P2-23 (services) should be imported before P2-20 (clients + appointments) so that appointment history can correctly reference existing providers and services.
+
+### P2-26 · User display names
+
+Staff and admin accounts currently show only their email address on the Users page. Adding a name makes it easier to identify users at a glance and matches the way providers and clients are displayed elsewhere in the app.
+
+**Data model:**
+- Add `first_name` and `last_name` (nullable strings) to the `users` table. Both fields are optional — legacy accounts without names continue to work, falling back to showing the email only.
+- Guest users already have a name via their linked `Client` record (`client_name` is already returned by `GET /admin/users`); this item covers staff and admin accounts.
+
+**Backend:**
+- Migration: add `first_name`, `last_name` columns to `users`.
+- `GET /admin/users`: include `first_name`, `last_name` in the response (already returned as `client_name` for guests; staff/admin get their own name fields).
+- `POST /admin/users` (create): accept optional `first_name`, `last_name`.
+- `PATCH /admin/users/{id}` (edit role — P2-24): also accept `first_name`, `last_name` in the same call.
+
+**Frontend:**
+- Users page: display `{first_name} {last_name}` under the email, same as how guests show their client name today.
+- Add user form: add optional First name / Last name fields.
+- Edit role dialog: add First name / Last name fields alongside role.
+
+**Out of scope:** enforcing names on existing accounts, merging with the Provider `display_name` (providers have their own name field; this is just for the login account record).
 
 ### P2-24 · Edit user (role and display name)
 
