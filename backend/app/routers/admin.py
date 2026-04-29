@@ -259,47 +259,48 @@ async def delete_user(
                                 detail="Cannot delete a provider with upcoming appointments — cancel them first")
 
     # Null every FK that references this user before deleting.
-    # Records are preserved — only the "who did it" attribution is cleared.
+    # Wrapped in one try/except so any constraint violation surfaces as a
+    # readable 409 instead of dropping the asyncpg connection ("Failed to fetch").
     from app.models.sale import Sale, SalePaymentEdit
     from app.models.retail import RetailStockMovement
     from app.models.cash_reconciliation import CashReconciliation, PettyCashEntry
     from app.models.time_block import TimeBlock
     from app.models.client import ClientColourNote
 
-    await db.execute(update(Appointment)
-        .where(Appointment.created_by_user_id == user.id).values(created_by_user_id=None))
-    await db.execute(update(Appointment)
-        .where(Appointment.confirmation_sent_by_user_id == user.id).values(confirmation_sent_by_user_id=None))
-    await db.execute(update(AppointmentRequest)
-        .where(AppointmentRequest.submitted_by_user_id == user.id).values(submitted_by_user_id=None))
-    await db.execute(update(AppointmentRequest)
-        .where(AppointmentRequest.reviewed_by_user_id == user.id).values(reviewed_by_user_id=None))
-    await db.execute(update(Client)
-        .where(Client.user_id == user.id).values(user_id=None))
-    await db.execute(update(Provider)
-        .where(Provider.user_id == user.id).values(user_id=None))
-    await db.execute(update(SalePaymentEdit)
-        .where(SalePaymentEdit.edited_by_user_id == user.id).values(edited_by_user_id=None))
-    await db.execute(update(RetailStockMovement)
-        .where(RetailStockMovement.created_by_user_id == user.id).values(created_by_user_id=None))
-    await db.execute(update(PettyCashEntry)
-        .where(PettyCashEntry.created_by_user_id == user.id).values(created_by_user_id=None))
-    await db.execute(update(CashReconciliation)
-        .where(CashReconciliation.closed_by_user_id == user.id).values(closed_by_user_id=None))
-    await db.execute(update(Sale)
-        .where(Sale.completed_by_user_id == user.id).values(completed_by_user_id=None))
-    await db.execute(update(TimeBlock)
-        .where(TimeBlock.created_by_user_id == user.id).values(created_by_user_id=None))
-    await db.execute(update(ClientColourNote)
-        .where(ClientColourNote.created_by_user_id == user.id).values(created_by_user_id=None))
-
-    tokens = (
-        await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
-    ).scalars().all()
-    for t in tokens:
-        await db.delete(t)
-
     try:
+        await db.execute(update(Appointment)
+            .where(Appointment.created_by_user_id == user.id).values(created_by_user_id=None))
+        await db.execute(update(Appointment)
+            .where(Appointment.confirmation_sent_by_user_id == user.id).values(confirmation_sent_by_user_id=None))
+        await db.execute(update(AppointmentRequest)
+            .where(AppointmentRequest.submitted_by_user_id == user.id).values(submitted_by_user_id=None))
+        await db.execute(update(AppointmentRequest)
+            .where(AppointmentRequest.reviewed_by_user_id == user.id).values(reviewed_by_user_id=None))
+        await db.execute(update(Client)
+            .where(Client.user_id == user.id).values(user_id=None))
+        await db.execute(update(Provider)
+            .where(Provider.user_id == user.id).values(user_id=None))
+        await db.execute(update(SalePaymentEdit)
+            .where(SalePaymentEdit.edited_by_user_id == user.id).values(edited_by_user_id=None))
+        await db.execute(update(RetailStockMovement)
+            .where(RetailStockMovement.created_by_user_id == user.id).values(created_by_user_id=None))
+        await db.execute(update(PettyCashEntry)
+            .where(PettyCashEntry.created_by_user_id == user.id).values(created_by_user_id=None))
+        await db.execute(update(CashReconciliation)
+            .where(CashReconciliation.closed_by_user_id == user.id).values(closed_by_user_id=None))
+        await db.execute(update(Sale)
+            .where(Sale.completed_by_user_id == user.id).values(completed_by_user_id=None))
+        await db.execute(update(TimeBlock)
+            .where(TimeBlock.created_by_user_id == user.id).values(created_by_user_id=None))
+        await db.execute(update(ClientColourNote)
+            .where(ClientColourNote.created_by_user_id == user.id).values(created_by_user_id=None))
+
+        tokens = (
+            await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+        ).scalars().all()
+        for t in tokens:
+            await db.delete(t)
+
         await db.flush()
         await db.delete(user)
         await db.commit()
@@ -307,7 +308,7 @@ async def delete_user(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot delete user — a database reference could not be cleared: {exc}",
+            detail=f"Cannot delete user — constraint: {exc}",
         )
 
 
