@@ -25,6 +25,7 @@ from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
 from app.models.promotion import TenantPromotion
 from app.models.retail import RetailItem
+from app.models.retail import RetailStockMovement, StockMovementKind
 from app.models.sale import Payment, Sale, SaleAppointment, SaleItem, SaleItemKind, SalePaymentEdit, SaleStatus
 from app.models.service import Service
 from app.models.tenant import Tenant
@@ -436,6 +437,19 @@ async def create_sale(
         db.add(si)
         sale_items.append(si)
         seq += 1
+
+    # Write sell movements for retail lines (atomic with the sale)
+    await db.flush()  # ensure si.id is populated
+    for si in sale_items:
+        if si.kind == SaleItemKind.retail and si.retail_item_id is not None:
+            db.add(RetailStockMovement(
+                tenant_id=tid,
+                retail_item_id=si.retail_item_id,
+                kind=StockMovementKind.sell,
+                quantity=-si.quantity,
+                sale_item_id=si.id,
+                created_by_user_id=current_user.id,
+            ))
 
     sale_payments: list[Payment] = []
     for in_pay in body.payments:
