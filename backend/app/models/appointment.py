@@ -120,8 +120,8 @@ class Appointment(TenantScopedBase):
     request_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("appointment_requests.id"), nullable=True
     )
-    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     appointment_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, index=True)
     source: Mapped[AppointmentSource] = mapped_column(Enum(AppointmentSource), nullable=False)

@@ -258,54 +258,45 @@ async def delete_user(
             raise HTTPException(status_code=409,
                                 detail="Cannot delete a provider with upcoming appointments — cancel them first")
 
-    # Guard: staff who have created appointments cannot be hard-deleted
-    # (appointments.created_by_user_id is non-nullable; deactivate instead)
-    if user.role in (UserRole.tenant_admin, UserRole.staff):
-        created = (
-            await db.execute(
-                select(Appointment).where(Appointment.created_by_user_id == user.id).limit(1)
-            )
-        ).scalar_one_or_none()
-        if created is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="Staff with appointment history cannot be permanently deleted — use Deactivate instead",
-            )
+    # Cleanup: null all audit FKs that reference this user before deleting
+    # (appointment history, receipts, stock movements are preserved — only the
+    # "who did it" reference is cleared)
 
-    # Cleanup before delete
-    # 1. Null out client.user_id so the client record (and appointment history) is preserved
-    client = (
-        await db.execute(select(Client).where(Client.user_id == user.id))
-    ).scalar_one_or_none()
-    if client is not None:
-        # Block if guest client has upcoming appointments
-        upcoming = (
-            await db.execute(
-                select(Appointment).where(
-                    Appointment.client_id == client.id,
-                    Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.in_progress]),
-                ).limit(1)
-            )
-        ).scalar_one_or_none()
-
-        if upcoming is not None:
-            raise HTTPException(status_code=409,
-                                detail="Cannot delete a user with upcoming appointments — cancel them first")
-        client.user_id = None
-
-    # 2. Null out appointment_requests FK (submitted_by / reviewed_by reference users.id)
+    # Appointments created by this user
     await db.execute(
-        update(AppointmentRequest)
-        .where(AppointmentRequest.submitted_by_user_id == user.id)
+        update(Appointment).where(Appointment.created_by_user_id == user.id)
+        .values(created_by_user_id=None)
+    )
+    # Appointment requests submitted/reviewed by this user
+    await db.execute(
+        update(AppointmentRequest).where(AppointmentRequest.submitted_by_user_id == user.id)
         .values(submitted_by_user_id=None)
     )
     await db.execute(
-        update(AppointmentRequest)
-        .where(AppointmentRequest.reviewed_by_user_id == user.id)
+        update(AppointmentRequest).where(AppointmentRequest.reviewed_by_user_id == user.id)
         .values(reviewed_by_user_id=None)
     )
-
-    # 3. Delete password reset tokens
+    # Delink client account (guest users); keep client + appointment history intact
+    await db.execute(
+        update(Client).where(Client.user_id == user.id).values(user_id=None)
+    )
+    # Payment edits and stock movements authored by this user
+    from app.models.sale import SalePaymentEdit
+    from app.models.retail import RetailStockMovement
+    from app.models.cash_reconciliation import PettyCashEntry
+    await db.execute(
+        update(SalePaymentEdit).where(SalePaymentEdit.edited_by_user_id == user.id)
+        .values(edited_by_user_id=None)
+    )
+    await db.execute(
+        update(RetailStockMovement).where(RetailStockMovement.created_by_user_id == user.id)
+        .values(created_by_user_id=None)
+    )
+    await db.execute(
+        update(PettyCashEntry).where(PettyCashEntry.created_by_user_id == user.id)
+        .values(created_by_user_id=None)
+    )
+    # Password reset tokens
     tokens = (
         await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
     ).scalars().all()

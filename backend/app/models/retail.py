@@ -45,6 +45,6 @@ class RetailStockMovement(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("sale_items.id"), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

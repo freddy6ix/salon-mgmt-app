@@ -312,9 +312,9 @@ function UserRow({ user }: { user: AdminUser }) {
               </Button>
             )}
             {confirmDelete && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 flex-wrap justify-end">
                 <span className="text-xs text-muted-foreground">
-                  Delete <strong>{user.email}</strong>? This is permanent.
+                  Permanently delete?
                 </span>
                 <Button
                   size="sm"

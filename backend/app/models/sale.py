@@ -94,7 +94,7 @@ class SalePaymentEdit(TenantScopedBase):
     sale_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sales.id"), nullable=False, index=True
     )
-    edited_by_user_id: Mapped[uuid.UUID] = mapped_column(
+    edited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     edited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
