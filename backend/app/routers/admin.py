@@ -14,8 +14,10 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
+from app.models.appointment import Appointment
 from app.models.client import Client
 from app.models.email_config import TenantEmailConfig
+from app.models.provider import Provider
 from app.models.tenant import Tenant
 from app.models.user import PasswordResetToken, User, UserRole
 
@@ -209,19 +211,98 @@ async def delete_user(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    tid = current_user.tenant_id
     user = (
         await db.execute(
-            select(User).where(
-                User.id == uuid.UUID(user_id),
-                User.tenant_id == current_user.tenant_id,
-            )
+            select(User).where(User.id == uuid.UUID(user_id), User.tenant_id == tid)
         )
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
-    user.is_active = False
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    # Guard: cannot remove the last active admin
+    if user.role in (UserRole.tenant_admin,):
+        admin_count = (
+            await db.execute(
+                select(User).where(
+                    User.tenant_id == tid,
+                    User.role == UserRole.tenant_admin,
+                    User.is_active == True,  # noqa: E712
+                    User.id != user.id,
+                )
+            )
+        ).scalars().all()
+        if not admin_count:
+            raise HTTPException(status_code=409, detail="Cannot delete the last active admin")
+
+    # Guard: provider with future confirmed/in-progress appointments
+    provider = (
+        await db.execute(select(Provider).where(Provider.user_id == user.id))
+    ).scalar_one_or_none()
+    if provider is not None:
+        from datetime import date
+        from app.models.appointment import AppointmentItem, AppointmentStatus
+        future_appts = (
+            await db.execute(
+                select(AppointmentItem).where(
+                    AppointmentItem.provider_id == provider.id,
+                    AppointmentItem.tenant_id == tid,
+                ).join(Appointment, Appointment.id == AppointmentItem.appointment_id).where(
+                    Appointment.appointment_date >= datetime.combine(date.today(), datetime.min.time()),
+                    Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.in_progress]),
+                )
+            )
+        ).scalars().all()
+        if future_appts:
+            raise HTTPException(status_code=409,
+                                detail="Cannot delete a provider with upcoming appointments — cancel them first")
+
+    # Guard: staff who have created appointments cannot be hard-deleted
+    # (appointments.created_by_user_id is non-nullable; deactivate instead)
+    if user.role in (UserRole.tenant_admin, UserRole.staff):
+        created = (
+            await db.execute(
+                select(Appointment).where(Appointment.created_by_user_id == user.id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if created is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Staff with appointment history cannot be permanently deleted — use Deactivate instead",
+            )
+
+    # Cleanup before delete
+    # 1. Null out client.user_id so the client record (and appointment history) is preserved
+    client = (
+        await db.execute(select(Client).where(Client.user_id == user.id))
+    ).scalar_one_or_none()
+    if client is not None:
+        # Block if guest client has upcoming appointments
+        from app.models.appointment import AppointmentStatus
+        upcoming = (
+            await db.execute(
+                select(Appointment).where(
+                    Appointment.client_id == client.id,
+                    Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.in_progress]),
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if upcoming is not None:
+            raise HTTPException(status_code=409,
+                                detail="Cannot delete a user with upcoming appointments — cancel them first")
+        client.user_id = None
+
+    # 2. Delete password reset tokens
+    tokens = (
+        await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    ).scalars().all()
+    for t in tokens:
+        await db.delete(t)
+
+    await db.flush()
+    await db.delete(user)
     await db.commit()
 
 

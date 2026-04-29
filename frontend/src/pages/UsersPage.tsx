@@ -205,9 +205,12 @@ function UserRow({ user }: { user: AdminUser }) {
     },
   })
 
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteUser(user.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); setConfirmDelete(false) },
+    onError: (err: unknown) => { setActionError((err as Error).message ?? 'Delete failed'); setConfirmDelete(false) },
   })
 
   const isGuest = user.role === 'guest'
@@ -297,17 +300,40 @@ function UserRow({ user }: { user: AdminUser }) {
                 </Button>
               </span>
             )}
-            {isGuest && (
+            {!confirmDelete && (
               <Button
                 size="sm"
                 variant="ghost"
                 className="text-xs h-7 text-muted-foreground"
-                disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate()}
-                title="Remove guest user"
+                onClick={() => { setConfirmDelete(true); setConfirmDeactivate(false); setActionError(null) }}
+                title="Permanently delete user"
               >
                 <Trash2Icon size={13} />
               </Button>
+            )}
+            {confirmDelete && (
+              <span className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">
+                  Delete <strong>{user.email}</strong>? This is permanent.
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs h-7 text-destructive"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate()}
+                >
+                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs h-7"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Cancel
+                </Button>
+              </span>
             )}
           </div>
         </td>
