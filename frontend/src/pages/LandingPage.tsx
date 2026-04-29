@@ -23,13 +23,13 @@ export default function LandingPage() {
     <div className="min-h-screen relative flex flex-col text-white">
       {/* Hero background */}
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className="absolute inset-0 bg-cover bg-center pointer-events-none"
         style={{ backgroundImage: 'url(/images/1Z2A5708.webp)' }}
         aria-hidden
       />
       {/* Soft gradient overlay for legibility */}
       <div
-        className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/70"
+        className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/70 pointer-events-none"
         aria-hidden
       />
 

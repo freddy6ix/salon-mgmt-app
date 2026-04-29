@@ -299,9 +299,16 @@ async def delete_user(
     for t in tokens:
         await db.delete(t)
 
-    await db.flush()
-    await db.delete(user)
-    await db.commit()
+    try:
+        await db.flush()
+        await db.delete(user)
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot delete user — a database reference could not be cleared: {exc}",
+        )
 
 
 @router.post("/users/{user_id}/send-welcome", status_code=status.HTTP_204_NO_CONTENT)
