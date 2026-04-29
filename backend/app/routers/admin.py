@@ -260,9 +260,11 @@ async def delete_user(
 
     # Null every FK that references this user before deleting.
     # Records are preserved — only the "who did it" attribution is cleared.
-    from app.models.sale import SalePaymentEdit
+    from app.models.sale import Sale, SalePaymentEdit
     from app.models.retail import RetailStockMovement
     from app.models.cash_reconciliation import CashReconciliation, PettyCashEntry
+    from app.models.time_block import TimeBlock
+    from app.models.client import ClientColourNote
 
     await db.execute(update(Appointment)
         .where(Appointment.created_by_user_id == user.id).values(created_by_user_id=None))
@@ -284,6 +286,12 @@ async def delete_user(
         .where(PettyCashEntry.created_by_user_id == user.id).values(created_by_user_id=None))
     await db.execute(update(CashReconciliation)
         .where(CashReconciliation.closed_by_user_id == user.id).values(closed_by_user_id=None))
+    await db.execute(update(Sale)
+        .where(Sale.completed_by_user_id == user.id).values(completed_by_user_id=None))
+    await db.execute(update(TimeBlock)
+        .where(TimeBlock.created_by_user_id == user.id).values(created_by_user_id=None))
+    await db.execute(update(ClientColourNote)
+        .where(ClientColourNote.created_by_user_id == user.id).values(created_by_user_id=None))
 
     tokens = (
         await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
