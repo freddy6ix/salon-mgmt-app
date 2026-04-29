@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import DateTime
@@ -23,13 +23,7 @@ class SaleItemKind(str, enum.Enum):
 
 class Sale(TenantScopedBase):
     __tablename__ = "sales"
-    __table_args__ = (
-        UniqueConstraint("appointment_id", name="uq_sale_appointment"),
-    )
 
-    appointment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False, index=True
-    )
     client_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False, index=True
     )
@@ -106,3 +100,15 @@ class SalePaymentEdit(TenantScopedBase):
     edited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     before_json: Mapped[str] = mapped_column(Text, nullable=False)
     after_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class SaleAppointment(TenantScopedBase):
+    """Junction: one sale can cover multiple appointments."""
+    __tablename__ = "sale_appointments"
+
+    sale_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sales.id"), nullable=False, index=True
+    )
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False, index=True
+    )

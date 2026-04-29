@@ -42,7 +42,7 @@ function EditPaymentsDialog({
   const mutation = useMutation({
     mutationFn: () => editSalePayments(saleId, rows),
     onSuccess: (updated) => {
-      qc.setQueryData(['sale', 'by-appointment', updated.appointment_id], updated)
+      updated.appointment_ids.forEach(id => qc.setQueryData(['sale', 'by-appointment', id], updated))
       onDone()
     },
     onError: (e: Error) => setError(e.message),

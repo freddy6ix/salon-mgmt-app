@@ -25,7 +25,7 @@ from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
 from app.models.promotion import TenantPromotion
 from app.models.retail import RetailItem
-from app.models.sale import Payment, Sale, SaleItem, SaleItemKind, SalePaymentEdit, SaleStatus
+from app.models.sale import Payment, Sale, SaleAppointment, SaleItem, SaleItemKind, SalePaymentEdit, SaleStatus
 from app.models.service import Service
 from app.models.tenant import Tenant
 
@@ -62,7 +62,7 @@ class PaymentIn(BaseModel):
 
 
 class SaleIn(BaseModel):
-    appointment_id: str
+    appointment_ids: list[str] = Field(min_length=1)
     notes: str | None = None
     items: list[SaleItemIn] = Field(min_length=1)
     payments: list[PaymentIn] = Field(min_length=1)
@@ -93,7 +93,7 @@ class PaymentOut(BaseModel):
 
 class SaleOut(BaseModel):
     id: str
-    appointment_id: str
+    appointment_ids: list[str]
     client_id: str
     subtotal: str
     discount_total: str
@@ -110,6 +110,7 @@ class SaleOut(BaseModel):
 
 def _serialize(
     sale: Sale,
+    appointment_ids: list[str],
     items: list[SaleItem],
     payments: list[Payment],
     methods_by_id: dict[uuid.UUID, TenantPaymentMethod],
@@ -118,7 +119,7 @@ def _serialize(
     pb = promos_by_id or {}
     return SaleOut(
         id=str(sale.id),
-        appointment_id=str(sale.appointment_id),
+        appointment_ids=appointment_ids,
         client_id=str(sale.client_id),
         subtotal=str(sale.subtotal),
         discount_total=str(sale.discount_total),
@@ -172,49 +173,59 @@ async def create_sale(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> SaleOut:
     tid = current_user.tenant_id
-    appt_uuid = uuid.UUID(body.appointment_id)
+    appt_uuids = [uuid.UUID(aid) for aid in body.appointment_ids]
 
-    # Load appointment
-    appt = (
+    # Load all appointments
+    appts = (
         await db.execute(
             select(Appointment).where(
-                Appointment.id == appt_uuid,
+                Appointment.id.in_(appt_uuids),
                 Appointment.tenant_id == tid,
             )
         )
-    ).scalar_one_or_none()
-    if appt is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    ).scalars().all()
+    if len(appts) != len(appt_uuids):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more appointments not found")
 
-    # R1 — only in_progress appointments can be checked out
-    if appt.status != AppointmentStatus.in_progress:
+    # R1 — all must be in_progress
+    non_progress = [a for a in appts if a.status != AppointmentStatus.in_progress]
+    if non_progress:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only appointments that are in progress can be checked out",
+            detail="All appointments must be in progress to check out",
         )
 
-    # R2 — at most one completed Sale per Appointment
+    # R1b — all must be on the same business date
+    dates = {a.appointment_date.date() for a in appts}
+    if len(dates) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="All appointments must be on the same business day",
+        )
+
+    # R2 — none may already have a completed sale (join through junction)
     existing = (
         await db.execute(
-            select(Sale).where(
-                Sale.tenant_id == tid,
-                Sale.appointment_id == appt_uuid,
+            select(SaleAppointment).where(
+                SaleAppointment.appointment_id.in_(appt_uuids),
+            ).join(Sale, Sale.id == SaleAppointment.sale_id).where(
                 Sale.status == SaleStatus.completed,
             )
         )
-    ).scalar_one_or_none()
-    if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This appointment already has a completed sale")
+    ).scalars().all()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="One or more appointments already have a completed sale")
 
     # Separate service vs retail items
     service_item_ids = [it.appointment_item_id for it in body.items if it.appointment_item_id]
     retail_item_ids_in = [it.retail_item_id for it in body.items if it.retail_item_id]
 
-    # Load all appointment items; validate that all appt items are present (R8)
+    # Load all appointment items across all appointments; validate R8
     appt_items = (
         await db.execute(
             select(AppointmentItem).where(
-                AppointmentItem.appointment_id == appt.id,
+                AppointmentItem.appointment_id.in_(appt_uuids),
                 AppointmentItem.tenant_id == tid,
             )
         )
@@ -224,7 +235,7 @@ async def create_sale(
     if set(service_item_ids) != set(appt_item_map.keys()):  # R8
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Sale must include exactly the appointment's service items (no missing or extra)",
+            detail="Sale must include exactly all service items across the selected appointments",
         )
 
     # Load retail items
@@ -334,10 +345,10 @@ async def create_sale(
         )
 
     # Persist (R3 — atomic with appointment status)
+    primary_appt = appts[0]
     sale = Sale(
         tenant_id=tid,
-        appointment_id=appt.id,
-        client_id=appt.client_id,
+        client_id=primary_appt.client_id,
         subtotal=subtotal,
         discount_total=discount_total,
         gst_amount=gst,
@@ -350,6 +361,14 @@ async def create_sale(
     )
     db.add(sale)
     await db.flush()
+
+    # Create junction rows linking each appointment to this sale
+    for appt in appts:
+        db.add(SaleAppointment(
+            tenant_id=tid,
+            sale_id=sale.id,
+            appointment_id=appt.id,
+        ))
 
     # Lookup service names for description snapshot
     service_ids = {ai.service_id for ai in appt_items}
@@ -430,11 +449,13 @@ async def create_sale(
         db.add(sp)
         sale_payments.append(sp)
 
-    appt.status = AppointmentStatus.completed
+    # Transition all appointments to completed atomically
+    for appt in appts:
+        appt.status = AppointmentStatus.completed
 
     await db.commit()
     await db.refresh(sale)
-    return _serialize(sale, sale_items, sale_payments, methods_by_id, promos_by_id)
+    return _serialize(sale, [str(a.id) for a in appts], sale_items, sale_payments, methods_by_id, promos_by_id)
 
 
 # ── GET /sales/by-appointment/{appointment_id} ────────────────────────────────
@@ -445,28 +466,39 @@ async def get_sale_by_appointment(
     current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> SaleOut:
+    tid = current_user.tenant_id
+    junction = (
+        await db.execute(
+            select(SaleAppointment).where(
+                SaleAppointment.appointment_id == uuid.UUID(appointment_id),
+            )
+        )
+    ).scalar_one_or_none()
+    if junction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No sale for this appointment")
+
     sale = (
         await db.execute(
-            select(Sale).where(
-                Sale.tenant_id == current_user.tenant_id,
-                Sale.appointment_id == uuid.UUID(appointment_id),
-                Sale.status == SaleStatus.completed,
-            )
+            select(Sale).where(Sale.id == junction.sale_id, Sale.tenant_id == tid, Sale.status == SaleStatus.completed)
         )
     ).scalar_one_or_none()
     if sale is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No sale for this appointment")
 
+    # All appointment_ids linked to this sale
+    all_junctions = (
+        await db.execute(select(SaleAppointment).where(SaleAppointment.sale_id == sale.id))
+    ).scalars().all()
+    appt_ids = [str(j.appointment_id) for j in all_junctions]
+
     items = (await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id).order_by(SaleItem.sequence))).scalars().all()
     payments = (await db.execute(select(Payment).where(Payment.sale_id == sale.id))).scalars().all()
     method_ids = {p.payment_method_id for p in payments}
     methods = (
-        await db.execute(
-            select(TenantPaymentMethod).where(TenantPaymentMethod.id.in_(method_ids))
-        )
+        await db.execute(select(TenantPaymentMethod).where(TenantPaymentMethod.id.in_(method_ids)))
     ).scalars().all() if method_ids else []
     methods_by_id = {m.id: m for m in methods}
-    return _serialize(sale, list(items), list(payments), methods_by_id)
+    return _serialize(sale, appt_ids, list(items), list(payments), methods_by_id)
 
 
 # ── POST /sales/{sale_id}/send-receipt ────────────────────────────────────────
@@ -666,6 +698,11 @@ async def edit_sale_payments(
     await db.commit()
     await db.refresh(sale)
 
+    all_junctions = (
+        await db.execute(select(SaleAppointment).where(SaleAppointment.sale_id == sale.id))
+    ).scalars().all()
+    appt_ids = [str(j.appointment_id) for j in all_junctions]
+
     items = (
         await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id).order_by(SaleItem.sequence))
     ).scalars().all()
@@ -673,4 +710,4 @@ async def edit_sale_payments(
         await db.execute(select(Payment).where(Payment.sale_id == sale.id))
     ).scalars().all()
 
-    return _serialize(sale, list(items), list(refreshed_payments), methods_by_id)
+    return _serialize(sale, appt_ids, list(items), list(refreshed_payments), methods_by_id)

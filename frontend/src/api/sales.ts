@@ -21,7 +21,7 @@ export interface SalePayment {
 
 export interface Sale {
   id: string
-  appointment_id: string
+  appointment_ids: string[]
   client_id: string
   subtotal: string
   discount_total: string
@@ -53,7 +53,7 @@ export interface SalePaymentIn {
 }
 
 export interface SaleIn {
-  appointment_id: string
+  appointment_ids: string[]
   notes?: string | null
   items: SaleItemIn[]
   payments: SalePaymentIn[]

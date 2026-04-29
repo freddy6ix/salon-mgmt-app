@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Appointment } from '@/api/appointments'
+import { listAppointments } from '@/api/appointments'
 import { createSale, sendReceipt, type Sale } from '@/api/sales'
 import { listPaymentMethods } from '@/api/paymentMethods'
 import { listPromotions, applyPromotion, type Promotion } from '@/api/promotions'
@@ -83,10 +84,52 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
       isPstExempt: false,
     }))
   )
+  const [extraAppointments, setExtraAppointments] = useState<Appointment[]>([])
   const [notes, setNotes] = useState('')
   const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [error, setError] = useState<string | null>(null)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
+
+  // Same-day in-progress appointments (for group checkout picker)
+  const { data: sameDayAppts = [] } = useQuery({
+    queryKey: ['appointments', date],
+    queryFn: () => listAppointments(date),
+  })
+  const addableAppointments = sameDayAppts.filter(
+    a => a.status === 'in_progress'
+      && a.id !== appointment.id
+      && !extraAppointments.find(e => e.id === a.id)
+  )
+
+  function addAppointment(appt: Appointment) {
+    setExtraAppointments(prev => [...prev, appt])
+    setItems(prev => [
+      ...prev,
+      ...appt.items.map(it => ({
+        kind: 'service' as const,
+        appointment_item_id: it.id,
+        retail_item_id: null,
+        description: it.service.name,
+        providerName: it.provider.display_name,
+        quantity: 1,
+        unitPrice: it.price.toFixed(2),
+        discount: '0.00',
+        promotionId: null,
+        isGstExempt: false,
+        isPstExempt: false,
+      })),
+    ])
+  }
+
+  function removeExtraAppointment(apptId: string) {
+    setExtraAppointments(prev => prev.filter(a => a.id !== apptId))
+    setItems(prev => prev.filter(it => {
+      const extra = extraAppointments.find(a => a.id === apptId)
+      if (!extra) return true
+      const extraItemIds = new Set(extra.items.map(i => i.id))
+      return !extraItemIds.has(it.appointment_item_id ?? '')
+    }))
+  }
 
   // Initialise payment row once methods are loaded (default: first method, $0, no cashback).
   useEffect(() => {
@@ -197,7 +240,7 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
 
   const mutation = useMutation({
     mutationFn: () => createSale({
-      appointment_id: appointment.id,
+      appointment_ids: [appointment.id, ...extraAppointments.map(a => a.id)],
       notes: notes.trim() || null,
       items: items.map(i => ({
         appointment_item_id: i.appointment_item_id ?? null,
@@ -263,6 +306,45 @@ export default function CheckoutPanel({ appointment, onClose, onCompleted }: Pro
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+        {/* Group checkout — extra appointments */}
+        {(extraAppointments.length > 0 || addableAppointments.length > 0) && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Appointments</Label>
+            <div className="rounded-md border divide-y text-sm">
+              <div className="px-3 py-2 flex justify-between items-center bg-muted/20">
+                <span>{appointment.client.first_name} {appointment.client.last_name}</span>
+                <span className="text-xs text-muted-foreground">primary</span>
+              </div>
+              {extraAppointments.map(a => (
+                <div key={a.id} className="px-3 py-2 flex justify-between items-center">
+                  <span>{a.client.first_name} {a.client.last_name}</span>
+                  <button
+                    onClick={() => removeExtraAppointment(a.id)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >remove</button>
+                </div>
+              ))}
+            </div>
+            {addableAppointments.length > 0 && (
+              <select
+                className="text-xs border border-input rounded-md px-2 py-1 bg-background w-full"
+                value=""
+                onChange={e => {
+                  const a = addableAppointments.find(x => x.id === e.target.value)
+                  if (a) addAppointment(a)
+                }}
+              >
+                <option value="">+ Add appointment to this sale</option>
+                {addableAppointments.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.client.first_name} {a.client.last_name} — {a.items.map(i => i.service.name).join(', ')}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         {/* Items */}
         <div className="space-y-2">
