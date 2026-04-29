@@ -258,45 +258,33 @@ async def delete_user(
             raise HTTPException(status_code=409,
                                 detail="Cannot delete a provider with upcoming appointments — cancel them first")
 
-    # Cleanup: null all audit FKs that reference this user before deleting
-    # (appointment history, receipts, stock movements are preserved — only the
-    # "who did it" reference is cleared)
-
-    # Appointments created by this user
-    await db.execute(
-        update(Appointment).where(Appointment.created_by_user_id == user.id)
-        .values(created_by_user_id=None)
-    )
-    # Appointment requests submitted/reviewed by this user
-    await db.execute(
-        update(AppointmentRequest).where(AppointmentRequest.submitted_by_user_id == user.id)
-        .values(submitted_by_user_id=None)
-    )
-    await db.execute(
-        update(AppointmentRequest).where(AppointmentRequest.reviewed_by_user_id == user.id)
-        .values(reviewed_by_user_id=None)
-    )
-    # Delink client account (guest users); keep client + appointment history intact
-    await db.execute(
-        update(Client).where(Client.user_id == user.id).values(user_id=None)
-    )
-    # Payment edits and stock movements authored by this user
+    # Null every FK that references this user before deleting.
+    # Records are preserved — only the "who did it" attribution is cleared.
     from app.models.sale import SalePaymentEdit
     from app.models.retail import RetailStockMovement
-    from app.models.cash_reconciliation import PettyCashEntry
-    await db.execute(
-        update(SalePaymentEdit).where(SalePaymentEdit.edited_by_user_id == user.id)
-        .values(edited_by_user_id=None)
-    )
-    await db.execute(
-        update(RetailStockMovement).where(RetailStockMovement.created_by_user_id == user.id)
-        .values(created_by_user_id=None)
-    )
-    await db.execute(
-        update(PettyCashEntry).where(PettyCashEntry.created_by_user_id == user.id)
-        .values(created_by_user_id=None)
-    )
-    # Password reset tokens
+    from app.models.cash_reconciliation import CashReconciliation, PettyCashEntry
+
+    await db.execute(update(Appointment)
+        .where(Appointment.created_by_user_id == user.id).values(created_by_user_id=None))
+    await db.execute(update(Appointment)
+        .where(Appointment.confirmation_sent_by_user_id == user.id).values(confirmation_sent_by_user_id=None))
+    await db.execute(update(AppointmentRequest)
+        .where(AppointmentRequest.submitted_by_user_id == user.id).values(submitted_by_user_id=None))
+    await db.execute(update(AppointmentRequest)
+        .where(AppointmentRequest.reviewed_by_user_id == user.id).values(reviewed_by_user_id=None))
+    await db.execute(update(Client)
+        .where(Client.user_id == user.id).values(user_id=None))
+    await db.execute(update(Provider)
+        .where(Provider.user_id == user.id).values(user_id=None))
+    await db.execute(update(SalePaymentEdit)
+        .where(SalePaymentEdit.edited_by_user_id == user.id).values(edited_by_user_id=None))
+    await db.execute(update(RetailStockMovement)
+        .where(RetailStockMovement.created_by_user_id == user.id).values(created_by_user_id=None))
+    await db.execute(update(PettyCashEntry)
+        .where(PettyCashEntry.created_by_user_id == user.id).values(created_by_user_id=None))
+    await db.execute(update(CashReconciliation)
+        .where(CashReconciliation.closed_by_user_id == user.id).values(closed_by_user_id=None))
+
     tokens = (
         await db.execute(select(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
     ).scalars().all()
