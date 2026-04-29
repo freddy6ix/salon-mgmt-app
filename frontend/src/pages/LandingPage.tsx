@@ -34,7 +34,7 @@ export default function LandingPage() {
       />
 
       {/* Top brand bar */}
-      <header className="relative z-10 px-6 sm:px-10 py-6 flex items-center justify-between">
+      <header className="relative z-20 px-6 sm:px-10 py-6 flex items-center justify-between">
         <img
           src="/salon-lyol-logo.png"
           alt="Salon Lyol"
