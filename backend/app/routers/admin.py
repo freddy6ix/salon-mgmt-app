@@ -13,7 +13,7 @@ from app.auth import hash_password
 from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
-from app.email import SmtpConfig, send_email, send_welcome_email
+from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
 from app.models.client import Client
 from app.models.email_config import TenantEmailConfig
 from app.models.tenant import Tenant
@@ -27,7 +27,7 @@ ALLOWED_MANAGED_ROLES = {UserRole.tenant_admin, UserRole.staff}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _get_smtp_config(tenant_id: uuid.UUID, db: AsyncSession) -> SmtpConfig:
+async def _get_email_cfg(tenant_id: uuid.UUID, db: AsyncSession) -> AnyEmailConfig:
     row = (
         await db.execute(
             select(TenantEmailConfig).where(TenantEmailConfig.tenant_id == tenant_id)
@@ -36,16 +36,9 @@ async def _get_smtp_config(tenant_id: uuid.UUID, db: AsyncSession) -> SmtpConfig
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Email not configured — set up SMTP in Settings → Email first",
+            detail="Email not configured — set up email in Settings → Email first",
         )
-    return SmtpConfig(
-        host=row.smtp_host,
-        port=row.smtp_port,
-        username=row.smtp_username,
-        password=row.smtp_password,
-        use_tls=row.smtp_use_tls,
-        from_address=row.from_address,
-    )
+    return email_cfg_from_row(row)
 
 
 async def _user_out(user: User, db: AsyncSession) -> "UserOut":
@@ -134,7 +127,7 @@ async def create_user(
 
     smtp_cfg = None
     if body.send_welcome:
-        smtp_cfg = await _get_smtp_config(current_user.tenant_id, db)
+        smtp_cfg = await _get_email_cfg(current_user.tenant_id, db)
 
     if existing is not None:
         existing.is_active = True
@@ -238,7 +231,7 @@ async def resend_welcome(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    smtp_cfg = await _get_smtp_config(current_user.tenant_id, db)
+    smtp_cfg = await _get_email_cfg(current_user.tenant_id, db)
     user = (
         await db.execute(
             select(User).where(
@@ -263,6 +256,10 @@ async def resend_welcome(
 
 class EmailConfigOut(BaseModel):
     is_configured: bool
+    send_mode: str  # 'smtp' | 'resend_api'
+    # Resend API fields
+    resend_api_key_set: bool
+    # SMTP fields
     smtp_host: str
     smtp_port: int
     smtp_username: str
@@ -272,9 +269,13 @@ class EmailConfigOut(BaseModel):
 
 
 class EmailConfigSave(BaseModel):
-    smtp_host: str
+    send_mode: str = "smtp"
+    # Resend API fields
+    resend_api_key: str | None = None
+    # SMTP fields
+    smtp_host: str = ""
     smtp_port: int = 587
-    smtp_username: str
+    smtp_username: str = ""
     smtp_password: str | None = None
     smtp_use_tls: bool = True
     from_address: str
@@ -283,9 +284,11 @@ class EmailConfigSave(BaseModel):
 def _email_config_out(row: TenantEmailConfig) -> EmailConfigOut:
     return EmailConfigOut(
         is_configured=True,
-        smtp_host=row.smtp_host,
+        send_mode=row.send_mode or "smtp",
+        resend_api_key_set=bool(row.resend_api_key),
+        smtp_host=row.smtp_host or "",
         smtp_port=row.smtp_port,
-        smtp_username=row.smtp_username,
+        smtp_username=row.smtp_username or "",
         smtp_password_set=bool(row.smtp_password),
         smtp_use_tls=row.smtp_use_tls,
         from_address=row.from_address,
@@ -294,6 +297,8 @@ def _email_config_out(row: TenantEmailConfig) -> EmailConfigOut:
 
 _EMPTY_EMAIL_CONFIG = EmailConfigOut(
     is_configured=False,
+    send_mode="smtp",
+    resend_api_key_set=False,
     smtp_host="",
     smtp_port=587,
     smtp_username="",
@@ -329,22 +334,29 @@ async def save_email_config(
     ).scalar_one_or_none()
 
     if row is None:
-        if not body.smtp_password:
+        if body.send_mode == "resend_api" and not body.resend_api_key:
+            raise HTTPException(status_code=400, detail="Resend API key is required")
+        if body.send_mode == "smtp" and not body.smtp_password:
             raise HTTPException(status_code=400, detail="Password is required for initial setup")
         row = TenantEmailConfig(
             tenant_id=current_user.tenant_id,
-            smtp_host=body.smtp_host.strip(),
+            send_mode=body.send_mode,
+            resend_api_key=body.resend_api_key,
+            smtp_host=body.smtp_host.strip() or None,
             smtp_port=body.smtp_port,
-            smtp_username=body.smtp_username.strip(),
+            smtp_username=body.smtp_username.strip() or None,
             smtp_password=body.smtp_password,
             smtp_use_tls=body.smtp_use_tls,
             from_address=body.from_address.strip(),
         )
         db.add(row)
     else:
-        row.smtp_host = body.smtp_host.strip()
+        row.send_mode = body.send_mode
+        if body.resend_api_key:
+            row.resend_api_key = body.resend_api_key
+        row.smtp_host = body.smtp_host.strip() or None
         row.smtp_port = body.smtp_port
-        row.smtp_username = body.smtp_username.strip()
+        row.smtp_username = body.smtp_username.strip() or None
         if body.smtp_password:
             row.smtp_password = body.smtp_password
         row.smtp_use_tls = body.smtp_use_tls
@@ -366,7 +378,7 @@ async def test_email_config(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     from app.email_layout import wrap_branded
-    smtp_cfg = await _get_smtp_config(current_user.tenant_id, db)
+    smtp_cfg = await _get_email_cfg(current_user.tenant_id, db)
     tenant = (
         await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
     ).scalar_one()

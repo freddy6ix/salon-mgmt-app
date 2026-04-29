@@ -16,7 +16,7 @@ from app.confirmation_template import (
     build_default_body,
     build_default_subject,
 )
-from app.email import SmtpConfig, send_email
+from app.email import email_cfg_from_row, send_email
 from app.email_layout import wrap_branded
 from app.models.appointment import (
     Appointment,
@@ -773,16 +773,9 @@ async def send_confirmation(
     if smtp_row is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Email not configured — set up SMTP in Settings → Email first",
+            detail="Email not configured — set up email in Settings → Email first",
         )
-    smtp_cfg = SmtpConfig(
-        host=smtp_row.smtp_host,
-        port=smtp_row.smtp_port,
-        username=smtp_row.smtp_username,
-        password=smtp_row.smtp_password,
-        use_tls=smtp_row.smtp_use_tls,
-        from_address=smtp_row.from_address,
-    )
+    smtp_cfg = email_cfg_from_row(smtp_row)
 
     tenant = (
         await db.execute(select(Tenant).where(Tenant.id == appt.tenant_id))

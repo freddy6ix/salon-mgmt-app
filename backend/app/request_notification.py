@@ -11,7 +11,7 @@ from html import escape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.email import SmtpConfig, send_email
+from app.email import email_cfg_from_row, send_email
 from app.email_layout import wrap_branded
 from app.models.appointment import AppointmentRequest, AppointmentRequestItem
 from app.models.email_config import TenantEmailConfig
@@ -107,14 +107,7 @@ async def send_request_notification(
         if smtp_row is None:
             logger.warning("Request notification skipped: tenant %s has no SMTP config", tenant_id)
             return
-        smtp_cfg = SmtpConfig(
-            host=smtp_row.smtp_host,
-            port=smtp_row.smtp_port,
-            username=smtp_row.smtp_username,
-            password=smtp_row.smtp_password,
-            use_tls=smtp_row.smtp_use_tls,
-            from_address=smtp_row.from_address,
-        )
+        smtp_cfg = email_cfg_from_row(smtp_row)
 
         items = (
             await db.execute(

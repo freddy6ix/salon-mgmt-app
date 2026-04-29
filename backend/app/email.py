@@ -5,7 +5,9 @@ import ssl
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
+
+import httpx
 
 if TYPE_CHECKING:
     from app.models.tenant import Tenant
@@ -21,6 +23,32 @@ class SmtpConfig:
     password: str
     use_tls: bool
     from_address: str
+
+
+@dataclass
+class ResendApiConfig:
+    api_key: str
+    from_address: str
+
+
+AnyEmailConfig = Union[SmtpConfig, ResendApiConfig]
+
+
+def email_cfg_from_row(row: Any) -> AnyEmailConfig:
+    """Build the right config object from a TenantEmailConfig ORM row."""
+    if getattr(row, "send_mode", "smtp") == "resend_api":
+        return ResendApiConfig(
+            api_key=row.resend_api_key or "",
+            from_address=row.from_address,
+        )
+    return SmtpConfig(
+        host=row.smtp_host or "",
+        port=row.smtp_port or 587,
+        username=row.smtp_username or "",
+        password=row.smtp_password or "",
+        use_tls=row.smtp_use_tls if row.smtp_use_tls is not None else True,
+        from_address=row.from_address,
+    )
 
 
 def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
@@ -63,8 +91,30 @@ def _send_sync(cfg: SmtpConfig, to: str, subject: str, html: str) -> None:
         raise RuntimeError(f"Connection error to {cfg.host}:{cfg.port} — {e}")
 
 
-async def send_email(cfg: SmtpConfig, to: str, subject: str, html: str, retries: int = 3) -> None:
-    """Send an email, retrying on transient connection drops (SMTPServerDisconnected)."""
+async def _send_via_resend(cfg: ResendApiConfig, to: str, subject: str, html: str) -> None:
+    if not cfg.api_key:
+        raise RuntimeError("Resend API key is not configured — enter it in Settings → Email")
+    if not cfg.from_address:
+        raise RuntimeError("From address is not configured")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://api.resend.com/emails",
+            json={"from": cfg.from_address, "to": [to], "subject": subject, "html": html},
+            headers={"Authorization": f"Bearer {cfg.api_key}"},
+        )
+    if resp.status_code not in (200, 201):
+        try:
+            msg = resp.json().get("message") or resp.text
+        except Exception:
+            msg = resp.text
+        raise RuntimeError(f"Resend API error ({resp.status_code}): {msg}")
+
+
+async def send_email(cfg: AnyEmailConfig, to: str, subject: str, html: str, retries: int = 3) -> None:
+    if isinstance(cfg, ResendApiConfig):
+        await _send_via_resend(cfg, to, subject, html)
+        return
+    # SMTP path — retry on transient connection drops
     last_err: Exception | None = None
     for attempt in range(retries):
         try:
@@ -93,7 +143,7 @@ def _cta_button(href: str, label: str, brand_color: str | None) -> str:
     )
 
 
-async def send_welcome_email(cfg: SmtpConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
+async def send_welcome_email(cfg: AnyEmailConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
     from app.email_layout import wrap_branded
     salon_name = tenant.name
     cta = _cta_button(reset_link, "Set my password", tenant.brand_color)
@@ -112,7 +162,7 @@ async def send_welcome_email(cfg: SmtpConfig, tenant: "Tenant", to: str, reset_l
     await send_email(cfg, to, subject, wrap_branded(inner, tenant, subject=subject))
 
 
-async def send_password_reset_email(cfg: SmtpConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
+async def send_password_reset_email(cfg: AnyEmailConfig, tenant: "Tenant", to: str, reset_link: str) -> None:
     from app.email_layout import wrap_branded
     salon_name = tenant.name
     cta = _cta_button(reset_link, "Reset my password", tenant.brand_color)

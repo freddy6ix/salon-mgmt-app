@@ -109,10 +109,10 @@ export default function ClientCard({ clientId, onClose }: Props) {
   })
 
   const cancelAppt = useMutation({
-    mutationFn: (appointmentId: string) => updateAppointmentStatus(appointmentId, 'cancelled'),
-    onSuccess: () => {
+    mutationFn: ({ id }: { id: string; date: string }) => updateAppointmentStatus(id, 'cancelled'),
+    onSuccess: (_, { date }) => {
       qc.invalidateQueries({ queryKey: ['client-history', clientId] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['appointments', date] })
     },
   })
 
@@ -299,7 +299,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                         Upcoming
                       </h3>
                       {upcoming.map(visit => (
-                        <VisitRow key={visit.appointment_id} visit={visit} onCancel={id => cancelAppt.mutate(id)} onClose={onClose} />
+                        <VisitRow key={visit.appointment_id} visit={visit} onCancel={(id, date) => cancelAppt.mutate({ id, date })} onClose={onClose} />
                       ))}
                     </div>
                   )}
@@ -418,7 +418,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
 
 function VisitRow({ visit, onCancel, onClose }: {
   visit: { appointment_id: string; date: string; status: string; items: { service_name: string; provider_name: string; price: number }[] }
-  onCancel?: (id: string) => void
+  onCancel?: (id: string, date: string) => void
   onClose?: () => void
 }) {
   const navigate = useNavigate()
@@ -451,7 +451,7 @@ function VisitRow({ visit, onCancel, onClose }: {
             confirmCancel ? (
               <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                 <span className="text-xs text-muted-foreground">Sure?</span>
-                <button onClick={() => { onCancel(visit.appointment_id); setConfirmCancel(false) }}
+                <button onClick={() => { onCancel(visit.appointment_id, visit.date); setConfirmCancel(false) }}
                   className="text-xs text-destructive hover:underline">Yes</button>
                 <button onClick={() => setConfirmCancel(false)}
                   className="text-xs text-muted-foreground hover:underline">No</button>

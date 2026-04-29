@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import StaffUser
-from app.email import send_email
+from app.email import email_cfg_from_row, send_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
 from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
@@ -507,12 +507,7 @@ async def send_receipt(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="Email not configured — set up SMTP in Settings → Email first")
 
-    from app.email import SmtpConfig
-    smtp = SmtpConfig(
-        host=cfg_row.smtp_host, port=cfg_row.smtp_port,
-        username=cfg_row.smtp_username, password=cfg_row.smtp_password,
-        use_tls=cfg_row.smtp_use_tls, from_address=cfg_row.from_address,
-    )
+    smtp = email_cfg_from_row(cfg_row)
 
     items_html = "".join(
         f"<tr><td style='padding:4px 0;'>{it.description}</td>"

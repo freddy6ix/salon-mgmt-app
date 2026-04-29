@@ -775,11 +775,16 @@ function EmailSection() {
     queryFn: getEmailConfig,
   })
 
+  const [sendMode, setSendMode] = useState<'smtp' | 'resend_api'>('resend_api')
+  // Resend API fields
+  const [resendApiKey, setResendApiKey] = useState('')
+  // SMTP fields
   const [host, setHost] = useState('')
   const [port, setPort] = useState('587')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [useTls, setUseTls] = useState(true)
+  // Shared
   const [fromAddress, setFromAddress] = useState('')
   const [testTo, setTestTo] = useState(user?.email ?? '')
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
@@ -787,6 +792,7 @@ function EmailSection() {
 
   useEffect(() => {
     if (cfg?.is_configured) {
+      setSendMode(cfg.send_mode)
       setHost(cfg.smtp_host)
       setPort(String(cfg.smtp_port))
       setUsername(cfg.smtp_username)
@@ -796,16 +802,26 @@ function EmailSection() {
   }, [cfg])
 
   const saveMutation = useMutation({
-    mutationFn: () => saveEmailConfig({
-      smtp_host: host.trim(),
-      smtp_port: parseInt(port, 10),
-      smtp_username: username.trim(),
-      smtp_password: password || undefined,
-      smtp_use_tls: useTls,
-      from_address: fromAddress.trim(),
-    }),
+    mutationFn: () => saveEmailConfig(
+      sendMode === 'resend_api'
+        ? {
+            send_mode: 'resend_api',
+            resend_api_key: resendApiKey || undefined,
+            from_address: fromAddress.trim(),
+          }
+        : {
+            send_mode: 'smtp',
+            smtp_host: host.trim(),
+            smtp_port: parseInt(port, 10),
+            smtp_username: username.trim(),
+            smtp_password: password || undefined,
+            smtp_use_tls: useTls,
+            from_address: fromAddress.trim(),
+          }
+    ),
     onSuccess: updated => {
       qc.setQueryData(['email-config'], updated)
+      setResendApiKey('')
       setPassword('')
       setSaveMsg('Saved.')
       setTimeout(() => setSaveMsg(null), 3000)
@@ -827,9 +843,9 @@ function EmailSection() {
   return (
     <section className="border rounded-lg p-5 space-y-5 bg-white">
       <div>
-        <h2 className="text-base font-medium">Email (SMTP)</h2>
+        <h2 className="text-base font-medium">Email</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Used for welcome emails and password resets. Works with Google Workspace, Resend SMTP, SendGrid, or any provider.
+          Used for confirmation emails, receipts, welcome emails, and password resets.
         </p>
       </div>
 
@@ -839,60 +855,114 @@ function EmailSection() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5 col-span-2 sm:col-span-1">
-          <Label htmlFor="smtp-host">SMTP host</Label>
-          <Input
-            id="smtp-host"
-            value={host}
-            onChange={e => setHost(e.target.value)}
-            placeholder="smtp.gmail.com"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="smtp-port">Port</Label>
-          <Input
-            id="smtp-port"
-            type="number"
-            value={port}
-            onChange={e => setPort(e.target.value)}
-            placeholder="587"
-          />
-        </div>
+      {/* Mode toggle */}
+      <div className="flex gap-1 p-1 bg-muted rounded-md w-fit">
+        {(['resend_api', 'smtp'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setSendMode(mode)}
+            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+              sendMode === mode
+                ? 'bg-white shadow-sm font-medium'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {mode === 'resend_api' ? 'Resend API' : 'SMTP'}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="smtp-username">Username</Label>
-        <Input
-          id="smtp-username"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          placeholder="noreply@salonlyol.ca"
-          autoComplete="off"
-        />
-      </div>
+      {sendMode === 'resend_api' ? (
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="resend-api-key">
+              API key
+              {cfg?.resend_api_key_set && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">(leave blank to keep current)</span>
+              )}
+            </Label>
+            <Input
+              id="resend-api-key"
+              type="password"
+              value={resendApiKey}
+              onChange={e => setResendApiKey(e.target.value)}
+              placeholder={cfg?.resend_api_key_set ? '••••••••' : 're_…'}
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              Get your API key from <strong>resend.com</strong> → API Keys. Make sure your sending domain (<strong>salonlyol.ca</strong>) is verified there.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5 col-span-2 sm:col-span-1">
+              <Label htmlFor="smtp-host">SMTP host</Label>
+              <Input
+                id="smtp-host"
+                value={host}
+                onChange={e => setHost(e.target.value)}
+                placeholder="smtp.gmail.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-port">Port</Label>
+              <Input
+                id="smtp-port"
+                type="number"
+                value={port}
+                onChange={e => setPort(e.target.value)}
+                placeholder="587"
+              />
+            </div>
+          </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="smtp-password">
-          Password / App password
-          {cfg?.smtp_password_set && (
-            <span className="ml-2 text-xs font-normal text-muted-foreground">(leave blank to keep current)</span>
-          )}
-        </Label>
-        <Input
-          id="smtp-password"
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder={cfg?.smtp_password_set ? '••••••••' : 'Required'}
-          autoComplete="new-password"
-        />
-        <p className="text-xs text-muted-foreground">
-          For Google Workspace: use an{' '}
-          <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords).
-          For Resend SMTP: username <code className="bg-muted px-1 rounded">resend</code>, password = your API key.
-        </p>
-      </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="smtp-username">Username</Label>
+            <Input
+              id="smtp-username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="noreply@salonlyol.ca"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="smtp-password">
+              Password / App password
+              {cfg?.smtp_password_set && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">(leave blank to keep current)</span>
+              )}
+            </Label>
+            <Input
+              id="smtp-password"
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder={cfg?.smtp_password_set ? '••••••••' : 'Required'}
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              For Google Workspace: use an <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="use-tls"
+              type="checkbox"
+              checked={useTls}
+              onChange={e => setUseTls(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="use-tls" className="font-normal cursor-pointer">
+              Use STARTTLS (recommended for port 587)
+            </Label>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="from-address">From address</Label>
@@ -900,24 +970,11 @@ function EmailSection() {
           id="from-address"
           value={fromAddress}
           onChange={e => setFromAddress(e.target.value)}
-          placeholder="Salon Lyol <noreply@salonlyol.ca>"
+          placeholder="Salon Lyol <info@salonlyol.ca>"
         />
         <p className="text-xs text-muted-foreground">
           Use the format <code className="bg-muted px-1 rounded">Name &lt;email@domain.com&gt;</code>
         </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          id="use-tls"
-          type="checkbox"
-          checked={useTls}
-          onChange={e => setUseTls(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-        <Label htmlFor="use-tls" className="font-normal cursor-pointer">
-          Use STARTTLS (recommended for port 587)
-        </Label>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -926,7 +983,7 @@ function EmailSection() {
           disabled={saveMutation.isPending}
         >
           <Save size={14} className="mr-1.5" />
-            {saveMutation.isPending ? 'Saving…' : 'Save'}
+          {saveMutation.isPending ? 'Saving…' : 'Save'}
         </Button>
         {saveMsg && (
           <span className={`text-sm ${saveMsg === 'Saved.' ? 'text-green-600' : 'text-destructive'}`}>

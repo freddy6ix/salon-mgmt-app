@@ -39,6 +39,8 @@ export function sendWelcomeEmail(id: string): Promise<void> {
 
 export interface EmailConfig {
   is_configured: boolean
+  send_mode: 'smtp' | 'resend_api'
+  resend_api_key_set: boolean
   smtp_host: string
   smtp_port: number
   smtp_username: string
@@ -52,11 +54,13 @@ export function getEmailConfig(): Promise<EmailConfig> {
 }
 
 export function saveEmailConfig(data: {
-  smtp_host: string
-  smtp_port: number
-  smtp_username: string
+  send_mode: 'smtp' | 'resend_api'
+  resend_api_key?: string
+  smtp_host?: string
+  smtp_port?: number
+  smtp_username?: string
   smtp_password?: string
-  smtp_use_tls: boolean
+  smtp_use_tls?: boolean
   from_address: string
 }): Promise<EmailConfig> {
   return api.put<EmailConfig>('/admin/email-config', data)
