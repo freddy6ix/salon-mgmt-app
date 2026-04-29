@@ -51,7 +51,7 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-export default function CheckoutPanel({ appointment, onClose, onCompleted }: Props) {
+export default function CheckoutPanel({ appointment, date, onClose, onCompleted }: Props) {
   const qc = useQueryClient()
 
   const { data: methods = [], isLoading: methodsLoading } = useQuery({
