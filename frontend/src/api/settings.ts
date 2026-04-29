@@ -64,6 +64,8 @@ export function updateOperatingHours(days: OperatingHoursDay[]): Promise<Operati
 export interface RequestNotifications {
   enabled: boolean
   recipients: string[]
+  reminder_enabled: boolean
+  reminder_lead_hours: number
 }
 
 export function getRequestNotifications(): Promise<RequestNotifications> {
@@ -71,7 +73,7 @@ export function getRequestNotifications(): Promise<RequestNotifications> {
 }
 
 export function updateRequestNotifications(
-  patch: { enabled?: boolean; recipients?: string[] },
+  patch: { enabled?: boolean; recipients?: string[]; reminder_enabled?: boolean; reminder_lead_hours?: number },
 ): Promise<RequestNotifications> {
   return api.patch<RequestNotifications>('/settings/notifications', patch)
 }

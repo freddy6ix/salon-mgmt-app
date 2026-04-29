@@ -366,6 +366,7 @@ export default function SettingsPage() {
           <>
             <EmailSection />
             <RequestNotificationsSection />
+            <RemindersSection />
           </>
         )}
       </div>
@@ -1040,6 +1041,95 @@ function colorIsDark(hex: string): boolean {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
+}
+
+const LEAD_HOUR_OPTIONS = [2, 4, 12, 24, 48, 72]
+
+function RemindersSection() {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['request-notifications'],
+    queryFn: getRequestNotifications,
+  })
+
+  const [enabled, setEnabled] = useState(false)
+  const [leadHours, setLeadHours] = useState(24)
+  const [dirty, setDirty] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.reminder_enabled)
+      setLeadHours(data.reminder_lead_hours)
+      setDirty(false)
+    }
+  }, [data])
+
+  const mutation = useMutation({
+    mutationFn: () => updateRequestNotifications({ reminder_enabled: enabled, reminder_lead_hours: leadHours }),
+    onSuccess: updated => {
+      qc.setQueryData(['request-notifications'], updated)
+      setDirty(false)
+      setError(null)
+      setSavedMsg('Saved.')
+      setTimeout(() => setSavedMsg(null), 3000)
+    },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
+  })
+
+  if (isLoading) return null
+
+  return (
+    <section className="border rounded-lg p-5 space-y-4 bg-white">
+      <div>
+        <h2 className="text-base font-medium">Appointment reminders</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Send clients an email reminder before their appointment. Uses the same outbound email credentials.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => { setEnabled(e.target.checked); setDirty(true) }}
+          className="h-4 w-4"
+        />
+        <span className="text-sm">Send reminder emails to clients</span>
+      </label>
+
+      {enabled && (
+        <div className="space-y-1.5">
+          <Label>Send reminder</Label>
+          <select
+            value={leadHours}
+            onChange={e => { setLeadHours(Number(e.target.value)); setDirty(true) }}
+            className="border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+          >
+            {LEAD_HOUR_OPTIONS.map(h => (
+              <option key={h} value={h}>
+                {h < 24 ? `${h} hours` : `${h / 24} day${h / 24 > 1 ? 's' : ''}`} before
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Reminders are only sent to clients who have an email address on file.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex items-center gap-3">
+        <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
+          <Save size={14} className="mr-1.5" />
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
+        {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
+      </div>
+    </section>
+  )
 }
 
 function RequestNotificationsSection() {

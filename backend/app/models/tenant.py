@@ -26,6 +26,8 @@ class Tenant(Base):
         Boolean, nullable=False, default=True
     )
     request_notification_recipients: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    reminder_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reminder_lead_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     address_line1: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address_line2: Mapped[str | None] = mapped_column(String(255), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)

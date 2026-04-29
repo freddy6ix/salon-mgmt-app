@@ -230,11 +230,15 @@ async def set_operating_hours(
 class RequestNotificationsOut(BaseModel):
     enabled: bool
     recipients: list[str]
+    reminder_enabled: bool
+    reminder_lead_hours: int
 
 
 class RequestNotificationsPatch(BaseModel):
     enabled: bool | None = None
     recipients: list[str] | None = None
+    reminder_enabled: bool | None = None
+    reminder_lead_hours: int | None = None
 
 
 def _split_recipients(raw: str | None) -> list[str]:
@@ -257,6 +261,8 @@ async def get_request_notifications(
     return RequestNotificationsOut(
         enabled=tenant.request_notifications_enabled,
         recipients=_split_recipients(tenant.request_notification_recipients),
+        reminder_enabled=tenant.reminder_enabled,
+        reminder_lead_hours=tenant.reminder_lead_hours,
     )
 
 
@@ -279,9 +285,20 @@ async def update_request_notifications(
                     detail=f"'{r}' doesn't look like an email address",
                 )
         tenant.request_notification_recipients = _join_recipients(body.recipients)
+    if body.reminder_enabled is not None:
+        tenant.reminder_enabled = body.reminder_enabled
+    if body.reminder_lead_hours is not None:
+        if body.reminder_lead_hours < 1:
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="reminder_lead_hours must be at least 1",
+            )
+        tenant.reminder_lead_hours = body.reminder_lead_hours
     await db.commit()
     await db.refresh(tenant)
     return RequestNotificationsOut(
         enabled=tenant.request_notifications_enabled,
         recipients=_split_recipients(tenant.request_notification_recipients),
+        reminder_enabled=tenant.reminder_enabled,
+        reminder_lead_hours=tenant.reminder_lead_hours,
     )

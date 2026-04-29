@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Email — SMTP reset link base URL
     frontend_url: str = "http://localhost:5173"
 
+    # Internal endpoints — shared secret for Cloud Scheduler calls
+    internal_secret: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

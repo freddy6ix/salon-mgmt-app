@@ -28,6 +28,7 @@ from app.models.appointment import (
     ConfirmationStatus,
 )
 from app.models.client import Client
+from app.reminder_dispatcher import cancel_reminders, schedule_reminder
 from app.models.email_config import TenantEmailConfig
 from app.models.provider import Provider
 from app.models.service import Service
@@ -348,6 +349,12 @@ async def create_appointment(
 
     await db.commit()
     await db.refresh(appt)
+
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tid))).scalar_one_or_none()
+    if tenant:
+        await schedule_reminder(appt, tenant, db)
+        await db.commit()
+
     return await _load_appointment_out(appt, db)
 
 
@@ -477,6 +484,9 @@ async def update_appointment_status(
         for item in items:
             if item.status not in (AppointmentItemStatus.cancelled, AppointmentItemStatus.completed):
                 item.status = item_status
+
+    if body.status in (AppointmentStatus.cancelled, AppointmentStatus.no_show):
+        await cancel_reminders(appt.id, db)
 
     await db.commit()
     await db.refresh(appt)

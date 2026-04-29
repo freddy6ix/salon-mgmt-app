@@ -22,7 +22,9 @@ from app.models.appointment import (
 from app.models.client import Client
 from app.models.provider import Provider
 from app.models.service import Service
+from app.models.tenant import Tenant
 from app.models.user import UserRole
+from app.reminder_dispatcher import schedule_reminder
 from app.request_notification import send_request_notification
 
 router = APIRouter(prefix="/appointment-requests", tags=["appointment-requests"])
@@ -412,6 +414,11 @@ async def convert_request(
     req.reviewed_at = datetime.now(timezone.utc)
 
     await db.commit()
+
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))).scalar_one_or_none()
+    if tenant:
+        await schedule_reminder(appt, tenant, db)
+        await db.commit()
 
     return ConvertOut(
         appointment_id=str(appt.id),
