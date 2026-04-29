@@ -14,7 +14,7 @@
     <img src="https://github.com/freddy6ix/salon-mgmt-app/actions/workflows/deploy.yml/badge.svg" alt="Deploy to Staging">
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/phase-2%20in%20progress-blue" alt="Phase 2 in progress">
+  <img src="https://img.shields.io/badge/phase-2%20nearly%20complete-blue" alt="Phase 2 nearly complete">
   &nbsp;
   <img src="https://img.shields.io/badge/deployed-GCP%20Cloud%20Run-4285F4?logo=googlecloud&logoColor=white" alt="Deployed on GCP">
 </p>
@@ -104,10 +104,25 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 
 ### POS & Checkout
 - Checkout panel on any in-progress appointment
+- Group checkout — multiple same-day appointments in a single transaction (common for families)
 - Tenant-configured payment methods (cash, card, e-transfer, and others)
 - Split payment across multiple methods in a single transaction
-- Ontario GST (5%) + PST (8%) tracked per sale
+- Ontario GST (5%) + PST (8%) tracked per sale, with per-item tax flags for retail
 - Cashback flow: tips are returned to the client as change and never touch salon revenue — correct for how the salon actually operates, and required for honest cash reconciliation
+- Tenant-defined promotions — percent or fixed-amount discounts applied per line at checkout
+- Sale summary on completed appointments with payment breakdown
+- Edit completed sale payments (same-day correction with full audit log)
+
+### Retail & Inventory
+- Retail product catalog (SKU, price, cost, tax flags) with full CRUD
+- Retail items available at checkout alongside services
+- Stock ledger: receive, sell, adjust, and return movements per item
+- On-hand count displayed in the catalog; sold at checkout automatically decremented
+- Adjustment flow: staff enters a physical count and the delta is computed and recorded with a reason
+
+### Sales Reporting & Cash Reconciliation
+- Monthly sales report covering revenue, discounts, taxes, and payment-type breakdown (similar to the legacy Milano report)
+- End-of-day cash till: open/close periods, petty cash entries, expected vs. counted variance, 30-day history
 
 ### Client CRM
 - Full client profile: contact details, pronouns, colour formulas, service notes, general notes
@@ -120,6 +135,13 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 - Processing-offset and processing-duration fields drive the grid's gap rendering
 - Gender-free haircut classification (Type 1 / Type 2 / Type 2+) — pricing based on effort and expertise, not client gender
 
+### Notifications & Email
+- Staff-authored appointment confirmation emails with branded layout
+- Appointment reminder emails — configurable lead time (2 h to 3 days), dispatched via Cloud Scheduler
+- New booking request notifications to configurable salon recipients
+- Rich-text WYSIWYG body editor for confirmation emails (Tiptap)
+- Fully branded email layout: salon logo, brand colour, address, and footer on all outbound email
+
 ### Multi-Provider Staff Management
 - Provider types: Stylist, Colourist, Dualist (can deliver both)
 - Default weekly schedules with versioned effective dates — past schedules are locked
@@ -129,8 +151,8 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 ### Settings & Branding
 - Tenant logo, brand colour, address, phone — applied to the app header and all outbound emails
 - Configurable appointment slot granularity and operating hours
-- User management for staff accounts
-- Email settings: new-request notifications with configurable recipients
+- User management: add, edit role, deactivate, and hard-delete staff and guest accounts
+- Email settings: SMTP or Resend API, new-request notifications, appointment reminders
 
 ---
 
@@ -139,11 +161,11 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **1** | Appointment book · Client management · Guest booking · Staff schedules | ✅ Complete |
-| **2** | POS & checkout · Notifications · Sales reporting · Retail catalog · Inventory · Data import | 🔄 In progress |
+| **2** | POS & checkout · Notifications · Sales reporting · Retail catalog · Inventory · Data import | 🔄 Nearly complete |
 | **3** | Multi-tenancy hardening · Beta salon onboarding | Planned |
 | **4** | AI-integrated CRM (email, chat, voice) · Advanced analytics | Planned |
 
-**Phase 2 remaining:** appointment reminders, monthly sales report, end-of-day cash reconciliation, retail catalog, inventory management, tenant-defined promotions, group checkout (multiple appointments → one payment), and bulk data import from Milano.
+**Phase 2 remaining:** bulk data import from Milano (clients, appointments, services, staff).
 
 ---
 
