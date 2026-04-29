@@ -14,6 +14,23 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Null FK references that point back to the requests being deleted
+    op.execute("""
+        UPDATE appointments
+        SET request_id = NULL
+        WHERE request_id IN (
+            SELECT id FROM appointment_requests
+            WHERE status IN ('reviewed', 'converted', 'declined')
+        )
+    """)
+    # Delete child items first (FK to appointment_requests.id)
+    op.execute("""
+        DELETE FROM appointment_request_items
+        WHERE request_id IN (
+            SELECT id FROM appointment_requests
+            WHERE status IN ('reviewed', 'converted', 'declined')
+        )
+    """)
     op.execute("""
         DELETE FROM appointment_requests
         WHERE status IN ('reviewed', 'converted', 'declined')
