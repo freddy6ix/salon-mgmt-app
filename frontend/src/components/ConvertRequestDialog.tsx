@@ -115,7 +115,20 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
   }, [clientQuery])
 
   function updateItem(idx: number, patch: Partial<ItemFormState>) {
-    setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
+    setItems(prev => {
+      const next = prev.map((it, i) => i === idx ? { ...it, ...patch } : it)
+      // Cascade start times for all subsequent items when time or duration changes
+      if ('startTime' in patch || 'durationMinutes' in patch) {
+        for (let i = idx; i < next.length - 1; i++) {
+          const [h, m] = next[i].startTime.split(':').map(Number)
+          const endMins = h * 60 + m + next[i].durationMinutes
+          const nh = Math.floor(endMins / 60)
+          const nm = endMins % 60
+          next[i + 1] = { ...next[i + 1], startTime: `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}` }
+        }
+      }
+      return next
+    })
   }
 
   function handleServiceChange(idx: number, serviceId: string) {
