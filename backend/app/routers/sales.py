@@ -6,6 +6,7 @@ GET  /sales/by-appointment/{appt_id}     — get the completed Sale for an appoi
 
 See docs/specs/P2-1-checkout-payment.md for the rule list and acceptance tests.
 """
+import json
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -13,7 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -24,7 +25,7 @@ from app.models.email_config import TenantEmailConfig
 from app.models.payment_method import TenantPaymentMethod
 from app.models.promotion import TenantPromotion
 from app.models.retail import RetailItem
-from app.models.sale import Payment, Sale, SaleItem, SaleItemKind, SaleStatus
+from app.models.sale import Payment, Sale, SaleItem, SaleItemKind, SalePaymentEdit, SaleStatus
 from app.models.service import Service
 from app.models.tenant import Tenant
 
@@ -102,6 +103,7 @@ class SaleOut(BaseModel):
     status: str
     completed_at: datetime | None
     notes: str | None
+    is_editable: bool
     items: list[SaleItemOut]
     payments: list[PaymentOut]
 
@@ -126,6 +128,11 @@ def _serialize(
         status=sale.status.value,
         completed_at=sale.completed_at,
         notes=sale.notes,
+        is_editable=(
+            sale.status == SaleStatus.completed
+            and sale.completed_at is not None
+            and sale.completed_at.date() == datetime.now(timezone.utc).date()
+        ),
         items=[
             SaleItemOut(
                 id=str(it.id),
@@ -549,3 +556,121 @@ async def send_receipt(
         await send_email(smtp, body.to, f"Your receipt from {tenant.name}", html)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ── PATCH /sales/{sale_id}/payments ──────────────────────────────────────────
+
+class EditPaymentIn(BaseModel):
+    payment_method_id: str
+    amount: Decimal
+    cashback_amount: Decimal = Decimal("0")
+
+
+class EditPaymentsIn(BaseModel):
+    payments: list[EditPaymentIn] = Field(min_length=1)
+
+
+@router.patch("/{sale_id}/payments", response_model=SaleOut)
+async def edit_sale_payments(
+    sale_id: str,
+    body: EditPaymentsIn,
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SaleOut:
+    tid = current_user.tenant_id
+
+    sale = (
+        await db.execute(
+            select(Sale).where(Sale.id == uuid.UUID(sale_id), Sale.tenant_id == tid)
+        )
+    ).scalar_one_or_none()
+    if sale is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+    if sale.status != SaleStatus.completed:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Only completed sales can have their payments edited")
+    if sale.completed_at is None or sale.completed_at.date() != datetime.now(timezone.utc).date():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Payments can only be edited on the day the sale was completed")
+
+    # Validate payment methods belong to this tenant
+    method_ids = [uuid.UUID(p.payment_method_id) for p in body.payments]
+    methods = (
+        await db.execute(
+            select(TenantPaymentMethod).where(
+                TenantPaymentMethod.id.in_(method_ids),
+                TenantPaymentMethod.tenant_id == tid,
+            )
+        )
+    ).scalars().all()
+    if len(methods) != len(set(method_ids)):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="One or more payment methods are invalid")
+    methods_by_id = {m.id: m for m in methods}
+
+    # Validate amounts
+    for p in body.payments:
+        if p.cashback_amount < 0:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail="cashback_amount must be ≥ 0")
+        if p.cashback_amount > p.amount:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail="cashback_amount cannot exceed payment amount")
+
+    applied = _money(sum(p.amount - p.cashback_amount for p in body.payments))
+    if applied != sale.total:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Payments after cashback ({applied}) must equal sale total ({sale.total})")
+
+    # Snapshot existing payments for audit log
+    existing_payments = (
+        await db.execute(select(Payment).where(Payment.sale_id == sale.id))
+    ).scalars().all()
+    before_json = json.dumps([
+        {"payment_method_id": str(p.payment_method_id),
+         "amount": str(p.amount),
+         "cashback_amount": str(p.cashback_amount)}
+        for p in existing_payments
+    ])
+
+    # Replace payment rows atomically
+    await db.execute(delete(Payment).where(Payment.sale_id == sale.id))
+    new_payments = [
+        Payment(
+            tenant_id=tid,
+            sale_id=sale.id,
+            payment_method_id=uuid.UUID(p.payment_method_id),
+            amount=_money(p.amount),
+            cashback_amount=_money(p.cashback_amount),
+        )
+        for p in body.payments
+    ]
+    db.add_all(new_payments)
+
+    after_json = json.dumps([
+        {"payment_method_id": str(p.payment_method_id),
+         "amount": str(p.amount),
+         "cashback_amount": str(p.cashback_amount)}
+        for p in body.payments
+    ])
+
+    db.add(SalePaymentEdit(
+        tenant_id=tid,
+        sale_id=sale.id,
+        edited_by_user_id=current_user.id,
+        edited_at=datetime.now(timezone.utc),
+        before_json=before_json,
+        after_json=after_json,
+    ))
+
+    await db.commit()
+    await db.refresh(sale)
+
+    items = (
+        await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id).order_by(SaleItem.sequence))
+    ).scalars().all()
+    refreshed_payments = (
+        await db.execute(select(Payment).where(Payment.sale_id == sale.id))
+    ).scalars().all()
+
+    return _serialize(sale, list(items), list(refreshed_payments), methods_by_id)

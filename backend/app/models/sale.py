@@ -92,3 +92,17 @@ class Payment(TenantScopedBase):
     cashback_amount: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, default=Decimal("0")
     )
+
+
+class SalePaymentEdit(TenantScopedBase):
+    __tablename__ = "sale_payment_edits"
+
+    sale_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sales.id"), nullable=False, index=True
+    )
+    edited_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    edited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    before_json: Mapped[str] = mapped_column(Text, nullable=False)
+    after_json: Mapped[str] = mapped_column(Text, nullable=False)

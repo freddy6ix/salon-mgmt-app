@@ -31,6 +31,7 @@ export interface Sale {
   status: 'pending' | 'completed'
   completed_at: string | null
   notes: string | null
+  is_editable: boolean
   items: SaleItem[]
   payments: SalePayment[]
 }
@@ -68,4 +69,11 @@ export function sendReceipt(saleId: string, to: string): Promise<void> {
 
 export function getSaleByAppointment(appointmentId: string): Promise<Sale> {
   return api.get<Sale>(`/sales/by-appointment/${appointmentId}`)
+}
+
+export function editSalePayments(
+  saleId: string,
+  payments: { payment_method_id: string; amount: string; cashback_amount: string }[],
+): Promise<Sale> {
+  return api.patch<Sale>(`/sales/${saleId}/payments`, { payments })
 }
