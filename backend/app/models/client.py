@@ -39,7 +39,7 @@ class Client(TenantScopedBase):
         UUID(as_uuid=True), ForeignKey("clients.id"), nullable=True
     )
     client_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    milano_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    legacy_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     pronouns: Mapped[str | None] = mapped_column(String(50), nullable=True)

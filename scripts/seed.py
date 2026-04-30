@@ -90,52 +90,52 @@ async def seed():
 
         # ── Providers ────────────────────────────────────────────────────────
         provider_data = [
-            dict(first_name="Jini", last_name="Jung", display_name="JJ", milano_code="JJ",
+            dict(first_name="Jini", last_name="Jung", display_name="JJ", provider_code="JJ",
                  provider_type=ProviderType.dualist, is_owner=True, booking_order=1,
                  has_appointments=True, makes_appointments=True, can_be_cashier=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Antonella", last_name="Cumbo", display_name="Antonella", milano_code="ANTONELLA",
+            dict(first_name="Antonella", last_name="Cumbo", display_name="Antonella", provider_code="ANTONELLA",
                  provider_type=ProviderType.dualist, booking_order=2,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Ryan", last_name="", display_name="Ryan", milano_code="RYAN",
+            dict(first_name="Ryan", last_name="", display_name="Ryan", provider_code="RYAN",
                  provider_type=ProviderType.dualist, booking_order=9,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Gumi", last_name="", display_name="Gumi", milano_code="GUMI",
+            dict(first_name="Gumi", last_name="", display_name="Gumi", provider_code="GUMI",
                  provider_type=ProviderType.dualist, booking_order=10,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Sarah", last_name="", display_name="Sarah", milano_code="SARAH",
+            dict(first_name="Sarah", last_name="", display_name="Sarah", provider_code="SARAH",
                  provider_type=ProviderType.dualist, booking_order=3,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="COLOUR"),
-            dict(first_name="Joanne", last_name="", display_name="Joanne", milano_code="JOANNE",
+            dict(first_name="Joanne", last_name="", display_name="Joanne", provider_code="JOANNE",
                  provider_type=ProviderType.colourist, booking_order=4,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="COLOUR"),
-            dict(first_name="Becky", last_name="", display_name="Becky", milano_code="BECKY",
+            dict(first_name="Becky", last_name="", display_name="Becky", provider_code="BECKY",
                  provider_type=ProviderType.stylist, booking_order=5,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Olga", last_name="", display_name="Olga", milano_code="OLGA",
+            dict(first_name="Olga", last_name="", display_name="Olga", provider_code="OLGA",
                  provider_type=ProviderType.dualist, booking_order=6,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="STYLING"),
-            dict(first_name="Mayumi", last_name="", display_name="Mayumi", milano_code="MAYUMI",
+            dict(first_name="Mayumi", last_name="", display_name="Mayumi", provider_code="MAYUMI",
                  provider_type=ProviderType.dualist, booking_order=7,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
                  department_code="COLOUR"),
-            dict(first_name="Asami", last_name="", display_name="Asami", milano_code="ASAMI",
+            dict(first_name="Asami", last_name="", display_name="Asami", provider_code="ASAMI",
                  provider_type=ProviderType.stylist, booking_order=8,
                  has_appointments=True, makes_appointments=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
@@ -145,7 +145,7 @@ async def seed():
         for p in provider_data:
             dept_code = p.pop("department_code")
             existing = await db.execute(
-                select(Provider).where(Provider.tenant_id == tid, Provider.milano_code == p["milano_code"])
+                select(Provider).where(Provider.tenant_id == tid, Provider.provider_code == p["provider_code"])
             )
             provider = existing.scalar_one_or_none()
             if provider is None:
@@ -158,7 +158,7 @@ async def seed():
                 await db.flush()
             else:
                 provider.provider_type = p["provider_type"]
-            providers[p["milano_code"]] = provider
+            providers[p["provider_code"]] = provider
         print(f"Providers: {list(providers.keys())}")
 
         # ── Service Categories ───────────────────────────────────────────────
@@ -302,8 +302,8 @@ async def seed():
             "BECKY":     {dow: OFF for dow in range(7)},
         }
 
-        for milano_code, schedule in PROVIDER_SCHEDULES.items():
-            provider = providers.get(milano_code)
+        for provider_code, schedule in PROVIDER_SCHEDULES.items():
+            provider = providers.get(provider_code)
             if provider is None:
                 continue
             # Delete and recreate so re-runs apply updated schedules
@@ -519,11 +519,11 @@ async def seed():
             )
 
         psp_count = 0
-        for milano_code, svc_code, price in PSP_DATA:
-            prov = providers.get(milano_code)
+        for provider_code, svc_code, price in PSP_DATA:
+            prov = providers.get(provider_code)
             svc  = services.get(svc_code)
             if prov is None or svc is None:
-                print(f"  WARN: skipping PSP ({milano_code}, {svc_code}) — not found")
+                print(f"  WARN: skipping PSP ({provider_code}, {svc_code}) — not found")
                 continue
             existing_psp = (
                 await db.execute(

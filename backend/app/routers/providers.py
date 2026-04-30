@@ -34,7 +34,7 @@ class ProviderDetail(BaseModel):
     first_name: str
     last_name: str
     display_name: str
-    milano_code: str | None
+    provider_code: str | None
     provider_type: str
     job_title: str | None
     is_owner: bool
@@ -105,7 +105,7 @@ def _detail(p: Provider) -> ProviderDetail:
         first_name=p.first_name,
         last_name=p.last_name,
         display_name=p.display_name,
-        milano_code=p.milano_code,
+        provider_code=p.provider_code,
         provider_type=p.provider_type.value,
         job_title=p.job_title,
         is_owner=p.is_owner,
@@ -523,7 +523,7 @@ class ProviderCreate(BaseModel):
     display_name: str
     provider_type: str
     job_title: str | None = None
-    milano_code: str | None = None
+    provider_code: str | None = None
     is_owner: bool = False
     booking_order: int = 0
     has_appointments: bool = True
@@ -604,7 +604,7 @@ async def create_provider(
         first_name=body.first_name,
         last_name=body.last_name,
         display_name=body.display_name,
-        milano_code=body.milano_code,
+        provider_code=body.provider_code,
         provider_type=provider_type,
         job_title=body.job_title,
         is_owner=body.is_owner,
@@ -662,7 +662,7 @@ class ProviderUpdate(BaseModel):
     display_name: str | None = None
     provider_type: str | None = None
     job_title: str | None = None
-    milano_code: str | None = None
+    provider_code: str | None = None
     is_owner: bool | None = None
     is_active: bool | None = None
     booking_order: int | None = None
@@ -738,8 +738,8 @@ async def update_provider(
             raise HTTPException(status_code=400, detail="Invalid provider_type")
     if body.job_title is not None:
         p.job_title = body.job_title
-    if body.milano_code is not None:
-        p.milano_code = body.milano_code
+    if body.provider_code is not None:
+        p.provider_code = body.provider_code
     if body.is_owner is not None:
         p.is_owner = body.is_owner
     if body.is_active is not None:

@@ -231,7 +231,7 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
     display_name: provider.display_name,
     provider_type: provider.provider_type,
     job_title: provider.job_title ?? '',
-    milano_code: provider.milano_code ?? '',
+    provider_code: provider.provider_code ?? '',
     is_owner: provider.is_owner,
     is_active: provider.is_active,
     booking_order: provider.booking_order,
@@ -263,7 +263,7 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
     mutationFn: () => updateProvider(provider.id, {
       ...form,
       job_title: form.job_title || null,
-      milano_code: form.milano_code || null,
+      provider_code: form.provider_code || null,
       sex: form.sex || null,
       personal_email: form.personal_email || null,
       cell_phone: form.cell_phone || null,
@@ -303,7 +303,7 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
           <option value="dualist">Dualist</option>
         </select>
       ))}
-      {fieldRow('Milano code', <Input value={form.milano_code} onChange={e => set('milano_code', e.target.value)} placeholder="e.g. GUMI" />)}
+      {fieldRow('Provider code', <Input value={form.provider_code} onChange={e => set('provider_code', e.target.value)} placeholder="e.g. GUMI" />)}
       {fieldRow('Login account', (
         <div className="space-y-1">
           <select

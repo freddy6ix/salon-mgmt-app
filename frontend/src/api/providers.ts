@@ -15,7 +15,7 @@ export interface ProviderDetail {
   first_name: string
   last_name: string
   display_name: string
-  milano_code: string | null
+  provider_code: string | null
   provider_type: 'stylist' | 'colourist' | 'dualist'
   job_title: string | null
   is_owner: boolean
@@ -78,7 +78,7 @@ export interface ProviderCreatePayload {
   display_name: string
   provider_type: string
   job_title?: string | null
-  milano_code?: string | null
+  provider_code?: string | null
   is_owner?: boolean
   booking_order?: number
   has_appointments?: boolean

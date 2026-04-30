@@ -44,7 +44,7 @@ class Provider(TenantScopedBase):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    milano_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    provider_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     provider_type: Mapped[ProviderType] = mapped_column(Enum(ProviderType), nullable=False)
     is_owner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
