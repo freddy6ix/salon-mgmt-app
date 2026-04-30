@@ -189,9 +189,13 @@ async def _ensure_house_provider(
     await db.execute(
         text(
             "INSERT INTO providers (id, tenant_id, first_name, last_name, display_name,"
-            " provider_type, is_owner, is_active, created_at, updated_at)"
+            " provider_type, is_owner, is_active,"
+            " can_be_cashier, makes_appointments, has_appointments, booking_order,"
+            " created_at, updated_at)"
             " VALUES (:id, :tid, 'House', 'Account', 'HOUSE',"
-            " 'stylist', false, false, NOW(), NOW())"
+            " 'stylist', false, false,"
+            " false, false, false, 99,"
+            " NOW(), NOW())"
         ),
         {"id": new_id, "tid": tenant_id},
     )
