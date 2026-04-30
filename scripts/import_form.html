@@ -3,52 +3,65 @@
 <head>
   <title>Legacy Data Import</title>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    body { font-family: sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; }
     label { display: block; margin-top: 16px; font-weight: bold; }
-    input[type=file] { margin-top: 6px; }
-    input[type=text] { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
-    button { margin-top: 24px; padding: 10px 24px; font-size: 16px; cursor: pointer; }
-    pre { background: #f4f4f4; padding: 16px; white-space: pre-wrap; word-break: break-all; margin-top: 24px; }
-    .note { color: #666; font-size: 13px; margin-top: 4px; }
+    input[type=file] { margin-top: 6px; display: block; }
+    input[type=text] { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; font-family: monospace; }
+    button { margin-top: 24px; padding: 10px 28px; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre { background: #f4f4f4; padding: 16px; white-space: pre-wrap; word-break: break-all; margin-top: 24px; border-radius: 4px; }
+    .note { color: #888; font-size: 13px; margin-top: 4px; }
+    .running { color: #c07000; }
+    .done { color: #007700; }
+    .err { color: #cc0000; }
   </style>
 </head>
 <body>
   <h2>Legacy Data Import</h2>
-  <p>Upload the CSV files exported from the legacy system. Safe to run multiple times.</p>
+  <p>Uploads the three CSV files and runs the full import in one request. Safe to re-run.</p>
 
   <label>API Base URL</label>
-  <input type="text" id="apiUrl" value="https://salon-api-XXXX.run.app" />
-  <p class="note">Replace with your actual Cloud Run API URL (no trailing slash)</p>
+  <input type="text" id="apiUrl" placeholder="https://salon-api-xxxx-uc.a.run.app" />
 
-  <label>JWT Token (from browser dev tools → Application → Local Storage → token)</label>
-  <input type="text" id="token" placeholder="eyJ..." />
+  <label>JWT Token</label>
+  <input type="text" id="token" placeholder="eyJ…" />
+  <p class="note">Log in to the app as Jini → open browser DevTools → Application → Local Storage → copy the <code>token</code> value.</p>
 
-  <label>Client Details.txt <span style="font-weight:normal">(required)</span></label>
+  <label>Client Details.txt</label>
   <input type="file" id="clientsFile" accept=".txt,.csv" />
 
-  <label>All Bookings.txt <span style="font-weight:normal">(optional — run after clients)</span></label>
+  <label>Future and Past Bookings.txt</label>
   <input type="file" id="bookingsFile" accept=".txt,.csv" />
 
-  <button onclick="runImport()">Run Import</button>
+  <label>Receipt Transactions.txt</label>
+  <input type="file" id="receiptsFile" accept=".txt,.csv" />
+
+  <button id="btn" onclick="runImport()">Run Import</button>
 
   <pre id="output">Results will appear here…</pre>
 
   <script>
     async function runImport() {
-      const apiUrl = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
-      const token = document.getElementById('token').value.trim();
-      const clientsFile = document.getElementById('clientsFile').files[0];
-      const bookingsFile = document.getElementById('bookingsFile').files[0];
-      const output = document.getElementById('output');
+      const apiUrl  = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+      const token   = document.getElementById('token').value.trim();
+      const clients = document.getElementById('clientsFile').files[0];
+      const bookings= document.getElementById('bookingsFile').files[0];
+      const receipts= document.getElementById('receiptsFile').files[0];
+      const output  = document.getElementById('output');
+      const btn     = document.getElementById('btn');
 
-      if (!clientsFile) { alert('Client Details.txt is required'); return; }
-      if (!token) { alert('JWT token is required'); return; }
+      if (!clients || !bookings || !receipts) { alert('All three files are required'); return; }
+      if (!token)   { alert('JWT token is required'); return; }
+      if (!apiUrl)  { alert('API URL is required'); return; }
 
-      output.textContent = 'Running…';
+      btn.disabled = true;
+      output.className = 'running';
+      output.textContent = 'Running… (this takes 2–5 minutes, please wait)';
 
       const form = new FormData();
-      form.append('clients_csv', clientsFile);
-      if (bookingsFile) form.append('bookings_csv', bookingsFile);
+      form.append('clients_csv', clients);
+      form.append('all_bookings_csv', bookings);
+      form.append('receipts_csv', receipts);
 
       try {
         const resp = await fetch(`${apiUrl}/admin/import-legacy`, {
@@ -57,9 +70,13 @@
           body: form,
         });
         const data = await resp.json();
+        output.className = resp.ok ? 'done' : 'err';
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
+        output.className = 'err';
         output.textContent = 'Error: ' + e.message;
+      } finally {
+        btn.disabled = false;
       }
     }
   </script>

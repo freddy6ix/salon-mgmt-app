@@ -13,7 +13,7 @@ from app.auth import hash_password
 from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
-from app.legacy_import import import_clients, import_bookings
+from app.legacy_import import import_clients, import_bookings, import_receipts, import_past_unreceipted_bookings
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentRequest, AppointmentStatus
 from app.models.client import Client
@@ -569,21 +569,25 @@ async def save_payroll_config(
 @router.post("/import-legacy")
 async def import_legacy_data(
     clients_csv: UploadFile,
+    all_bookings_csv: UploadFile,
+    receipts_csv: UploadFile,
     current_user: AdminUser,
     db: AsyncSession = Depends(get_db),
-    bookings_csv: UploadFile | None = None,
 ) -> dict:
     """
-    One-time import of legacy CSV data. Safe to run multiple times.
-    Upload Client Details.txt as clients_csv and All Bookings.txt as bookings_csv.
+    Full one-time import of legacy CSV data. Safe to run multiple times.
+      clients_csv      → Client Details.txt
+      all_bookings_csv → Future and Past Bookings.txt
+      receipts_csv     → Receipt Transactions.txt
+    Order: clients → receipts (completed appts) → past unreceipted → future bookings.
     """
-    result: dict = {}
-
     clients_content = await clients_csv.read()
-    result["clients"] = await import_clients(db, current_user.tenant_id, clients_content)
+    bookings_content = await all_bookings_csv.read()
+    receipts_content = await receipts_csv.read()
 
-    if bookings_csv is not None:
-        bookings_content = await bookings_csv.read()
-        result["bookings"] = await import_bookings(db, current_user.tenant_id, bookings_content)
-
+    result: dict = {}
+    result["clients"]  = await import_clients(db, current_user.tenant_id, clients_content)
+    result["receipts"] = await import_receipts(db, current_user.tenant_id, receipts_content, bookings_content)
+    result["past_unreceipted"] = await import_past_unreceipted_bookings(db, current_user.tenant_id, bookings_content)
+    result["future_bookings"]  = await import_bookings(db, current_user.tenant_id, bookings_content, future_only=True)
     return result

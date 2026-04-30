@@ -77,6 +77,7 @@ jobs:
             --image ${{ env.REGISTRY }}/salon-api:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
             --set-cloudsql-instances ${{ vars.CLOUD_SQL_INSTANCE }} \
+            --timeout 900 \
             $ENV_FLAG \
             --quiet
 
