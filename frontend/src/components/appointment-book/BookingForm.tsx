@@ -262,19 +262,16 @@ export default function BookingForm({
                       </button>
                     </li>
                   ))}
-                  <li>
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-muted/40"
-                      onClick={() => { setShowNewClient(true); setNewFirst(clientQuery); setClientQuery('') }}
-                    >
-                      + New client "{clientQuery}"
-                    </button>
-                  </li>
                 </ul>
               )
             )}
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {!selectedClient && !showNewClient && (
+                <Button variant="outline" onClick={() => { setShowNewClient(true); setNewFirst(clientQuery); setClientQuery('') }}>
+                  + New client
+                </Button>
+              )}
               <Button disabled={!selectedClient} onClick={() => setStep('items')}>
                 Next →
               </Button>
