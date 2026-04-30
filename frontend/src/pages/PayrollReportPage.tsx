@@ -371,7 +371,7 @@ export default function PayrollReportPage() {
               {staff.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Staff</p>
-                  <ReviewTable lines={data?.lines.map(toEditable) ?? []} editable={staff} onChange={updateLine} />
+                  <ReviewTable editable={staff} onChange={updateLine} />
                 </div>
               )}
             </div>
