@@ -10,8 +10,8 @@ if [ "${RUN_SEED:-false}" = "true" ]; then
 fi
 
 if [ "${RUN_IMPORT:-false}" = "true" ]; then
-  echo "Running legacy data import..."
-  PYTHONPATH=/app python scripts/run_import.py || echo "WARNING: import exited with errors (non-fatal)"
+  echo "Running legacy data import in background (check logs for [import] lines)..."
+  PYTHONPATH=/app python scripts/run_import.py &
 fi
 
 echo "Starting server..."

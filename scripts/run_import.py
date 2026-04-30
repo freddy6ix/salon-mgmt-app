@@ -42,14 +42,15 @@ async def main() -> None:
             print(f"[import] Tenant '{TENANT_SLUG}' not found — skipping", flush=True)
             return
 
-        # Fast-path: skip if already imported
+        # Fast-path: skip if a full import has already completed (> 5000 clients
+        # with legacy_id means the client step finished successfully).
         already = (await db.execute(
             select(func.count()).select_from(Client).where(
                 Client.tenant_id == tenant.id,
                 Client.legacy_id.isnot(None),
             )
         )).scalar()
-        if already:
+        if already > 5000:
             print(f"[import] {already} clients already imported — skipping", flush=True)
             return
 

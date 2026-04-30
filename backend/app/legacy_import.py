@@ -232,7 +232,19 @@ async def import_clients(
 ) -> dict:
     rows = _read_csv(content)
     provider_map = await _load_providers(db, tenant_id)
-    created = updated = skipped = 0
+
+    # Load all existing legacy_ids in one query
+    existing_ids: dict[str, uuid.UUID] = {
+        r.legacy_id: r.id
+        for r in (await db.execute(
+            text("SELECT id, legacy_id FROM clients WHERE tenant_id = :tid AND legacy_id IS NOT NULL"),
+            {"tid": tenant_id},
+        )).fetchall()
+    }
+
+    to_insert = []
+    to_update = []
+    skipped = 0
 
     for row in rows:
         code = (row.get("Code") or "").strip().lstrip("|")
@@ -240,48 +252,48 @@ async def import_clients(
         if not code or not name:
             skipped += 1
             continue
-
         first_name, last_name = _parse_name(name)
         email = _clean_email(row.get("Email") or "")
         cell = _clean_phone(row.get("Cell Phone") or "")
         staff = (row.get("Staff") or "").strip().upper()
         preferred_provider_id = provider_map.get(staff) if staff else None
-
-        existing = (await db.execute(
-            text("SELECT id FROM clients WHERE tenant_id = :tid AND legacy_id = :code"),
-            {"tid": tenant_id, "code": code},
-        )).fetchone()
-
-        if existing:
-            await db.execute(
-                text(
-                    "UPDATE clients SET first_name = :fn, last_name = :ln, email = :email,"
-                    " cell_phone = :cell, preferred_provider_id = :ppid, updated_at = NOW()"
-                    " WHERE id = :id AND tenant_id = :tid"
-                ),
-                {"fn": first_name, "ln": last_name, "email": email,
-                 "cell": cell, "ppid": preferred_provider_id,
-                 "id": existing.id, "tid": tenant_id},
-            )
-            updated += 1
+        params = {"fn": first_name, "ln": last_name, "email": email,
+                  "cell": cell, "ppid": preferred_provider_id}
+        if code in existing_ids:
+            to_update.append({**params, "id": existing_ids[code], "tid": tenant_id})
         else:
-            await db.execute(
-                text(
-                    "INSERT INTO clients (id, tenant_id, client_code, legacy_id,"
-                    " first_name, last_name, email, cell_phone, preferred_provider_id,"
-                    " country, is_active, no_show_count, late_cancellation_count,"
-                    " account_balance, created_at, updated_at)"
-                    " VALUES (:id, :tid, :code, :code, :fn, :ln, :email, :cell, :ppid,"
-                    " 'CA', true, 0, 0, 0, NOW(), NOW())"
-                ),
-                {"id": uuid.uuid4(), "tid": tenant_id, "code": code,
-                 "fn": first_name, "ln": last_name, "email": email,
-                 "cell": cell, "ppid": preferred_provider_id},
-            )
-            created += 1
+            to_insert.append({**params, "id": uuid.uuid4(), "tid": tenant_id, "code": code})
+
+    # Batch insert in chunks of 500
+    CHUNK = 500
+    for i in range(0, len(to_insert), CHUNK):
+        chunk = to_insert[i:i + CHUNK]
+        await db.execute(
+            text(
+                "INSERT INTO clients (id, tenant_id, client_code, legacy_id,"
+                " first_name, last_name, email, cell_phone, preferred_provider_id,"
+                " country, is_active, no_show_count, late_cancellation_count,"
+                " account_balance, created_at, updated_at)"
+                " VALUES (:id, :tid, :code, :code, :fn, :ln, :email, :cell, :ppid,"
+                " 'CA', true, 0, 0, 0, NOW(), NOW())"
+            ),
+            chunk,
+        )
+
+    # Batch update
+    for i in range(0, len(to_update), CHUNK):
+        chunk = to_update[i:i + CHUNK]
+        await db.execute(
+            text(
+                "UPDATE clients SET first_name = :fn, last_name = :ln, email = :email,"
+                " cell_phone = :cell, preferred_provider_id = :ppid, updated_at = NOW()"
+                " WHERE id = :id AND tenant_id = :tid"
+            ),
+            chunk,
+        )
 
     await db.commit()
-    return {"created": created, "updated": updated, "skipped": skipped}
+    return {"created": len(to_insert), "updated": len(to_update), "skipped": skipped}
 
 
 # ---------------------------------------------------------------------------
