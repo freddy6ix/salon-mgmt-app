@@ -551,3 +551,8 @@ When onboarding a staff member (or owner), provide an "Annual salary" pay type o
 - Payroll report line: formatted as `Salary $X,XXX.XX` (no hours, no commission, no vacation pay unless vacation_pct > 0).
 - Compensation tab in Staff Management: selecting "Annual salary" shows an "Annual amount ($)" input and a read-only "Per period ($)" display.
 - Owner providers default vacation_pct = 0 when this pay type is selected (configurable).
+
+
+### Docs · Update README with appointment book screenshots
+
+Retake the appointment book screenshots to show the new sub-slot gridlines, gutter time labels at each granularity increment, and the Time Slot Indicator highlight. Replace the current screenshots in the GitHub README.
