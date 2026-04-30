@@ -511,15 +511,22 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
         />
         <div style={{ height: HEADER_HEIGHT }} />
         <div className="relative" style={{ height: TOTAL_HEIGHT }}>
-          {timeLabels.map(({ label, topPx, isHour }) => (
-            <span
-              key={topPx}
-              className={`absolute right-2 -translate-y-1/2 ${isHour ? 'text-xs text-muted-foreground' : 'text-[10px] text-muted-foreground/50'}`}
-              style={{ top: topPx }}
-            >
-              {label}
-            </span>
-          ))}
+          {timeLabels.map(({ label, topPx, isHour }) => {
+            const isTsi = tsi?.slotTopPx === topPx
+            return (
+              <span
+                key={topPx}
+                className={`absolute right-2 -translate-y-1/2 ${
+                  isTsi
+                    ? 'text-blue-600 font-semibold ' + (isHour ? 'text-xs' : 'text-[10px]')
+                    : isHour ? 'text-xs text-muted-foreground' : 'text-[10px] text-muted-foreground/50'
+                }`}
+                style={{ top: topPx }}
+              >
+                {label}
+              </span>
+            )
+          })}
         </div>
       </div>
 
