@@ -119,6 +119,8 @@ export interface ProviderCreatePayload {
   td1_provincial_credit?: number | null
   user_id?: string | null
   sin?: string | null
+  provider_photo_url?: string | null
+  is_active?: boolean
 }
 
 export type ProviderUpdatePayload = Partial<ProviderCreatePayload>

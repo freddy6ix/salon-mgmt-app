@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { format, addDays } from 'date-fns'
 import { Send, Printer, ClipboardCopy, RefreshCw } from 'lucide-react'
 import { getPayrollReport, sendPayrollEmail, type ProviderPayrollLine } from '@/api/providers'
-import { getPayrollConfig, getEmailConfig } from '@/api/admin'
+import { getPayrollConfig } from '@/api/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -122,11 +122,9 @@ function buildEmailBody(opts: {
 // ── Review table ──────────────────────────────────────────────────────────────
 
 function ReviewTable({
-  lines,
   editable,
   onChange,
 }: {
-  lines: EditableLine[]
   editable: EditableLine[]
   onChange: (id: string, patch: Partial<EditableLine>) => void
 }) {
@@ -146,7 +144,6 @@ function ReviewTable({
         </thead>
         <tbody>
           {editable.map((el) => {
-            const orig = lines.find(l => l.provider_id === el.provider_id)
             const gross = el.is_owner
               ? el.service_commission
               : el.pay_basis === 'hourly' && el.hourly_minimum
@@ -229,7 +226,6 @@ export default function PayrollReportPage() {
   const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const { data: payrollCfg } = useQuery({ queryKey: ['payroll-config'], queryFn: getPayrollConfig })
-  const { data: emailCfg } = useQuery({ queryKey: ['email-config'], queryFn: getEmailConfig })
 
   useEffect(() => {
     if (!settingsLoaded && payrollCfg) {
@@ -369,7 +365,7 @@ export default function PayrollReportPage() {
               {owners.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Owner</p>
-                  <ReviewTable lines={data?.lines.map(toEditable) ?? []} editable={owners} onChange={updateLine} />
+                  <ReviewTable editable={owners} onChange={updateLine} />
                 </div>
               )}
               {staff.length > 0 && (
