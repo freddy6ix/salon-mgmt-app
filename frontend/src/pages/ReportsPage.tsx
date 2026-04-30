@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format, addMonths, subMonths } from 'date-fns'
+import { format, addMonths, subMonths, endOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { getMonthlyReport } from '@/api/reports'
+import { getPayrollReport } from '@/api/providers'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
-function fmt(s: string): string {
-  const n = parseFloat(s)
+function fmt(s: string | number): string {
+  const n = typeof s === 'number' ? s : parseFloat(s)
   return Number.isFinite(n) ? n.toFixed(2) : '0.00'
 }
 
@@ -32,11 +33,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function TableRow({ label, value, sub, bold }: { label: string; value: string; sub?: string; bold?: boolean }) {
+function Row({
+  label, value, indent, bold, negative, sub,
+}: {
+  label: string; value: string; indent?: boolean; bold?: boolean; negative?: boolean; sub?: string
+}) {
   return (
     <div className={`flex justify-between items-baseline px-4 py-2 border-b last:border-0 text-sm ${bold ? 'font-semibold' : ''}`}>
-      <span className={bold ? '' : 'text-muted-foreground'}>{label}{sub && <span className="ml-2 text-xs font-normal text-muted-foreground">{sub}</span>}</span>
-      <span className="tabular-nums">${value}</span>
+      <span className={`${bold ? '' : 'text-muted-foreground'} ${indent ? 'pl-4' : ''}`}>
+        {label}
+        {sub && <span className="ml-2 text-xs font-normal text-muted-foreground">{sub}</span>}
+      </span>
+      <span className="tabular-nums">{negative ? '−' : ''}${value}</span>
     </div>
   )
 }
@@ -47,11 +55,23 @@ export default function ReportsPage() {
 
   const year = cursor.getFullYear()
   const month = cursor.getMonth() + 1
+  const monthStart = format(cursor, 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(cursor), 'yyyy-MM-dd')
 
   const { data: report, isLoading } = useQuery({
     queryKey: ['monthly-report', year, month],
     queryFn: () => getMonthlyReport(year, month),
   })
+
+  const { data: payroll } = useQuery({
+    queryKey: ['payroll-report-for-sales', year, month],
+    queryFn: () => getPayrollReport(monthStart, monthEnd),
+    enabled: !!report && report.sale_count > 0,
+  })
+
+  const payrollTotal = payroll?.lines.reduce((sum, l) => sum + l.gross_pay, 0) ?? 0
+  const netSales = report ? parseFloat(report.subtotal) : 0
+  const payrollPct = payrollTotal > 0 && netSales > 0 ? (payrollTotal / netSales) * 100 : null
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
 
@@ -80,7 +100,8 @@ export default function ReportsPage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
             </div>
-            <Skeleton className="h-40 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-48 rounded-lg" />
             <Skeleton className="h-40 rounded-lg" />
           </div>
         ) : !report ? null : report.sale_count === 0 ? (
@@ -98,34 +119,59 @@ export default function ReportsPage() {
               <SummaryCard label="Avg. sale" value={fmt(String(parseFloat(report.total) / report.sale_count))} />
             </div>
 
-            {/* Revenue breakdown */}
-            <Section title="Revenue breakdown">
-              <TableRow label="Services" value={fmt(report.service_total)} />
-              <TableRow label="Retail" value={fmt(report.retail_total)} />
-              {parseFloat(report.discount_total) > 0 && (
-                <div className="flex justify-between px-4 py-2 border-b text-sm text-muted-foreground">
-                  <span>Discounts</span>
-                  <span className="tabular-nums">−${fmt(report.discount_total)}</span>
+            {/* Payroll % of net sales — primary KPI */}
+            {payrollPct !== null && (
+              <div className={`flex items-center justify-between rounded-lg border px-5 py-4 ${
+                payrollPct > 60 ? 'bg-red-50 border-red-200' :
+                payrollPct > 50 ? 'bg-amber-50 border-amber-200' :
+                'bg-green-50 border-green-200'
+              }`}>
+                <div>
+                  <p className="text-xs text-muted-foreground">Payroll % of net sales</p>
+                  <p className="text-2xl font-semibold tabular-nums mt-0.5">{payrollPct.toFixed(1)}%</p>
                 </div>
+                <div className="text-right text-sm text-muted-foreground">
+                  <p>Payroll ${fmt(payrollTotal)}</p>
+                  <p>Net sales ${fmt(netSales)}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Revenue */}
+            <Section title="Revenue">
+              <Row label="Service sales" value={fmt(report.service_gross)} />
+              {parseFloat(report.service_discount) > 0 && (
+                <Row label="Less discounts" value={fmt(report.service_discount)} indent negative />
               )}
-              <TableRow label="Subtotal" value={fmt(report.subtotal)} />
-              <TableRow label="GST (5%)" value={fmt(report.gst_amount)} />
-              <TableRow label="PST (8%)" value={fmt(report.pst_amount)} />
-              <TableRow label="Total" value={fmt(report.total)} bold />
+              <Row label="Total service sales" value={fmt(report.service_total)} />
+              <Row label="Retail sales" value={fmt(report.retail_gross)} />
+              {parseFloat(report.retail_discount) > 0 && (
+                <Row label="Less discounts" value={fmt(report.retail_discount)} indent negative />
+              )}
+              <Row label="Total retail sales" value={fmt(report.retail_total)} />
+              <Row label="Total before tax" value={fmt(report.subtotal)} bold />
+              <Row label="GST (5%)" value={fmt(report.gst_amount)} />
+              <Row label="PST (8%)" value={fmt(report.pst_amount)} />
+              <Row label="Grand total" value={fmt(report.total)} bold />
             </Section>
 
             {/* By provider */}
             {report.by_provider.length > 0 && (
               <Section title="By provider (services)">
                 {report.by_provider.map(r => (
-                  <TableRow key={r.provider_name} label={r.provider_name} value={fmt(r.total)} sub={`${r.sale_count} ${r.sale_count === 1 ? 'sale' : 'sales'}`} />
+                  <Row
+                    key={r.provider_name}
+                    label={r.provider_name}
+                    value={fmt(r.total)}
+                    sub={`${r.sale_count} ${r.sale_count === 1 ? 'sale' : 'sales'}`}
+                  />
                 ))}
               </Section>
             )}
 
-            {/* By payment method */}
+            {/* Payment reconciliation */}
             {report.by_payment_method.length > 0 && (
-              <Section title="By payment method">
+              <Section title="Payment reconciliation">
                 {report.by_payment_method.map(r => {
                   const hasCashback = parseFloat(r.cashback) > 0
                   return (
@@ -142,6 +188,9 @@ export default function ReportsPage() {
                     </div>
                   )
                 })}
+                {parseFloat(report.petty_cash_total) > 0 && (
+                  <Row label="Plus petty cash" value={fmt(report.petty_cash_total)} />
+                )}
               </Section>
             )}
 

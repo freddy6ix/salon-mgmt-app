@@ -28,8 +28,13 @@ export interface MonthlyReport {
   gst_amount: string
   pst_amount: string
   total: string
+  service_gross: string
+  service_discount: string
   service_total: string
+  retail_gross: string
+  retail_discount: string
   retail_total: string
+  petty_cash_total: string
   by_provider: ProviderRow[]
   by_payment_method: PaymentMethodRow[]
   by_day: DayRow[]

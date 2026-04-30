@@ -1,6 +1,6 @@
 import uuid
 from calendar import monthrange
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated
 
@@ -13,6 +13,7 @@ from app.database import get_db
 from app.deps import StaffUser
 from app.models.payment_method import TenantPaymentMethod
 from app.models.provider import Provider
+from app.models.cash_reconciliation import CashReconciliation, PettyCashEntry
 from app.models.sale import Payment, Sale, SaleItem, SaleItemKind, SaleStatus
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -52,8 +53,13 @@ class MonthlyReport(BaseModel):
     gst_amount: str
     pst_amount: str
     total: str
+    service_gross: str
+    service_discount: str
     service_total: str
+    retail_gross: str
+    retail_discount: str
     retail_total: str
+    petty_cash_total: str
     by_provider: list[ProviderRow]
     by_payment_method: list[PaymentMethodRow]
     by_day: list[DayRow]
@@ -95,22 +101,46 @@ async def monthly_report(
     ).one()
     sale_count, subtotal, discount_total, gst, pst, total = totals_row
 
-    # ── Service vs retail split ───────────────────────────────────────────────
+    # ── Service vs retail split (net line_total + gross + discount per stream) ─
     kind_rows = (
         await db.execute(
-            select(SaleItem.kind, func.coalesce(func.sum(SaleItem.line_total), 0))
+            select(
+                SaleItem.kind,
+                func.coalesce(func.sum(SaleItem.line_total), 0),
+                func.coalesce(func.sum(SaleItem.unit_price * SaleItem.quantity), 0),
+                func.coalesce(func.sum(SaleItem.discount_amount * SaleItem.quantity), 0),
+            )
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(*completed)
             .group_by(SaleItem.kind)
         )
     ).all()
-    service_total = Decimal("0")
-    retail_total = Decimal("0")
-    for kind, amt in kind_rows:
+    service_total = service_gross = service_discount = Decimal("0")
+    retail_total = retail_gross = retail_discount = Decimal("0")
+    for kind, net, gross, disc in kind_rows:
         if kind == SaleItemKind.service:
-            service_total = Decimal(str(amt))
+            service_total = Decimal(str(net))
+            service_gross = Decimal(str(gross))
+            service_discount = Decimal(str(disc))
         else:
-            retail_total = Decimal(str(amt))
+            retail_total = Decimal(str(net))
+            retail_gross = Decimal(str(gross))
+            retail_discount = Decimal(str(disc))
+
+    # ── Petty cash disbursed in the period ────────────────────────────────────
+    petty_cash_total = Decimal(str(
+        (
+            await db.execute(
+                select(func.coalesce(func.sum(PettyCashEntry.amount), 0))
+                .join(CashReconciliation, CashReconciliation.id == PettyCashEntry.reconciliation_id)
+                .where(
+                    CashReconciliation.tenant_id == tid,
+                    CashReconciliation.business_date >= date(year, month, 1),
+                    CashReconciliation.business_date <= date(year, month, last_day),
+                )
+            )
+        ).scalar() or 0
+    ))
 
     # ── By provider (service items only) ─────────────────────────────────────
     provider_rows = (
@@ -167,8 +197,13 @@ async def monthly_report(
         gst_amount=_d(gst),
         pst_amount=_d(pst),
         total=_d(total),
+        service_gross=_d(service_gross),
+        service_discount=_d(service_discount),
         service_total=_d(service_total),
+        retail_gross=_d(retail_gross),
+        retail_discount=_d(retail_discount),
         retail_total=_d(retail_total),
+        petty_cash_total=_d(petty_cash_total),
         by_provider=[
             ProviderRow(provider_name=name, total=_d(amt), sale_count=cnt)
             for name, amt, cnt in provider_rows
