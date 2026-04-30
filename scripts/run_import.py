@@ -1,11 +1,16 @@
 """
-Startup import script — runs once via docker-entrypoint.sh when RUN_IMPORT=true.
+Startup import script — runs via docker-entrypoint.sh when RUN_IMPORT=true.
 Uses the app's own database connection (handles Cloud SQL Unix socket automatically).
 Safe to leave RUN_IMPORT=true permanently: exits immediately after the first run.
+
+Import order (each step is idempotent):
+  1. Clients
+  2. Receipt transactions → completed appointments + sales
+  3. Past bookings with no receipt → confirmed appointments (client never arrived)
+  4. Future bookings → confirmed upcoming appointments
 """
 
 import asyncio
-import sys
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -13,11 +18,19 @@ from sqlalchemy import func, select
 DATA_DIR = Path("/app/data")
 TENANT_SLUG = "salon-lyol"
 
+CLIENTS_FILE        = DATA_DIR / "Client Details.txt"
+RECEIPTS_FILE       = DATA_DIR / "Receipt Transactions.txt"
+ALL_BOOKINGS_FILE   = DATA_DIR / "Future and Past Bookings.txt"
+
 
 async def main() -> None:
-    # Import here so the app's DB engine is initialised after env vars are loaded
     from app.database import AsyncSessionLocal
-    from app.legacy_import import import_clients, import_bookings
+    from app.legacy_import import (
+        import_clients,
+        import_bookings,
+        import_receipts,
+        import_past_unreceipted_bookings,
+    )
     from app.models.client import Client
     from app.models.tenant import Tenant
 
@@ -29,35 +42,55 @@ async def main() -> None:
             print(f"[import] Tenant '{TENANT_SLUG}' not found — skipping", flush=True)
             return
 
-        # Fast-path: if any clients with a legacy_id already exist, the import
-        # has already run. Skip to avoid the startup cost on every deploy.
-        already = (
-            await db.execute(
-                select(func.count()).select_from(Client).where(
-                    Client.tenant_id == tenant.id,
-                    Client.legacy_id.isnot(None),
-                )
+        # Fast-path: skip if already imported
+        already = (await db.execute(
+            select(func.count()).select_from(Client).where(
+                Client.tenant_id == tenant.id,
+                Client.legacy_id.isnot(None),
             )
-        ).scalar()
+        )).scalar()
         if already:
             print(f"[import] {already} clients already imported — skipping", flush=True)
             return
 
-        clients_file = DATA_DIR / "Client Details.txt"
-        bookings_file = DATA_DIR / "All Bookings.txt"
-
-        if not clients_file.exists():
-            print(f"[import] {clients_file} not found — skipping", flush=True)
+        if not CLIENTS_FILE.exists():
+            print(f"[import] {CLIENTS_FILE} not found — skipping", flush=True)
             return
 
-        print("[import] Importing clients …", flush=True)
-        clients_result = await import_clients(db, tenant.id, clients_file.read_bytes())
-        print(f"[import] Clients: {clients_result}", flush=True)
+        # 1. Clients
+        print("[import] Step 1/4 — clients …", flush=True)
+        r = await import_clients(db, tenant.id, CLIENTS_FILE.read_bytes())
+        print(f"[import] Clients: {r}", flush=True)
 
-        if bookings_file.exists():
-            print("[import] Importing bookings …", flush=True)
-            bookings_result = await import_bookings(db, tenant.id, bookings_file.read_bytes())
-            print(f"[import] Bookings: {bookings_result}", flush=True)
+        # 2. Completed appointments from receipt transactions
+        if RECEIPTS_FILE.exists() and ALL_BOOKINGS_FILE.exists():
+            print("[import] Step 2/4 — receipt transactions (completed appointments) …", flush=True)
+            r = await import_receipts(
+                db, tenant.id,
+                RECEIPTS_FILE.read_bytes(),
+                ALL_BOOKINGS_FILE.read_bytes(),
+            )
+            print(f"[import] Receipts: {r}", flush=True)
+        else:
+            print("[import] Step 2/4 — receipt files missing, skipping", flush=True)
+
+        # 3. Past bookings with no receipt (client never arrived)
+        if ALL_BOOKINGS_FILE.exists():
+            print("[import] Step 3/4 — past unreceipted bookings …", flush=True)
+            r = await import_past_unreceipted_bookings(
+                db, tenant.id, ALL_BOOKINGS_FILE.read_bytes()
+            )
+            print(f"[import] Past unreceipted: {r}", flush=True)
+
+        # 4. Future bookings
+        if ALL_BOOKINGS_FILE.exists():
+            print("[import] Step 4/4 — future bookings …", flush=True)
+            r = await import_bookings(
+                db, tenant.id,
+                ALL_BOOKINGS_FILE.read_bytes(),
+                future_only=True,
+            )
+            print(f"[import] Future bookings: {r}", flush=True)
 
         print("[import] Done", flush=True)
 

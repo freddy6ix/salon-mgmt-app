@@ -1,9 +1,8 @@
 """
 One-time import of legacy Salon Lyol data.
 
-Called from the POST /admin/import-legacy endpoint.
-Idempotent: clients upsert on legacy_id, bookings skip if
-(client_id, appointment_date) already exists.
+Called from the POST /admin/import-legacy endpoint and scripts/run_import.py.
+All functions are idempotent — safe to re-run.
 """
 
 import csv
@@ -11,13 +10,15 @@ import io
 import re
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Maps legacy booking service codes → service_code in our DB.
-# Update if Jini used different codes when creating CON/CAC.
+# ---------------------------------------------------------------------------
+# Booking service code → DB service_code
+# ---------------------------------------------------------------------------
 SERVICE_CODE_MAP: dict[str, str] = {
     "ST1H":    "ST1",
     "ST2H":    "ST2",
@@ -47,28 +48,83 @@ SERVICE_CODE_MAP: dict[str, str] = {
     "CAC":     "cac",
 }
 
-BLANK_PHONE = "(416)"
+# ---------------------------------------------------------------------------
+# Receipt description → DB service_code  (lowercase key for case-insensitive match)
+# Descriptions not in this map are treated as retail sale items.
+# ---------------------------------------------------------------------------
+RECEIPT_SERVICE_MAP: dict[str, str] = {
+    "type 1 haircut":                   "ST1",
+    "type 2 haircut":                   "ST2",
+    "type 2+ haircut":                  "ST2P",
+    "blowdry":                          "BLD",
+    "root touch-up":                    "RTO",
+    "root touch-up(bleach/highlift)":   "RTOB",
+    "partial head highlights":          "PHL",
+    "full head highlights":             "FHL",
+    "accent high lights(under 15foi":   "ACC",
+    "toner add-on":                     "TNRA",
+    "toner/gloss stand alone":          "TNR",
+    "consultation":                     "con",
+    "additional colour":                "cac",
+    "balayage full":                    "BLY",
+    "balayage touch-up":                "BLT",
+    "camo color":                       "CCAMO",
+    "color full color":                 "CFC",
+    "vivid color":                      "CVC",
+    "refreshing ends":                  "REF",
+    "milbon treatment add-on":          "MLBA",
+    "milbon treatment stand alone":     "MLB",
+    "olaplex":                          "MDO",
+    "metal detox":                      "MDO",
+    "fringe cut":                       "FRG",
+    "mk hair botox with home care":     "BOT",
+    "mk hairbotox without homecare":    "BOTNHC",
+    "hair extensions":                  "EXT",
+    "color correction":                 "CCR",
+    "updo":                             "UPD",
+    "special updo":                     "UPD",
+    "heat tool finish":                 "HTF",
+    "treatments 1":                     "MLB",
+    "additonal styling":                "BLD",
+    "toner/gloss stand alone":          "TNR",
+    # These are service-like but have no catalog entry — kept as service kind
+    # so they don't inflate retail revenue in reports
+    "perm":                             None,
+    "redo":                             None,
+    "color additional":                 None,
+    "bdb reimbursement by house":       None,
+    "additional colour":                "cac",
+    "blow dry bundle 5+1":              "BLD",
+}
 
+# Descriptions that are services even though they have no service_code mapping.
+# Anything else is retail.
+_SERVICE_DESCS: set[str] = set(RECEIPT_SERVICE_MAP.keys())
+
+
+def _is_service(description: str) -> bool:
+    return description.lower() in _SERVICE_DESCS
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
 
 def _read_csv(content: bytes) -> list[dict]:
-    text_content = content.decode("latin-1")
-    return list(csv.DictReader(io.StringIO(text_content)))
+    return list(csv.DictReader(io.StringIO(content.decode("latin-1"))))
 
 
 def _clean_phone(raw: str) -> str | None:
     if not raw:
         return None
-    stripped = raw.strip()
-    if stripped.replace("(416)", "").strip() == "" or len(stripped) < 7:
-        return None
-    digits = re.sub(r"\D", "", stripped)
-    if len(digits) < 7:
+    digits = re.sub(r"\D", "", raw.strip())
+    if len(digits) < 7 or digits == "4160000000":
         return None
     if len(digits) == 10:
         return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
     if len(digits) == 11 and digits[0] == "1":
         return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
-    return stripped
+    return raw.strip()
 
 
 def _clean_email(raw: str) -> str | None:
@@ -80,14 +136,94 @@ def _clean_email(raw: str) -> str | None:
 
 def _parse_name(full: str) -> tuple[str, str]:
     parts = full.strip().split(None, 1)
-    if len(parts) == 1:
-        return parts[0], ""
-    return parts[0], parts[1]
+    return (parts[0], parts[1]) if len(parts) == 2 else (parts[0], "")
 
 
-def _parse_booking_dt(date_str: str, time_str: str) -> datetime:
+def _parse_dt(date_str: str, time_str: str) -> datetime:
     return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %I:%M:%S %p")
 
+
+def _parse_date_noon(date_str: str) -> datetime:
+    return datetime.strptime(date_str, "%m/%d/%Y").replace(hour=12)
+
+
+# ---------------------------------------------------------------------------
+# DB lookup helpers
+# ---------------------------------------------------------------------------
+
+async def _load_providers(db: AsyncSession, tenant_id: uuid.UUID) -> dict[str, uuid.UUID]:
+    rows = (await db.execute(
+        text("SELECT id, display_name FROM providers WHERE tenant_id = :tid"),
+        {"tid": tenant_id},
+    )).fetchall()
+    return {r.display_name.upper(): r.id for r in rows if r.display_name}
+
+
+async def _load_service_detail(db: AsyncSession, tenant_id: uuid.UUID) -> dict[str, dict]:
+    rows = (await db.execute(
+        text("SELECT id, service_code, default_price, duration_minutes "
+             "FROM services WHERE tenant_id = :tid AND is_active = true"),
+        {"tid": tenant_id},
+    )).fetchall()
+    return {
+        r.service_code: {"id": r.id, "price": float(r.default_price or 0), "duration": r.duration_minutes}
+        for r in rows
+    }
+
+
+async def _load_client_map(db: AsyncSession, tenant_id: uuid.UUID) -> dict[str, uuid.UUID]:
+    rows = (await db.execute(
+        text("SELECT id, legacy_id FROM clients WHERE tenant_id = :tid AND legacy_id IS NOT NULL"),
+        {"tid": tenant_id},
+    )).fetchall()
+    return {r.legacy_id: r.id for r in rows}
+
+
+async def _ensure_house_provider(
+    db: AsyncSession, tenant_id: uuid.UUID, provider_map: dict[str, uuid.UUID]
+) -> uuid.UUID:
+    """Return the HOUSE provider id, creating it if needed."""
+    if "HOUSE" in provider_map:
+        return provider_map["HOUSE"]
+    new_id = uuid.uuid4()
+    await db.execute(
+        text(
+            "INSERT INTO providers (id, tenant_id, first_name, last_name, display_name,"
+            " provider_type, is_owner, is_active, created_at, updated_at)"
+            " VALUES (:id, :tid, 'House', 'Account', 'HOUSE',"
+            " 'stylist', false, false, NOW(), NOW())"
+        ),
+        {"id": new_id, "tid": tenant_id},
+    )
+    provider_map["HOUSE"] = new_id
+    return new_id
+
+
+async def _ensure_unknown_payment_method(
+    db: AsyncSession, tenant_id: uuid.UUID
+) -> uuid.UUID:
+    """Return the 'unknown' payment method id, creating it if needed."""
+    row = (await db.execute(
+        text("SELECT id FROM tenant_payment_methods WHERE tenant_id = :tid AND code = 'unknown'"),
+        {"tid": tenant_id},
+    )).fetchone()
+    if row:
+        return row.id
+    new_id = uuid.uuid4()
+    await db.execute(
+        text(
+            "INSERT INTO tenant_payment_methods (id, tenant_id, code, label, kind,"
+            " is_active, sort_order, created_at, updated_at)"
+            " VALUES (:id, :tid, 'unknown', 'Unknown', 'other', true, 99, NOW(), NOW())"
+        ),
+        {"id": new_id, "tid": tenant_id},
+    )
+    return new_id
+
+
+# ---------------------------------------------------------------------------
+# Client import
+# ---------------------------------------------------------------------------
 
 async def import_clients(
     db: AsyncSession,
@@ -95,16 +231,7 @@ async def import_clients(
     content: bytes,
 ) -> dict:
     rows = _read_csv(content)
-
-    # Load provider display_name → id map
-    prov_rows = await db.execute(
-        text("SELECT id, display_name FROM providers WHERE tenant_id = :tid AND is_active = true"),
-        {"tid": tenant_id},
-    )
-    provider_map: dict[str, uuid.UUID] = {
-        r.display_name.upper(): r.id for r in prov_rows if r.display_name
-    }
-
+    provider_map = await _load_providers(db, tenant_id)
     created = updated = skipped = 0
 
     for row in rows:
@@ -120,12 +247,10 @@ async def import_clients(
         staff = (row.get("Staff") or "").strip().upper()
         preferred_provider_id = provider_map.get(staff) if staff else None
 
-        existing = (
-            await db.execute(
-                text("SELECT id FROM clients WHERE tenant_id = :tid AND legacy_id = :code"),
-                {"tid": tenant_id, "code": code},
-            )
-        ).fetchone()
+        existing = (await db.execute(
+            text("SELECT id FROM clients WHERE tenant_id = :tid AND legacy_id = :code"),
+            {"tid": tenant_id, "code": code},
+        )).fetchone()
 
         if existing:
             await db.execute(
@@ -134,11 +259,9 @@ async def import_clients(
                     " cell_phone = :cell, preferred_provider_id = :ppid, updated_at = NOW()"
                     " WHERE id = :id AND tenant_id = :tid"
                 ),
-                {
-                    "fn": first_name, "ln": last_name, "email": email,
-                    "cell": cell, "ppid": preferred_provider_id,
-                    "id": existing.id, "tid": tenant_id,
-                },
+                {"fn": first_name, "ln": last_name, "email": email,
+                 "cell": cell, "ppid": preferred_provider_id,
+                 "id": existing.id, "tid": tenant_id},
             )
             updated += 1
         else:
@@ -151,11 +274,9 @@ async def import_clients(
                     " VALUES (:id, :tid, :code, :code, :fn, :ln, :email, :cell, :ppid,"
                     " 'CA', true, 0, 0, 0, NOW(), NOW())"
                 ),
-                {
-                    "id": uuid.uuid4(), "tid": tenant_id, "code": code,
-                    "fn": first_name, "ln": last_name, "email": email,
-                    "cell": cell, "ppid": preferred_provider_id,
-                },
+                {"id": uuid.uuid4(), "tid": tenant_id, "code": code,
+                 "fn": first_name, "ln": last_name, "email": email,
+                 "cell": cell, "ppid": preferred_provider_id},
             )
             created += 1
 
@@ -163,41 +284,27 @@ async def import_clients(
     return {"created": created, "updated": updated, "skipped": skipped}
 
 
+# ---------------------------------------------------------------------------
+# Future booking import  (All Bookings.txt or Future and Past Bookings.txt)
+# ---------------------------------------------------------------------------
+
 async def import_bookings(
     db: AsyncSession,
     tenant_id: uuid.UUID,
     content: bytes,
+    future_only: bool = True,
 ) -> dict:
     rows = _read_csv(content)
+    today = datetime.now()
 
-    # Load lookup maps
-    prov_rows = await db.execute(
-        text("SELECT id, display_name FROM providers WHERE tenant_id = :tid AND is_active = true"),
-        {"tid": tenant_id},
-    )
-    provider_map: dict[str, uuid.UUID] = {
-        r.display_name.upper(): r.id for r in prov_rows if r.display_name
-    }
+    if future_only:
+        rows = [r for r in rows if r.get("Date") and
+                datetime.strptime(r["Date"].strip(), "%m/%d/%Y") >= today]
 
-    svc_rows = await db.execute(
-        text(
-            "SELECT id, service_code, default_price, duration_minutes"
-            " FROM services WHERE tenant_id = :tid AND is_active = true"
-        ),
-        {"tid": tenant_id},
-    )
-    service_detail: dict[str, dict] = {
-        r.service_code: {"id": r.id, "price": float(r.default_price or 0), "duration": r.duration_minutes}
-        for r in svc_rows
-    }
+    provider_map = await _load_providers(db, tenant_id)
+    service_detail = await _load_service_detail(db, tenant_id)
+    client_map = await _load_client_map(db, tenant_id)
 
-    client_rows = await db.execute(
-        text("SELECT id, legacy_id FROM clients WHERE tenant_id = :tid AND legacy_id IS NOT NULL"),
-        {"tid": tenant_id},
-    )
-    client_map: dict[str, uuid.UUID] = {r.legacy_id: r.id for r in client_rows}
-
-    # Group rows → one appointment per (client_code, date)
     groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for row in rows:
         code = (row.get("Code") or "").strip()
@@ -208,7 +315,7 @@ async def import_bookings(
         groups[key].sort(key=lambda r: r.get("TimeInt") or r.get("Time") or "")
 
     created = skipped_existing = skipped_no_client = skipped_no_service = skipped_no_provider = 0
-    unmapped_codes: set[str] = set()
+    unmapped: set[str] = set()
 
     for (client_code, date_str), items in groups.items():
         client_id = client_map.get(client_code)
@@ -217,37 +324,28 @@ async def import_bookings(
             continue
 
         try:
-            appt_dt = _parse_booking_dt(date_str, items[0]["Time"])
+            appt_dt = _parse_dt(date_str, items[0]["Time"])
         except (ValueError, KeyError):
             skipped_no_client += 1
             continue
 
-        existing = (
-            await db.execute(
-                text(
-                    "SELECT id FROM appointments"
-                    " WHERE tenant_id = :tid AND client_id = :cid AND appointment_date = :dt"
-                ),
-                {"tid": tenant_id, "cid": client_id, "dt": appt_dt},
-            )
-        ).fetchone()
+        existing = (await db.execute(
+            text("SELECT id FROM appointments"
+                 " WHERE tenant_id = :tid AND client_id = :cid AND appointment_date = :dt"),
+            {"tid": tenant_id, "cid": client_id, "dt": appt_dt},
+        )).fetchone()
         if existing:
             skipped_existing += 1
             continue
 
-        # Resolve all items before writing
         resolved = []
         skip_group = False
         for seq, item in enumerate(items, start=1):
             legacy_svc = (item.get("Service") or "").strip()
             db_code = SERVICE_CODE_MAP.get(legacy_svc)
-            if not db_code:
-                unmapped_codes.add(legacy_svc)
-                skip_group = True
-                break
-            svc = service_detail.get(db_code)
+            svc = service_detail.get(db_code) if db_code else None
             if not svc:
-                unmapped_codes.add(f"{legacy_svc}→{db_code}(missing)")
+                unmapped.add(legacy_svc)
                 skip_group = True
                 break
             staff = (item.get("Staff") or "").strip().upper()
@@ -257,48 +355,36 @@ async def import_bookings(
                 skip_group = True
                 break
             try:
-                item_dt = _parse_booking_dt(date_str, item["Time"])
+                item_dt = _parse_dt(date_str, item["Time"])
             except (ValueError, KeyError):
                 skip_group = True
                 break
-            resolved.append({
-                "seq": seq, "service_id": svc["id"], "provider_id": provider_id,
-                "start_time": item_dt, "duration": svc["duration"], "price": svc["price"],
-            })
+            resolved.append({"seq": seq, "service_id": svc["id"], "provider_id": provider_id,
+                              "start_time": item_dt, "duration": svc["duration"], "price": svc["price"]})
 
         if skip_group or not resolved:
-            if not skip_group:
-                skipped_no_client += 1
-            else:
-                skipped_no_service += 1
+            skipped_no_service += 1
             continue
 
         appt_id = uuid.uuid4()
         await db.execute(
-            text(
-                "INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
-                " source, status, confirmation_status, created_at, updated_at)"
-                " VALUES (:id, :tid, :cid, :dt,"
-                " 'staff_entered', 'confirmed', 'not_sent', NOW(), NOW())"
-            ),
+            text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
+                 " source, status, confirmation_status, created_at, updated_at)"
+                 " VALUES (:id, :tid, :cid, :dt,"
+                 " 'staff_entered', 'confirmed', 'not_sent', NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id, "dt": appt_dt},
         )
         for ri in resolved:
             await db.execute(
-                text(
-                    "INSERT INTO appointment_items (id, tenant_id, appointment_id,"
-                    " service_id, provider_id, sequence, start_time, duration_minutes, price,"
-                    " price_is_locked, status, created_at, updated_at)"
-                    " VALUES (:id, :tid, :appt_id,"
-                    " :svc_id, :prov_id, :seq, :start_time, :dur, :price,"
-                    " true, 'pending', NOW(), NOW())"
-                ),
-                {
-                    "id": uuid.uuid4(), "tid": tenant_id, "appt_id": appt_id,
-                    "svc_id": ri["service_id"], "prov_id": ri["provider_id"],
-                    "seq": ri["seq"], "start_time": ri["start_time"],
-                    "dur": ri["duration"], "price": ri["price"],
-                },
+                text("INSERT INTO appointment_items (id, tenant_id, appointment_id,"
+                     " service_id, provider_id, sequence, start_time, duration_minutes, price,"
+                     " price_is_locked, status, created_at, updated_at)"
+                     " VALUES (:id, :tid, :appt_id, :svc_id, :prov_id, :seq, :st, :dur, :price,"
+                     " true, 'pending', NOW(), NOW())"),
+                {"id": uuid.uuid4(), "tid": tenant_id, "appt_id": appt_id,
+                 "svc_id": ri["service_id"], "prov_id": ri["provider_id"],
+                 "seq": ri["seq"], "st": ri["start_time"],
+                 "dur": ri["duration"], "price": ri["price"]},
             )
         created += 1
 
@@ -309,5 +395,328 @@ async def import_bookings(
         "skipped_no_client": skipped_no_client,
         "skipped_no_service": skipped_no_service,
         "skipped_no_provider": skipped_no_provider,
-        "unmapped_service_codes": sorted(unmapped_codes),
+        "unmapped_service_codes": sorted(unmapped),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Receipt Transactions import  (completed appointments + sales)
+# ---------------------------------------------------------------------------
+
+async def import_receipts(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    receipts_content: bytes,
+    bookings_content: bytes,
+) -> dict:
+    receipt_rows = _read_csv(receipts_content)
+    booking_rows = _read_csv(bookings_content)
+
+    provider_map = await _load_providers(db, tenant_id)
+    service_detail = await _load_service_detail(db, tenant_id)
+    client_map = await _load_client_map(db, tenant_id)
+
+    house_id = await _ensure_house_provider(db, tenant_id, provider_map)
+    unknown_pm_id = await _ensure_unknown_payment_method(db, tenant_id)
+
+    # Build booking time lookup: (client_code, date_str) → earliest Time string
+    booking_time: dict[tuple[str, str], str] = {}
+    for r in booking_rows:
+        key = (r.get("Code", "").strip(), r.get("Date", "").strip())
+        if key[0] and key[1] and r.get("Time"):
+            ti = int(r.get("TimeInt") or 9999)
+            if key not in booking_time or ti < int(
+                next((b.get("TimeInt") or 9999) for b in booking_rows
+                     if b.get("Code", "").strip() == key[0]
+                     and b.get("Date", "").strip() == key[1]), 9999):
+                booking_time[key] = r["Time"].strip()
+
+    # Group receipt rows by receipt number
+    receipt_groups: dict[str, list[dict]] = defaultdict(list)
+    for r in receipt_rows:
+        rnum = (r.get("Receipt") or "").strip()
+        if rnum:
+            receipt_groups[rnum].append(r)
+
+    created = skipped_existing = skipped_no_client = skipped_walk_in = errors = 0
+
+    for receipt_num, items in receipt_groups.items():
+        client_code = (items[0].get("Client") or "").strip()
+        date_str = (items[0].get("Date") or "").strip()
+
+        if client_code == "WALK_IN":
+            skipped_walk_in += 1
+            continue
+
+        client_id = client_map.get(client_code)
+        if not client_id:
+            skipped_no_client += 1
+            continue
+
+        # Dedup: skip if this receipt was already imported
+        note_key = f"legacy_receipt:{receipt_num}"
+        existing = (await db.execute(
+            text("SELECT id FROM appointments"
+                 " WHERE tenant_id = :tid AND notes = :note"),
+            {"tid": tenant_id, "note": note_key},
+        )).fetchone()
+        if existing:
+            skipped_existing += 1
+            continue
+
+        # Appointment time: use booking record if available, else noon
+        bk_time = booking_time.get((client_code, date_str))
+        try:
+            appt_dt = (_parse_dt(date_str, bk_time) if bk_time
+                       else _parse_date_noon(date_str))
+        except ValueError:
+            appt_dt = _parse_date_noon(date_str)
+
+        # Totals
+        subtotal = sum(float(r.get("Amount") or 0) for r in items)
+        gst_total = sum(float(r.get("GST") or 0) for r in items)
+        pst_total = sum(float(r.get("PST") or 0) for r in items)
+        total = subtotal + gst_total + pst_total
+
+        # Create appointment
+        appt_id = uuid.uuid4()
+        completed_at = appt_dt.replace(tzinfo=timezone.utc)
+        await db.execute(
+            text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
+                 " source, status, confirmation_status, notes, created_at, updated_at)"
+                 " VALUES (:id, :tid, :cid, :dt,"
+                 " 'staff_entered', 'completed', 'skipped', :note, NOW(), NOW())"),
+            {"id": appt_id, "tid": tenant_id, "cid": client_id,
+             "dt": appt_dt, "note": note_key},
+        )
+
+        # Create appointment items for service lines
+        appt_item_seq = 1
+        receipt_item_to_appt_item: dict[int, uuid.UUID] = {}  # index → appt_item_id
+
+        for idx, item in enumerate(items):
+            desc = (item.get("Description") or "").strip()
+            staff = (item.get("Staff") or "").strip().upper()
+            amount = float(item.get("Amount") or 0)
+
+            if not _is_service(desc):
+                continue  # retail — no appointment item
+
+            db_code = RECEIPT_SERVICE_MAP.get(desc.lower())
+            svc = service_detail.get(db_code) if db_code else None
+
+            provider_id = provider_map.get(staff) if staff else house_id
+            if not provider_id:
+                provider_id = house_id
+
+            if svc:
+                ai_id = uuid.uuid4()
+                await db.execute(
+                    text("INSERT INTO appointment_items (id, tenant_id, appointment_id,"
+                         " service_id, provider_id, sequence, start_time, duration_minutes,"
+                         " price, price_is_locked, status, created_at, updated_at)"
+                         " VALUES (:id, :tid, :appt_id, :svc_id, :prov_id, :seq, :st, :dur,"
+                         " :price, true, 'completed', NOW(), NOW())"),
+                    {"id": ai_id, "tid": tenant_id, "appt_id": appt_id,
+                     "svc_id": svc["id"], "prov_id": provider_id,
+                     "seq": appt_item_seq, "st": appt_dt,
+                     "dur": svc["duration"], "price": amount},
+                )
+                receipt_item_to_appt_item[idx] = ai_id
+                appt_item_seq += 1
+
+        # Create sale
+        sale_id = uuid.uuid4()
+        await db.execute(
+            text("INSERT INTO sales (id, tenant_id, client_id, subtotal, discount_total,"
+                 " gst_amount, pst_amount, total, status, completed_at, created_at, updated_at)"
+                 " VALUES (:id, :tid, :cid, :sub, 0, :gst, :pst, :total,"
+                 " 'completed', :cat, NOW(), NOW())"),
+            {"id": sale_id, "tid": tenant_id, "cid": client_id,
+             "sub": Decimal(str(round(subtotal, 2))),
+             "gst": Decimal(str(round(gst_total, 2))),
+             "pst": Decimal(str(round(pst_total, 2))),
+             "total": Decimal(str(round(total, 2))),
+             "cat": completed_at},
+        )
+
+        # Create sale items
+        for idx, item in enumerate(items):
+            desc = (item.get("Description") or "").strip()
+            staff = (item.get("Staff") or "").strip().upper()
+            amount = float(item.get("Amount") or 0)
+            qty = int(item.get("Quantity") or 1)
+            is_svc = _is_service(desc)
+            kind = "service" if is_svc else "retail"
+            provider_id = provider_map.get(staff) if staff else None
+            ai_id = receipt_item_to_appt_item.get(idx)
+
+            await db.execute(
+                text("INSERT INTO sale_items (id, tenant_id, sale_id, appointment_item_id,"
+                     " description, provider_id, kind, sequence, quantity,"
+                     " unit_price, discount_amount, line_total, created_at, updated_at)"
+                     " VALUES (:id, :tid, :sale_id, :ai_id,"
+                     " :desc, :prov_id, :kind, :seq, :qty,"
+                     " :unit_price, 0, :line_total, NOW(), NOW())"),
+                {"id": uuid.uuid4(), "tid": tenant_id, "sale_id": sale_id,
+                 "ai_id": ai_id, "desc": desc, "prov_id": provider_id,
+                 "kind": kind, "seq": idx + 1, "qty": qty,
+                 "unit_price": Decimal(str(round(amount, 2))),
+                 "line_total": Decimal(str(round(amount * qty, 2)))},
+            )
+
+        # Link sale → appointment
+        await db.execute(
+            text("INSERT INTO sale_appointments (id, tenant_id, sale_id, appointment_id,"
+                 " created_at, updated_at)"
+                 " VALUES (:id, :tid, :sale_id, :appt_id, NOW(), NOW())"),
+            {"id": uuid.uuid4(), "tid": tenant_id,
+             "sale_id": sale_id, "appt_id": appt_id},
+        )
+
+        # Single payment for the full receipt total
+        await db.execute(
+            text("INSERT INTO sale_payments (id, tenant_id, sale_id, payment_method_id,"
+                 " amount, cashback_amount, created_at, updated_at)"
+                 " VALUES (:id, :tid, :sale_id, :pm_id, :amount, 0, NOW(), NOW())"),
+            {"id": uuid.uuid4(), "tid": tenant_id,
+             "sale_id": sale_id, "pm_id": unknown_pm_id,
+             "amount": Decimal(str(round(total, 2)))},
+        )
+
+        created += 1
+
+        # Commit in batches of 200 to avoid huge transactions
+        if created % 200 == 0:
+            await db.commit()
+
+    await db.commit()
+    return {
+        "created": created,
+        "skipped_existing": skipped_existing,
+        "skipped_no_client": skipped_no_client,
+        "skipped_walk_in": skipped_walk_in,
+        "errors": errors,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Past bookings with no receipt  (confirmed, client never arrived)
+# ---------------------------------------------------------------------------
+
+async def import_past_unreceipted_bookings(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    content: bytes,
+) -> dict:
+    """
+    Import past bookings that have no receipt transaction — confirmed appointments
+    where the client never arrived (no-show or cancellation, unknown which).
+    """
+    rows = _read_csv(content)
+    today = datetime.now()
+
+    past_rows = [r for r in rows if r.get("Date") and
+                 datetime.strptime(r["Date"].strip(), "%m/%d/%Y") < today]
+
+    provider_map = await _load_providers(db, tenant_id)
+    service_detail = await _load_service_detail(db, tenant_id)
+    client_map = await _load_client_map(db, tenant_id)
+
+    # Load existing appointment dates per client to detect already-imported
+    # (receipts were imported first so these are already in the DB)
+    existing_keys: set[tuple[uuid.UUID, str]] = set()
+    appt_rows = (await db.execute(
+        text("SELECT client_id, appointment_date::text FROM appointments WHERE tenant_id = :tid"),
+        {"tid": tenant_id},
+    )).fetchall()
+    for r in appt_rows:
+        # Store as (client_id, date string YYYY-MM-DD)
+        existing_keys.add((r.client_id, str(r.appointment_date)[:10]))
+
+    # Group by (client_code, date)
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in past_rows:
+        code = (row.get("Code") or "").strip()
+        date_str = (row.get("Date") or "").strip()
+        if code and date_str:
+            groups[(code, date_str)].append(row)
+    for key in groups:
+        groups[key].sort(key=lambda r: r.get("TimeInt") or r.get("Time") or "")
+
+    created = skipped_existing = skipped_no_client = skipped_no_service = 0
+
+    for (client_code, date_str), items in groups.items():
+        client_id = client_map.get(client_code)
+        if not client_id:
+            skipped_no_client += 1
+            continue
+
+        # Skip if a receipt already created an appointment on this date for this client
+        date_ymd = datetime.strptime(date_str, "%m/%d/%Y").strftime("%Y-%m-%d")
+        if (client_id, date_ymd) in existing_keys:
+            skipped_existing += 1
+            continue
+
+        try:
+            appt_dt = _parse_dt(date_str, items[0]["Time"])
+        except (ValueError, KeyError):
+            skipped_no_client += 1
+            continue
+
+        resolved = []
+        skip_group = False
+        for seq, item in enumerate(items, start=1):
+            legacy_svc = (item.get("Service") or "").strip()
+            db_code = SERVICE_CODE_MAP.get(legacy_svc)
+            svc = service_detail.get(db_code) if db_code else None
+            if not svc:
+                skip_group = True
+                break
+            staff = (item.get("Staff") or "").strip().upper()
+            provider_id = provider_map.get(staff)
+            if not provider_id:
+                skip_group = True
+                break
+            try:
+                item_dt = _parse_dt(date_str, item["Time"])
+            except (ValueError, KeyError):
+                skip_group = True
+                break
+            resolved.append({"seq": seq, "service_id": svc["id"], "provider_id": provider_id,
+                              "start_time": item_dt, "duration": svc["duration"], "price": svc["price"]})
+
+        if skip_group or not resolved:
+            skipped_no_service += 1
+            continue
+
+        appt_id = uuid.uuid4()
+        await db.execute(
+            text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
+                 " source, status, confirmation_status, created_at, updated_at)"
+                 " VALUES (:id, :tid, :cid, :dt,"
+                 " 'staff_entered', 'confirmed', 'skipped', NOW(), NOW())"),
+            {"id": appt_id, "tid": tenant_id, "cid": client_id, "dt": appt_dt},
+        )
+        for ri in resolved:
+            await db.execute(
+                text("INSERT INTO appointment_items (id, tenant_id, appointment_id,"
+                     " service_id, provider_id, sequence, start_time, duration_minutes,"
+                     " price, price_is_locked, status, created_at, updated_at)"
+                     " VALUES (:id, :tid, :appt_id, :svc_id, :prov_id, :seq, :st, :dur, :price,"
+                     " true, 'cancelled', NOW(), NOW())"),
+                {"id": uuid.uuid4(), "tid": tenant_id, "appt_id": appt_id,
+                 "svc_id": ri["service_id"], "prov_id": ri["provider_id"],
+                 "seq": ri["seq"], "st": ri["start_time"],
+                 "dur": ri["duration"], "price": ri["price"]},
+            )
+        created += 1
+        existing_keys.add((client_id, date_ymd))
+
+    await db.commit()
+    return {
+        "created": created,
+        "skipped_existing": skipped_existing,
+        "skipped_no_client": skipped_no_client,
+        "skipped_no_service": skipped_no_service,
     }
