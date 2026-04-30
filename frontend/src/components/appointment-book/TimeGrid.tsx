@@ -126,6 +126,7 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
   const [drag, setDrag] = useState<DragState | null>(null)
   const [nowPx, setNowPx] = useState<number | null>(null)
   const [slotMenu, setSlotMenu] = useState<SlotMenu | null>(null)
+  const [tsi, setTsi] = useState<{ providerId: string; slotTopPx: number } | null>(null)
 
   type PendingPatch = {
     appointmentId: string
@@ -200,18 +201,23 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
 
   const { formatTime: ft } = useTimeFormat()
   const timeLabels = useMemo(() => {
-    const labels: { label: string; topPx: number }[] = []
+    const labels: { label: string; topPx: number; isHour: boolean }[] = []
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
       const totalMins = START_HOUR * 60 + slot * SLOT_MINUTES
-      if (totalMins % 60 === 0) {
+      const isHour = totalMins % 60 === 0
+      if (isHour) {
         const d = new Date(2000, 0, 1, Math.floor(totalMins / 60), 0)
-        labels.push({ label: ft(d, { hourOnly: true }), topPx: slot * SLOT_HEIGHT })
+        labels.push({ label: ft(d, { hourOnly: true }), topPx: slot * SLOT_HEIGHT, isHour: true })
+      } else {
+        const mins = totalMins % 60
+        labels.push({ label: `:${String(mins).padStart(2, '0')}`, topPx: slot * SLOT_HEIGHT, isHour: false })
       }
     }
     return labels
   }, [SLOT_MINUTES, TOTAL_SLOTS, ft])
 
-  const hourLines = useMemo(() => timeLabels.map((l) => l.topPx), [timeLabels])
+  const hourLines = useMemo(() => timeLabels.filter((l) => l.isHour).map((l) => l.topPx), [timeLabels])
+  const slotLines = useMemo(() => timeLabels.filter((l) => !l.isHour).map((l) => l.topPx), [timeLabels])
 
   const hoursMap = useMemo(() => {
     const m = new Map<string, { startPx: number; endPx: number }>()
@@ -242,6 +248,14 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
       if (x >= rects[i].left && x <= rects[i].right) return i
     }
     return -1
+  }
+
+  function slotTopFromClientY(clientY: number, colIdx: number): number {
+    const rects = getColumnRects()
+    const colRect = rects[colIdx]
+    if (!colRect) return 0
+    const offsetY = clientY - colRect.top - HEADER_HEIGHT
+    return Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
   }
 
   // ── Snap helpers ─────────────────────────────────────────────────────────
@@ -497,10 +511,10 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
         />
         <div style={{ height: HEADER_HEIGHT }} />
         <div className="relative" style={{ height: TOTAL_HEIGHT }}>
-          {timeLabels.map(({ label, topPx }) => (
+          {timeLabels.map(({ label, topPx, isHour }) => (
             <span
-              key={label}
-              className="absolute right-2 text-xs text-muted-foreground -translate-y-1/2"
+              key={topPx}
+              className={`absolute right-2 -translate-y-1/2 ${isHour ? 'text-xs text-muted-foreground' : 'text-[10px] text-muted-foreground/50'}`}
               style={{ top: topPx }}
             >
               {label}
@@ -549,9 +563,30 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
               style={{ height: TOTAL_HEIGHT }}
               onClick={(e) => {
                 if (dragRef.current || didDragRef.current) return
+                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                const offsetY = e.clientY - rect.top
+                const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
+                setTsi({ providerId: provider.id, slotTopPx })
+              }}
+              onDoubleClick={(e) => {
+                if (dragRef.current || didDragRef.current) return
                 if (date < format(new Date(), 'yyyy-MM-dd')) return
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
+                const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
+                setTsi({ providerId: provider.id, slotTopPx })
+                const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
+                const h = Math.floor(totalMins / 60)
+                const m = totalMins % 60
+                onNewAppointment?.(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, provider.id)
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                if (date < format(new Date(), 'yyyy-MM-dd')) return
+                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                const offsetY = e.clientY - rect.top
+                const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
+                setTsi({ providerId: provider.id, slotTopPx })
                 const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
                 const h = Math.floor(totalMins / 60)
                 const m = totalMins % 60
@@ -573,9 +608,22 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
 
               {/* Hour lines — skip the very first one (top: 0) to avoid bleeding into gutter border */}
               {hourLines.filter((topPx) => topPx > 0).map((topPx) => (
-                <div key={topPx} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: topPx }} />
+                <div key={topPx} className="absolute left-0 right-0 border-t border-gray-200" style={{ top: topPx }} />
               ))}
 
+              {/* Sub-slot gridlines — lighter than hour lines */}
+              {slotLines.filter((topPx) => topPx > 0).map((topPx) => (
+                <div key={`sub-${topPx}`} className="absolute left-0 right-0 border-t border-gray-100 pointer-events-none" style={{ top: topPx }} />
+              ))}
+
+
+              {/* Time Slot Indicator (TSI) highlight */}
+              {tsi && tsi.providerId === provider.id && (
+                <div
+                  className="absolute left-0 right-0 bg-blue-200/40 pointer-events-none z-[1]"
+                  style={{ top: tsi.slotTopPx, height: SLOT_HEIGHT }}
+                />
+              )}
 
               {/* Drag ghost in this column */}
               {drag && drag.type === 'move' && drag.currentProviderIdx === providerIdx && (
@@ -616,7 +664,16 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                           topPx/heightPx so move/resize work on the whole appointment. */}
                       <div
                         className="flex-1 px-1.5 py-0.5 overflow-hidden"
-                        onClick={(e) => { if (!didDragRef.current) { e.stopPropagation(); onItemClick?.(item, appointment) } }}
+                        onClick={(e) => {
+                          if (didDragRef.current) return
+                          e.stopPropagation()
+                          setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                          onItemClick?.(item, appointment)
+                        }}
                         onPointerDown={(e) => onMovePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
                       >
                         <p className="text-xs font-medium truncate leading-tight">
@@ -668,7 +725,15 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                   >
                     <div
                       className="flex-1 px-1.5 py-0.5 overflow-hidden"
-                      onClick={(e) => { if (!didDragRef.current) { e.stopPropagation(); onBlockClick?.(block) } }}
+                      onClick={(e) => {
+                        if (didDragRef.current) return
+                        e.stopPropagation()
+                        setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                        onBlockClick?.(block)
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                      }}
                       onPointerDown={(e) => onBlockMovePointerDown(e, block, topPx, heightPx, providerIdx)}
                     >
                       <p className="text-xs font-medium truncate leading-tight text-gray-700">
