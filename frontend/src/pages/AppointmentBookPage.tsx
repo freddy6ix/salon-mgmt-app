@@ -214,8 +214,14 @@ export default function AppointmentBookPage() {
           e.preventDefault()
           if (!panelOpen) next()
           break
-        case 't': case 'T':
+        case 'h': case 'H':
           if (!panelOpen) goToday()
+          break
+        case 't': case 'T':
+          if (!panelOpen) navigate('/till')
+          break
+        case 'c': case 'C':
+          if (!panelOpen) navigate('/clients')
           break
         case 'n': case 'N':
           if (!panelOpen && tsiRef.current) {
@@ -251,9 +257,11 @@ export default function AppointmentBookPage() {
   const shortcuts: ShortcutDef[] = [
     { label: 'Previous day',     keys: ['←'],      action: prev,          disabled: anyPanelOpen },
     { label: 'Next day',         keys: ['→'],      action: next,          disabled: anyPanelOpen },
-    { label: 'Go to today',      keys: ['T'],      action: goToday,       disabled: anyPanelOpen },
-    { label: 'New appointment',  keys: ['N'],      action: newApptAtTsi,  disabled: anyPanelOpen || !tsi },
-    { label: 'New block',        keys: ['B'],      action: newBlockAtTsi, disabled: anyPanelOpen || !tsi },
+    { label: 'Go to today',      keys: ['H'],      action: goToday,            disabled: anyPanelOpen },
+    { label: 'Till',             keys: ['T'],      action: () => navigate('/till'),    disabled: anyPanelOpen },
+    { label: 'Clients',          keys: ['C'],      action: () => navigate('/clients'), disabled: anyPanelOpen },
+    { label: 'New appointment',  keys: ['N'],      action: newApptAtTsi,       disabled: anyPanelOpen || !tsi },
+    { label: 'New block',        keys: ['B'],      action: newBlockAtTsi,      disabled: anyPanelOpen || !tsi },
     { label: 'Move slot up',     keys: ['↑'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.max(0, t.slotTopPx - SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
     { label: 'Move slot down',   keys: ['↓'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.min(maxSlotTop, t.slotTopPx + SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
     { label: 'Show shortcuts',   keys: ['?'],      action: () => setShowShortcuts(v => !v) },
