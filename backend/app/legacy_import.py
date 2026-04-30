@@ -437,15 +437,24 @@ async def import_receipts(
 
     # Build booking time lookup: (client_code, date_str) → earliest Time string
     booking_time: dict[tuple[str, str], str] = {}
+    booking_time_int: dict[tuple[str, str], int] = {}
     for r in booking_rows:
-        key = (r.get("Code", "").strip(), r.get("Date", "").strip())
-        if key[0] and key[1] and r.get("Time"):
+        code = r.get("Code", "").strip()
+        date = r.get("Date", "").strip()
+        time_str = r.get("Time", "").strip()
+        if not code or not date or not time_str:
+            continue
+        try:
             ti = int(r.get("TimeInt") or 9999)
-            if key not in booking_time or ti < int(
-                next((b.get("TimeInt") or 9999) for b in booking_rows
-                     if b.get("Code", "").strip() == key[0]
-                     and b.get("Date", "").strip() == key[1]), 9999):
-                booking_time[key] = r["Time"].strip()
+        except (ValueError, TypeError):
+            ti = 9999
+        key = (code, date)
+        if ti < booking_time_int.get(key, 9999):
+            booking_time[key] = time_str
+            booking_time_int[key] = ti
+        elif key not in booking_time:
+            booking_time[key] = time_str
+            booking_time_int[key] = ti
 
     # Group receipt rows by receipt number
     receipt_groups: dict[str, list[dict]] = defaultdict(list)
