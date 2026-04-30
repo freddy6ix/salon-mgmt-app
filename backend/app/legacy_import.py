@@ -272,10 +272,10 @@ async def import_clients(
             text(
                 "INSERT INTO clients (id, tenant_id, client_code, legacy_id,"
                 " first_name, last_name, email, cell_phone, preferred_provider_id,"
-                " country, is_active, no_show_count, late_cancellation_count,"
+                " country, is_active, is_vip, no_show_count, late_cancellation_count,"
                 " account_balance, created_at, updated_at)"
                 " VALUES (:id, :tid, :code, :code, :fn, :ln, :email, :cell, :ppid,"
-                " 'CA', true, 0, 0, 0, NOW(), NOW())"
+                " 'CA', true, false, 0, 0, 0, NOW(), NOW())"
             ),
             chunk,
         )
