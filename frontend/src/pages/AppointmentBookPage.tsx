@@ -303,7 +303,7 @@ export default function AppointmentBookPage() {
             slotMinutes={slotMinutes}
             providerHours={schedules}
             tsi={tsi}
-            onTsiChange={setTsi}
+            onTsiChange={(t) => { setTsi(t); if (t) (document.activeElement as HTMLElement)?.blur() }}
             onItemClick={(item, appt) => setSelected({ item, appt })}
             onNewAppointment={(time, providerId) => setBooking({ time, providerId })}
             onNewBlock={(time, providerId) => setCreatingBlock({ time, providerId })}
@@ -317,7 +317,7 @@ export default function AppointmentBookPage() {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => setShowShortcuts(v => !v)}
+        onClick={(e) => { setShowShortcuts(v => !v); (e.currentTarget as HTMLElement).blur() }}
         className="fixed bottom-6 right-6 z-40 h-9 w-9 rounded-full shadow-md"
         title="Keyboard shortcuts (?)"
       >
