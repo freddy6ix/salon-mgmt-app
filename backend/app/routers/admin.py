@@ -585,9 +585,13 @@ async def import_legacy_data(
     bookings_content = await all_bookings_csv.read()
     receipts_content = await receipts_csv.read()
 
+    import traceback
     result: dict = {}
-    result["clients"]  = await import_clients(db, current_user.tenant_id, clients_content)
-    result["receipts"] = await import_receipts(db, current_user.tenant_id, receipts_content, bookings_content)
-    result["past_unreceipted"] = await import_past_unreceipted_bookings(db, current_user.tenant_id, bookings_content)
-    result["future_bookings"]  = await import_bookings(db, current_user.tenant_id, bookings_content, future_only=True)
+    try:
+        result["clients"]  = await import_clients(db, current_user.tenant_id, clients_content)
+        result["receipts"] = await import_receipts(db, current_user.tenant_id, receipts_content, bookings_content)
+        result["past_unreceipted"] = await import_past_unreceipted_bookings(db, current_user.tenant_id, bookings_content)
+        result["future_bookings"]  = await import_bookings(db, current_user.tenant_id, bookings_content, future_only=True)
+    except Exception:
+        result["error"] = traceback.format_exc()
     return result
