@@ -33,6 +33,17 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
+      # ── Type-check frontend (native — faster than inside Docker) ───────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm ci && npm run typecheck
+
       # ── API image ──────────────────────────────────────────────────────────
       - name: Build API image
         run: |
