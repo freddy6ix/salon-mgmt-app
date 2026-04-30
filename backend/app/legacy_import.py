@@ -247,7 +247,7 @@ async def import_clients(
     skipped = 0
 
     for row in rows:
-        code = (row.get("Code") or "").strip().lstrip("|")
+        code = (row.get("Code") or "").strip().lstrip("|")[:20]
         name = (row.get("Name") or "").strip()
         if not code or not name:
             skipped += 1
