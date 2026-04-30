@@ -761,10 +761,11 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
     {/* Slot popover — single-click on empty grid → choose New appointment / New block. */}
     {slotMenu && (
       <>
-        <div className="fixed inset-0 z-30" onClick={() => setSlotMenu(null)} />
+        <div className="fixed inset-0 z-30" onClick={() => setSlotMenu(null)} onContextMenu={(e) => { e.preventDefault(); setSlotMenu(null) }} />
         <div
           className="fixed z-40 bg-white border rounded-md shadow-lg py-1 min-w-[160px]"
           style={{ left: slotMenu.x, top: slotMenu.y }}
+          onContextMenu={(e) => e.preventDefault()}
         >
           <button
             className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
