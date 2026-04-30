@@ -5,8 +5,8 @@
 <h1 align="center">Salon Management System</h1>
 
 <p align="center">
-  Cloud-native salon management software — replacing legacy desktop tools with a modern,<br>
-  AI-ready platform built for the way premium salons actually work.
+  Cloud-native salon management software built for the way premium salons actually work —<br>
+  a modern, AI-ready platform replacing legacy desktop tools.
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 ## The Problem
 
-Legacy salon software (Milano, Vagaro, Mindbody) was designed for a different era — desktop-first, rigid pricing models, and no path to customization. For a high-end independent salon like [Salon Lyol](https://salonlyol.ca) in Toronto, the appointment book *is* the business: multi-service, multi-provider bookings where colour-development gaps and idle-time optimization are daily concerns. No off-the-shelf tool models this correctly.
+Legacy salon software was designed for a different era — desktop-first, rigid pricing models, and no path to customization. For a high-end independent salon like [Salon Lyol](https://salonlyol.ca) in Toronto, the appointment book *is* the business: multi-service, multi-provider bookings where colour-development gaps and idle-time optimization are daily concerns. No off-the-shelf tool models this correctly.
 
 This project replaces Salon Lyol's current system with purpose-built cloud software, and is being designed from day one as a multi-tenant SaaS platform for other premium salons.
 
@@ -121,7 +121,7 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 - Adjustment flow: staff enters a physical count and the delta is computed and recorded with a reason
 
 ### Sales Reporting & Cash Reconciliation
-- Monthly sales report covering revenue, discounts, taxes, and payment-type breakdown (similar to the legacy Milano report)
+- Monthly sales report covering revenue, discounts, taxes, and payment-type breakdown
 - End-of-day cash till: open/close periods, petty cash entries, expected vs. counted variance, 30-day history
 
 ### Client CRM
@@ -142,17 +142,25 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 - Rich-text WYSIWYG body editor for confirmation emails (Tiptap)
 - Fully branded email layout: salon logo, brand colour, address, and footer on all outbound email
 
-### Multi-Provider Staff Management
-- Provider types: Stylist, Colourist, Dualist (can deliver both)
-- Default weekly schedules with versioned effective dates — past schedules are locked
-- Per-date exceptions for individual days
-- Tenant-configurable salon operating hours (drives the appointment grid)
+### Staff Management & Payroll
+- Full provider CRUD: profile, contact info, booking settings, photo
+- Employment details: hire date, certification, SIN (encrypted), direct deposit banking
+- Tax onboarding fields: CPP/EI exemptions, EI rate type, WCB/CSST, TD1 federal and provincial credits
+- Pay configuration: hourly, salary, or commission with hourly floor
+- Commission tiers: configurable revenue brackets with per-provider rates
+- Product fee rules: flat fee per styling service, percentage of colour revenue
+- Retail commission percentage per provider
+- Weekly schedule management with versioned effective dates — past schedules locked
+- Per-date exceptions (days off, modified hours)
+- **Payroll calculator** per provider per period: scheduled hours, service revenue by category, product fees, commission tier selection, retail commission, vacation pay — displayed as a full breakdown
+- **Payroll Report** page: calculates all active providers for a configurable pay period (default: 16th of prior month → 15th of current month), editable amounts per provider, auto-generates the payroll email in Paytrak format, sends directly to the payroll provider or saves as PDF
 
 ### Settings & Branding
 - Tenant logo, brand colour, address, phone — applied to the app header and all outbound emails
 - Configurable appointment slot granularity and operating hours
 - User management: add, edit role, deactivate, and hard-delete staff and guest accounts
-- Email settings: SMTP or Resend API, new-request notifications, appointment reminders
+- Email settings: SMTP or Resend API, client communications address, accounting/payroll address
+- Payroll provider settings: provider name, email, client ID, signature, and email footer — pre-fills the Payroll Report page
 
 ---
 
@@ -161,11 +169,25 @@ This project replaces Salon Lyol's current system with purpose-built cloud softw
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **1** | Appointment book · Client management · Guest booking · Staff schedules | ✅ Complete |
-| **2** | POS & checkout · Notifications · Sales reporting · Retail catalog · Inventory · Data import | 🔄 Nearly complete |
+| **2** | POS & checkout · Notifications · Sales reporting · Retail catalog · Inventory · Staff management · Payroll | 🔄 Nearly complete |
 | **3** | Multi-tenancy hardening · Beta salon onboarding | Planned |
 | **4** | AI-integrated CRM (email, chat, voice) · Advanced analytics | Planned |
 
-**Phase 2 remaining:** bulk data import from Milano (clients, appointments, services, staff).
+**Phase 2 remaining:** bulk data import (clients, appointments, services, staff); staff check-in/check-out; annual salary pay type.
+
+---
+
+## By the Numbers
+
+This codebase is built almost entirely through [Claude Code](https://claude.ai/code) — spec-driven, session-by-session, with a single developer directing the work.
+
+| Metric | Count |
+|--------|-------|
+| **Frontend** (TypeScript / React) | ~14,650 lines · 66 files |
+| **Backend** (Python / FastAPI) | ~8,850 lines · 53 files |
+| **Database migrations** (Alembic) | ~1,970 lines · 36 migrations |
+| **Total source** | **~25,470 lines** |
+| **Git commits** | 208 |
 
 ---
 

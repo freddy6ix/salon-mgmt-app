@@ -47,6 +47,15 @@ export interface EmailConfig {
   smtp_password_set: boolean
   smtp_use_tls: boolean
   from_address: string
+  accounting_from_address: string | null
+}
+
+export interface PayrollConfig {
+  provider_name: string | null
+  provider_email: string | null
+  client_id: string | null
+  signature: string | null
+  footer: string | null
 }
 
 export function getEmailConfig(): Promise<EmailConfig> {
@@ -62,8 +71,17 @@ export function saveEmailConfig(data: {
   smtp_password?: string
   smtp_use_tls?: boolean
   from_address: string
+  accounting_from_address?: string | null
 }): Promise<EmailConfig> {
   return api.put<EmailConfig>('/admin/email-config', data)
+}
+
+export function getPayrollConfig(): Promise<PayrollConfig> {
+  return api.get<PayrollConfig>('/admin/payroll-config')
+}
+
+export function savePayrollConfig(data: PayrollConfig): Promise<PayrollConfig> {
+  return api.put<PayrollConfig>('/admin/payroll-config', data)
 }
 
 export function testEmailConfig(to: string): Promise<void> {

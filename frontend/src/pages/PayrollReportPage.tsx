@@ -1,0 +1,477 @@
+import { useState, useEffect, useRef } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { format, addDays } from 'date-fns'
+import { Send, Printer, ClipboardCopy, RefreshCw } from 'lucide-react'
+import { getPayrollReport, sendPayrollEmail, type ProviderPayrollLine } from '@/api/providers'
+import { getPayrollConfig, getEmailConfig } from '@/api/admin'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function defaultPeriod() {
+  const now = new Date()
+  // period_end = 15th of current month; period_start = 16th of previous month
+  const periodEnd = new Date(now.getFullYear(), now.getMonth(), 15)
+  const periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 16)
+  return {
+    start: format(periodStart, 'yyyy-MM-dd'),
+    end: format(periodEnd, 'yyyy-MM-dd'),
+  }
+}
+
+function defaultPaymentDate(periodEnd: string) {
+  return format(addDays(new Date(periodEnd + 'T12:00:00'), 5), 'yyyy-MM-dd')
+}
+
+function longDate(iso: string) {
+  return format(new Date(iso + 'T12:00:00'), 'MMMM do yyyy')
+}
+
+function fmtCad(n: number) {
+  return n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ── Pay line generation ───────────────────────────────────────────────────────
+
+interface EditableLine {
+  provider_id: string
+  first_name: string
+  last_name: string
+  is_owner: boolean
+  pay_basis: string
+  scheduled_hours: number
+  hourly_minimum: number | null
+  service_commission: number
+  retail_commission: number
+  vacation_pct: number
+}
+
+function generatePayLine(line: EditableLine): string {
+  const name = `${line.first_name} ${line.last_name}`
+
+  if (line.is_owner) {
+    return `${name}\nService Commission = $${fmtCad(line.service_commission)} (No Stat holidays and no Vacation pay)`
+  }
+
+  let base = ''
+  if (line.pay_basis === 'hourly' && line.hourly_minimum) {
+    const total = Math.round(line.scheduled_hours * line.hourly_minimum * 100) / 100
+    base = `${Math.round(line.scheduled_hours)} hours @$${fmtCad(line.hourly_minimum)} = $${fmtCad(total)}`
+  } else {
+    base = `Service Commission $${fmtCad(line.service_commission)}`
+  }
+
+  const retail = line.retail_commission > 0 ? ` + Retail Commission $${fmtCad(line.retail_commission)}` : ''
+  const vac = line.vacation_pct > 0 ? ` + ${line.vacation_pct}% vacation pay` : ''
+
+  return `${name}\n${base}${retail}${vac}`
+}
+
+function buildEmailBody(opts: {
+  paymentDate: string
+  periodStart: string
+  periodEnd: string
+  notes: string
+  owners: EditableLine[]
+  staff: EditableLine[]
+  signature: string
+  footer: string
+}): string {
+  const { paymentDate, periodStart, periodEnd, notes, owners, staff, signature, footer } = opts
+  const pmtFormatted = format(new Date(paymentDate + 'T12:00:00'), 'MMMM do yyyy')
+
+  const lines: string[] = []
+  lines.push('Team1,')
+  lines.push('')
+  lines.push(
+    `This is the ${pmtFormatted} payroll for the pay period from ${longDate(periodStart)} to ${longDate(periodEnd)}.`
+  )
+  if (notes.trim()) {
+    lines.push(notes.trim())
+  }
+
+  if (owners.length) {
+    lines.push('')
+    lines.push('@Owner')
+    owners.forEach(o => lines.push(generatePayLine(o)))
+  }
+
+  if (staff.length) {
+    lines.push('')
+    lines.push('@STAFF')
+    staff.forEach((s, i) => {
+      if (i > 0) lines.push('')
+      lines.push(generatePayLine(s))
+    })
+  }
+
+  lines.push('')
+  lines.push(`Thank you,\n${signature}`)
+
+  if (footer.trim()) {
+    lines.push('')
+    lines.push('--')
+    lines.push(footer.trim())
+  }
+
+  return lines.join('\n')
+}
+
+// ── Review table ──────────────────────────────────────────────────────────────
+
+function ReviewTable({
+  lines,
+  editable,
+  onChange,
+}: {
+  lines: EditableLine[]
+  editable: EditableLine[]
+  onChange: (id: string, patch: Partial<EditableLine>) => void
+}) {
+  return (
+    <div className="overflow-auto border rounded-lg">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/30 border-b">
+          <tr>
+            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">Basis</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Hours</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Svc Commission ($)</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Retail Commission ($)</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Vac %</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Gross Pay ($)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {editable.map((el) => {
+            const orig = lines.find(l => l.provider_id === el.provider_id)
+            const gross = el.is_owner
+              ? el.service_commission
+              : el.pay_basis === 'hourly' && el.hourly_minimum
+              ? el.scheduled_hours * el.hourly_minimum + el.retail_commission
+              : el.service_commission + el.retail_commission
+
+            return (
+              <tr key={el.provider_id} className="border-b last:border-0 hover:bg-muted/20">
+                <td className="px-4 py-2">
+                  <span className="font-medium">{el.first_name} {el.last_name}</span>
+                  {el.is_owner && (
+                    <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Owner</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-muted-foreground capitalize text-xs">{el.pay_basis}</td>
+                <td className="px-4 py-2 text-right">
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={el.scheduled_hours}
+                    onChange={e => onChange(el.provider_id, { scheduled_hours: parseFloat(e.target.value) || 0 })}
+                    className="w-20 h-7 text-xs text-right ml-auto"
+                  />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={el.service_commission}
+                    onChange={e => onChange(el.provider_id, { service_commission: parseFloat(e.target.value) || 0 })}
+                    className="w-28 h-7 text-xs text-right ml-auto"
+                  />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={el.retail_commission}
+                    onChange={e => onChange(el.provider_id, { retail_commission: parseFloat(e.target.value) || 0 })}
+                    className="w-24 h-7 text-xs text-right ml-auto"
+                  />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  {el.is_owner ? (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ) : (
+                    <Input
+                      type="number"
+                      step="1"
+                      value={el.vacation_pct}
+                      onChange={e => onChange(el.provider_id, { vacation_pct: parseFloat(e.target.value) || 0 })}
+                      className="w-16 h-7 text-xs text-right ml-auto"
+                    />
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right font-medium">
+                  ${fmtCad(gross)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function PayrollReportPage() {
+  const defaults = defaultPeriod()
+  const [periodStart, setPeriodStart] = useState(defaults.start)
+  const [periodEnd, setPeriodEnd] = useState(defaults.end)
+  const [paymentDate, setPaymentDate] = useState(() => defaultPaymentDate(defaults.end))
+  const [notes, setNotes] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [toEmail, setToEmail] = useState('')
+  const [signature, setSignature] = useState('')
+  const [footer, setFooter] = useState('')
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+
+  const { data: payrollCfg } = useQuery({ queryKey: ['payroll-config'], queryFn: getPayrollConfig })
+  const { data: emailCfg } = useQuery({ queryKey: ['email-config'], queryFn: getEmailConfig })
+
+  useEffect(() => {
+    if (!settingsLoaded && payrollCfg) {
+      if (payrollCfg.provider_email) setToEmail(payrollCfg.provider_email)
+      if (payrollCfg.client_id) setClientId(payrollCfg.client_id)
+      if (payrollCfg.signature) setSignature(payrollCfg.signature)
+      if (payrollCfg.footer) setFooter(payrollCfg.footer)
+      setSettingsLoaded(true)
+    }
+  }, [payrollCfg, settingsLoaded])
+  const [editableLines, setEditableLines] = useState<EditableLine[]>([])
+  const [emailText, setEmailText] = useState('')
+  const [copied, setCopied] = useState(false)
+  const emailRef = useRef<HTMLTextAreaElement>(null)
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['payroll-report', periodStart, periodEnd],
+    queryFn: () => getPayrollReport(periodStart, periodEnd),
+    enabled: false,
+  })
+
+  function toEditable(l: ProviderPayrollLine): EditableLine {
+    return {
+      provider_id: l.provider_id,
+      first_name: l.first_name,
+      last_name: l.last_name,
+      is_owner: l.is_owner,
+      pay_basis: l.pay_basis,
+      scheduled_hours: l.scheduled_hours,
+      hourly_minimum: l.hourly_minimum,
+      service_commission: l.service_commission,
+      retail_commission: l.retail_commission,
+      vacation_pct: l.vacation_pct,
+    }
+  }
+
+  useEffect(() => {
+    if (data) {
+      const els = [...data.lines].sort((a, b) => {
+        if (a.is_owner !== b.is_owner) return a.is_owner ? -1 : 1
+        return a.booking_order - b.booking_order
+      }).map(toEditable)
+      setEditableLines(els)
+    }
+  }, [data])
+
+  useEffect(() => {
+    if (editableLines.length === 0) return
+    const owners = editableLines.filter(l => l.is_owner)
+    const staff = editableLines.filter(l => !l.is_owner)
+    setEmailText(buildEmailBody({ paymentDate, periodStart, periodEnd, notes, owners, staff, signature, footer }))
+  }, [editableLines, paymentDate, periodStart, periodEnd, notes, signature, footer])
+
+  function updateLine(id: string, patch: Partial<EditableLine>) {
+    setEditableLines(prev => prev.map(l => l.provider_id === id ? { ...l, ...patch } : l))
+  }
+
+  function handleCalculate() {
+    refetch()
+  }
+
+  const subject = `${clientId} : ${format(new Date(paymentDate + 'T12:00:00'), 'MMMM do yyyy')} Payroll`
+
+  const sendMutation = useMutation({
+    mutationFn: () => sendPayrollEmail({ to_email: toEmail, subject, body_text: emailText }),
+  })
+
+  function handleCopy() {
+    navigator.clipboard.writeText(emailText).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handlePrint() {
+    window.print()
+  }
+
+  const owners = editableLines.filter(l => l.is_owner)
+  const staff = editableLines.filter(l => !l.is_owner)
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <header className="bg-white border-b px-6 py-3 flex items-center gap-4">
+        <h1 className="font-semibold text-base">Payroll Report</h1>
+        <span className="text-sm text-muted-foreground">Paytrak</span>
+      </header>
+
+      <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6 max-w-[1400px]">
+
+        {/* ── Left: Period + Review ── */}
+        <div className="space-y-5">
+          {/* Period controls */}
+          <div className="bg-white border rounded-lg p-4 space-y-4">
+            <h2 className="text-sm font-semibold">Pay Period</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Period start</Label>
+                <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Period end</Label>
+                <Input type="date" value={periodEnd} onChange={e => {
+                  setPeriodEnd(e.target.value)
+                  setPaymentDate(defaultPaymentDate(e.target.value))
+                }} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Payment date</Label>
+                <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleCalculate} disabled={isLoading} className="w-full gap-2">
+                  <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                  {isLoading ? 'Calculating…' : 'Calculate'}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Stat holiday / notes (added after opening paragraph)</Label>
+              <Input
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="e.g. Please add a statutory holiday (Good Friday) for everyone but Jong Joung."
+              />
+            </div>
+          </div>
+
+          {/* Review table */}
+          {editableLines.length > 0 && (
+            <div className="bg-white border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Review — adjust amounts if needed</h2>
+                <span className="text-xs text-muted-foreground">Changes update the email preview automatically</span>
+              </div>
+
+              {owners.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Owner</p>
+                  <ReviewTable lines={data?.lines.map(toEditable) ?? []} editable={owners} onChange={updateLine} />
+                </div>
+              )}
+              {staff.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Staff</p>
+                  <ReviewTable lines={data?.lines.map(toEditable) ?? []} editable={staff} onChange={updateLine} />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Right: Email composer ── */}
+        <div className="space-y-5">
+          <div className="bg-white border rounded-lg p-4 space-y-4">
+            <h2 className="text-sm font-semibold">Email</h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">To</Label>
+                <Input value={toEmail} onChange={e => setToEmail(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Paytrak client ID</Label>
+                <Input value={clientId} onChange={e => setClientId(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Subject</Label>
+              <Input value={subject} readOnly className="bg-muted/30 text-muted-foreground" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Signature name</Label>
+                <Input value={signature} onChange={e => setSignature(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Footer (after --)</Label>
+              <textarea
+                value={footer}
+                onChange={e => setFooter(e.target.value)}
+                rows={4}
+                className="w-full border border-input rounded-md px-3 py-2 text-xs bg-background resize-none font-mono"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Email body — review and edit before sending</Label>
+                <button onClick={handleCopy} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <ClipboardCopy size={12} />
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <textarea
+                ref={emailRef}
+                value={emailText}
+                onChange={e => setEmailText(e.target.value)}
+                rows={20}
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none font-mono"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button
+                onClick={() => sendMutation.mutate()}
+                disabled={!emailText || sendMutation.isPending || editableLines.length === 0}
+                className="gap-2"
+              >
+                <Send size={14} />
+                {sendMutation.isPending ? 'Sending…' : 'Send to Paytrak'}
+              </Button>
+              <Button variant="ghost" onClick={handlePrint} className="gap-2">
+                <Printer size={14} />
+                Print / Save PDF
+              </Button>
+            </div>
+
+            {sendMutation.isSuccess && (
+              <p className="text-sm text-emerald-600">Email sent to {toEmail}</p>
+            )}
+            {sendMutation.isError && (
+              <p className="text-sm text-destructive">
+                Failed to send: {(sendMutation.error as Error)?.message}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          header, .xl\\:grid-cols-2 > div:first-child > div:first-child, button { display: none !important; }
+          body { background: white; }
+          textarea { border: none; height: auto; overflow: visible; white-space: pre-wrap; font-size: 12px; }
+        }
+      `}</style>
+    </div>
+  )
+}

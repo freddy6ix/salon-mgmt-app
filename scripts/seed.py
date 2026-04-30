@@ -13,10 +13,8 @@ from urllib.parse import quote_plus
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.auth import hash_password
 from app.config import settings
 from app.models.tenant import Tenant
-from app.models.user import User, UserRole
 from app.models.department import Department
 from app.models.provider import Provider, ProviderType, OnlineBookingVisibility
 from app.models.service import ServiceCategory, Service, PricingType
@@ -90,30 +88,13 @@ async def seed():
             depts[d["code"]] = dept
         print(f"Departments: {list(depts.keys())}")
 
-        # ── Owner user + provider (JJ) ───────────────────────────────────────
-        existing = await db.execute(
-            select(User).where(User.tenant_id == tid, User.email == "jj@salonlyol.ca")
-        )
-        jj_user = existing.scalar_one_or_none()
-        if jj_user is None:
-            jj_user = User(
-                tenant_id=tid,
-                email="jj@salonlyol.ca",
-                password_hash=hash_password("changeme123"),
-                role=UserRole.tenant_admin,
-                is_active=True,
-            )
-            db.add(jj_user)
-            await db.flush()
-            print(f"Created user JJ: {jj_user.id}")
-
         # ── Providers ────────────────────────────────────────────────────────
         provider_data = [
             dict(first_name="Jini", last_name="Jung", display_name="JJ", milano_code="JJ",
                  provider_type=ProviderType.dualist, is_owner=True, booking_order=1,
                  has_appointments=True, makes_appointments=True, can_be_cashier=True,
                  online_booking_visibility=OnlineBookingVisibility.available_to_all,
-                 user_id=jj_user.id, department_code="STYLING"),
+                 department_code="STYLING"),
             dict(first_name="Antonella", last_name="Cumbo", display_name="Antonella", milano_code="ANTONELLA",
                  provider_type=ProviderType.dualist, booking_order=2,
                  has_appointments=True, makes_appointments=True,
@@ -822,7 +803,6 @@ async def seed():
         await db.commit()
         print("\nSeed complete.")
         print(f"  Tenant ID : {tenant.id}")
-        print(f"  Login     : jj@salonlyol.ca / changeme123")
         print()
         print("NOTE — needs owner input:")
         print("  CCAMO  Camo Colour        — in catalog, no per-provider pricing in XLS")

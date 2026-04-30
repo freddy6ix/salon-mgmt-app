@@ -58,7 +58,7 @@
 - `[ ]` **Seed service catalog and provider prices for PROD tenant**
   Run the seed against the PROD tenant (or enter manually via the Services page). This is the real catalog, not test data.
 
-- `[ ]` **Import client data from Milano (P2-20)**
+- `[ ]` **Import client data from existing system (P2-20)**
   Once P2-20 (bulk import) is shipped, use it to migrate existing client history.
 
 ---

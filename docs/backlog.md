@@ -133,6 +133,17 @@ Send the client a reminder before their appointment. Lead time is configurable (
 - Channel (email / SMS / both) configurable per tenant
 - Per-appointment opt-out
 
+### P2-3a · Cancellation notice to client
+
+When an appointment that already has a confirmation sent is cancelled by staff, offer to send the client a cancellation notice.
+
+- Trigger: appointment is cancelled (status → `cancelled`) and `confirmation_sent_at` is non-null on the appointment record
+- UX: after the cancellation action completes, show a prompt — "A confirmation was sent for this appointment. Send a cancellation notice to [client email]?" with Send / Skip options
+- Email content: appointment date, time, provider(s), services, salon contact info, and a brief apology / re-booking invite
+- Backend: `POST /appointments/{id}/send-cancellation` — sends the notice via the tenant's configured email, returns 204; 404 if no confirmation was ever sent
+- No new schema fields needed — `confirmation_sent_at` already indicates a confirmation was sent; the cancellation notice is fire-and-forget (no tracking field in v1)
+- Out of scope for v1: SMS channel, re-booking link, per-tenant on/off toggle
+
 ### P2-4 · New booking request notification to salon
 When a guest submits a booking request via the public form, notify the salon staff by email.
 
@@ -141,7 +152,7 @@ When a guest submits a booking request via the public form, notify the salon sta
 - Recipient address(es) configurable in tenant settings
 
 ### P2-5 · Monthly sales report
-Reproduces the "Daily Sales Report" from Milano for any configurable date range (daily, weekly, monthly).
+Comprehensive sales report for any configurable date range (daily, weekly, monthly).
 
 Full spec in `docs/reports/reports-annotations.md`. Key sections:
 
@@ -165,8 +176,7 @@ Follow-up to P2-1 (deferred Q3 from `docs/specs/P2-1-checkout-payment.md`). When
 - Fetch the sale when the appointment status is `completed`; render under the existing "Checked out" indicator
 - Read-only view in v1 (editing/voiding deferred — see P2-1 spec Q1)
 
-**Milano receipt layout reference:** `docs/screenshots/receipt-layout.jpeg`
-Milano's receipt is structured in three zones: **Header** (logo image + salon name), **Body** (date/time; per-line service/retail amounts; summary block with Services, Retail, G/C, SubTotal, GST, PST), **Footer** (client first + last name, next appointment date, salon address, phone, email). Options include "Always Email eReceipt" and a default prompt (None / Receipt / eReceipt / Invoice). Our email receipt already covers the body/footer content; this screenshot is reference if we add a printable/PDF receipt in a future item.
+**Receipt layout:** Three zones — **Header** (logo + salon name), **Body** (date/time; per-line service/retail amounts; summary block with Services, Retail, G/C, SubTotal, GST, PST), **Footer** (client first + last name, next appointment date, salon address, phone, email). Options include "Always Email eReceipt" and a default prompt (None / Receipt / eReceipt / Invoice). Our email receipt already covers the body/footer content; this structure is reference if we add a printable/PDF receipt in a future item.
 
 ### P2-7 · Edit a completed sale (correct payment methods / splits)
 
@@ -195,19 +205,12 @@ Cash is the one payment method that has to physically match a count at the end o
 4. Closing the reconciliation locks all cash payments and petty-cash entries in that period — they can no longer be edited (protects audit trail).
 5. The closing balance becomes the next day's opening.
 
-**Why this matters:** without this, the P2-5 sales report can compute "cash sales" but no one can confirm the till matches. This is the linchpin of cash control and Milano had it.
+**Why this matters:** without this, the P2-5 sales report can compute "cash sales" but no one can confirm the till matches. This is the linchpin of cash control.
 
-**Milano reference screenshots:** `docs/screenshots/daily reconciliation/`
-Four screenshots capture exactly how Milano implements this:
-- `E0221A0A` — Entry point: a date-range picker (From / To) before opening the reconciliation view. Suggests we should support running the reconciliation for any date, not just "today".
-- `156F71AD` — **Payment Type Reconciliation** main table: columns are Type, Counted (editable), Expected (system-computed), Difference. Payment types shown: AMEX, CASH, DEBIT, VISA. Totals row at bottom. "Post" button commits the count.
-- `6F3B6E33` — **Transaction drill-down** per payment type (shown for DEBIT): lists each individual sale by date and receipt number with its amount. Checkboxes to confirm individual receipts; "Total Confirmed Receipts" sums the ticked ones. This lets staff reconcile card batches against a terminal report. Lower priority for v1 but good to know it exists.
-- `DD144CF2` — **Cash Reconciliation** denomination dialog: staff enter the count of each denomination (100, 50, 20, 10, 5, 2, 1, 0.50, 0.25, 0.10, 0.05, 0.01); system multiplies and totals. Shows: Total Cash Counted, Less Opening Float, Net Cash Counted, Net Cash Expected, and Over/Under variance. "Print" and "Ok" buttons.
-
-Key design notes from Milano reference:
-1. Milano reconciles **all payment types** (not just cash), entering a "Counted" amount for each. Card types would be compared against terminal batch totals. For v1 we can scope to cash-only (since cards are self-reconciling) but the UI should be aware of the fuller model.
-2. The cash denomination grid is a nice-to-have — staff can count by denomination rather than entering a lump sum. Consider as an optional mode.
-3. The date-range entry suggests reconciliations can be run retroactively or across multiple days, not just end-of-today.
+**UI design notes:**
+1. Reconcile **all payment types** (not just cash), entering a "Counted" amount for each. Card types compared against terminal batch totals. For v1 scope to cash-only (cards are self-reconciling) but the UI should anticipate the fuller model.
+2. Support a date-range picker — reconciliations should be runnable for any date, not just "today".
+3. The cash denomination grid is a nice-to-have — staff count by denomination rather than entering a lump sum. Consider as an optional mode: staff enter counts of each denomination (100, 50, 20, 10, 5, 2, 1, 0.50, 0.25, 0.10, 0.05, 0.01); system multiplies and totals, showing: Total Cash Counted, Less Opening Float, Net Cash Counted, Net Cash Expected, Over/Under variance.
 
 **Depends on:**
 - P2-5 (monthly sales report) — shares the reconciliation period model and petty cash semantics.
@@ -400,7 +403,7 @@ When an appointment is cancelled from the client card (Clients → client → Ap
 
 ### P2-20 · Import client data (with history and future appointments)
 
-Bulk import client records from a CSV or Excel export of Milano (or other salon software), including appointment history and any future bookings.
+Bulk import client records from a CSV or Excel export of an existing salon system, including appointment history and any future bookings.
 
 **Scope:**
 - CSV/Excel upload via an admin-only import page
@@ -412,7 +415,7 @@ Bulk import client records from a CSV or Excel export of Milano (or other salon 
 
 **Out of scope for v1:** colour notes import, no-show date details (just counts), payment history.
 
-**Why this matters:** without client history, the appointment book starts cold and staff lose the institutional memory of client preferences, formulas, and no-show patterns that Milano holds.
+**Why this matters:** without client history, the appointment book starts cold and staff lose the institutional memory of client preferences, formulas, and no-show patterns built up over years.
 
 ### P2-21 · Import retail inventory
 
@@ -502,3 +505,51 @@ Permanently removes a user account and all directly owned data from the database
 **Backend:** `DELETE /users/{id}` (admin-only, tenant-scoped) — runs all deletes in a transaction; returns 204 on success.
 
 **Frontend:** "Delete" action on each row in the Users page (separate from Edit); two-step confirmation dialog that names the user and warns about permanent deletion; on success removes the row from the list.
+
+
+### P-CLEAN · Remove remaining Milano reference (provider code column)
+
+The documentation, backlog, and screenshot files have already been cleansed. One code reference remains:
+
+*Code:*
+- `providers.milano_code` column — rename to `provider_code` or `staff_code` (migration required). Update all references in models, routers, seed script, and any frontend that reads it.
+
+*Seed data:*
+- `scripts/seed.py` — the `milano_code` key in `provider_data` must be renamed to match once the column is renamed. The values (e.g. `"GUMI"`, `"RYAN"`) are fine to keep.
+
+**What to preserve:** The underlying feature specs and UI designs are independent of any third-party product — only the column name needs to change.
+
+### P2-24 · Staff check-in / check-out
+
+Staff check in and out on the app each working day so the system knows their actual hours. This is the authoritative source for hourly pay when a provider's service commission for the pay period does not meet their hourly floor.
+
+**Why this matters:** The payroll calculator currently uses *scheduled* hours from the provider's weekly schedule as a proxy. Scheduled hours are not the same as hours actually worked — staff may arrive late, leave early, or work extra. For hourly-floor calculation this needs to be accurate.
+
+**Data model:**
+- `StaffTimeEntry` table: `provider_id`, `tenant_id`, `entry_date` (date), `check_in_at` (timestamptz), `check_out_at` (timestamptz nullable), `total_hours` (computed on check-out), `notes`.
+- One open entry per provider per day (check_in_at set, check_out_at null = currently clocked in).
+- Check-out closes the entry and computes `total_hours`.
+
+**App flow:**
+- Staff-facing clock widget on the dashboard (or a dedicated clock-in page): large "Clock In" / "Clock Out" button showing current status.
+- Admin can view and edit time entries for any provider (corrections for forgotten clock-outs, etc.) from the Staff Management page under a new "Time" tab.
+- Admin can manually add entries (e.g. forgot to clock in).
+
+**Payroll integration:**
+- Payroll calculator switches from scheduled hours to summed `total_hours` from `StaffTimeEntry` for the pay period when time entries exist.
+- Falls back to schedule-derived hours if no entries for the period (preserves backward compatibility during rollout).
+
+**Depends on:** Staff Management module (already built).
+
+### P2-25 · Annual / flat salary pay type for owner
+
+When onboarding a staff member (or owner), provide an "Annual salary" pay type option in addition to Hourly and Commission. Entering an annual amount lets the system divide by the number of pay cycles per year to compute the per-period gross — no hours or commission calculation required.
+
+**Why this matters:** The owner (JJ) currently draws a flat $6,000 per pay cycle. This is entered manually in the payroll review table each month. An annual salary config would pre-fill the amount automatically so it only needs adjustment if the draw changes.
+
+**Implementation:**
+- Add `annual_salary` to the `PayType` enum (migration required).
+- When `pay_type = annual_salary`, `pay_amount` stores the annual amount. Payroll calculator divides by cycles per year (configurable per tenant, default 12 for monthly pay periods).
+- Payroll report line: formatted as `Salary $X,XXX.XX` (no hours, no commission, no vacation pay unless vacation_pct > 0).
+- Compensation tab in Staff Management: selecting "Annual salary" shows an "Annual amount ($)" input and a read-only "Per period ($)" display.
+- Owner providers default vacation_pct = 0 when this pay type is selected (configurable).

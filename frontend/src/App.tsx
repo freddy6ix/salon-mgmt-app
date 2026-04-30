@@ -7,7 +7,8 @@ import RegisterPage from '@/pages/RegisterPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import DashboardPage from '@/pages/DashboardPage'
 import AppointmentBookPage from '@/pages/AppointmentBookPage'
-import StaffSchedulePage from '@/pages/StaffSchedulePage'
+import StaffManagementPage from '@/pages/StaffManagementPage'
+import PayrollReportPage from '@/pages/PayrollReportPage'
 import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
@@ -58,7 +59,8 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/appointments" element={<AppointmentBookPage />} />
         <Route path="/requests" element={<RequestsPage />} />
-        <Route path="/staff" element={<StaffSchedulePage />} />
+        <Route path="/staff" element={<StaffManagementPage />} />
+        <Route path="/payroll" element={<PayrollReportPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/reports" element={<ReportsPage />} />

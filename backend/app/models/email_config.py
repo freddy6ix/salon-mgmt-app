@@ -21,3 +21,4 @@ class TenantEmailConfig(TenantScopedBase):
     smtp_use_tls: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     from_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    accounting_from_address: Mapped[str | None] = mapped_column(String(255), nullable=True)

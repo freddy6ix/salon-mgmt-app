@@ -353,10 +353,12 @@ class EmailConfigOut(BaseModel):
     smtp_password_set: bool
     smtp_use_tls: bool
     from_address: str
+    accounting_from_address: str | None
 
 
 class EmailConfigSave(BaseModel):
     send_mode: str = "smtp"
+    accounting_from_address: str | None = None
     # Resend API fields
     resend_api_key: str | None = None
     # SMTP fields
@@ -379,6 +381,7 @@ def _email_config_out(row: TenantEmailConfig) -> EmailConfigOut:
         smtp_password_set=bool(row.smtp_password),
         smtp_use_tls=row.smtp_use_tls,
         from_address=row.from_address,
+        accounting_from_address=row.accounting_from_address,
     )
 
 
@@ -392,6 +395,7 @@ _EMPTY_EMAIL_CONFIG = EmailConfigOut(
     smtp_password_set=False,
     smtp_use_tls=True,
     from_address="",
+    accounting_from_address=None,
 )
 
 
@@ -448,6 +452,7 @@ async def save_email_config(
             row.smtp_password = body.smtp_password
         row.smtp_use_tls = body.smtp_use_tls
         row.from_address = body.from_address.strip()
+    row.accounting_from_address = body.accounting_from_address.strip() if body.accounting_from_address else None
 
     await db.commit()
     await db.refresh(row)
@@ -482,3 +487,77 @@ async def test_email_config(
         await send_email(smtp_cfg, body.to, subject, wrap_branded(inner, tenant, subject=subject))
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ── Payroll config ────────────────────────────────────────────────────────────
+
+class PayrollConfigOut(BaseModel):
+    provider_name: str | None
+    provider_email: str | None
+    client_id: str | None
+    signature: str | None
+    footer: str | None
+
+
+class PayrollConfigSave(BaseModel):
+    provider_name: str | None = None
+    provider_email: str | None = None
+    client_id: str | None = None
+    signature: str | None = None
+    footer: str | None = None
+
+
+def _payroll_config_out(row: "TenantPayrollConfig") -> PayrollConfigOut:
+    return PayrollConfigOut(
+        provider_name=row.provider_name,
+        provider_email=row.provider_email,
+        client_id=row.client_id,
+        signature=row.signature,
+        footer=row.footer,
+    )
+
+_EMPTY_PAYROLL_CONFIG = PayrollConfigOut(
+    provider_name=None, provider_email=None, client_id=None, signature=None, footer=None,
+)
+
+
+@router.get("/payroll-config", response_model=PayrollConfigOut)
+async def get_payroll_config(
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PayrollConfigOut:
+    from app.models.payroll_config import TenantPayrollConfig
+    row = (
+        await db.execute(
+            select(TenantPayrollConfig).where(TenantPayrollConfig.tenant_id == current_user.tenant_id)
+        )
+    ).scalar_one_or_none()
+    return _payroll_config_out(row) if row else _EMPTY_PAYROLL_CONFIG
+
+
+@router.put("/payroll-config", response_model=PayrollConfigOut)
+async def save_payroll_config(
+    body: PayrollConfigSave,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PayrollConfigOut:
+    from app.models.payroll_config import TenantPayrollConfig
+    row = (
+        await db.execute(
+            select(TenantPayrollConfig).where(TenantPayrollConfig.tenant_id == current_user.tenant_id)
+        )
+    ).scalar_one_or_none()
+
+    if row is None:
+        row = TenantPayrollConfig(tenant_id=current_user.tenant_id)
+        db.add(row)
+
+    row.provider_name = body.provider_name.strip() if body.provider_name else None
+    row.provider_email = body.provider_email.strip() if body.provider_email else None
+    row.client_id = body.client_id.strip() if body.client_id else None
+    row.signature = body.signature.strip() if body.signature else None
+    row.footer = body.footer.strip() if body.footer else None
+
+    await db.commit()
+    await db.refresh(row)
+    return _payroll_config_out(row)

@@ -43,7 +43,7 @@ The mobile app is **Phase 2**. Phase 1 delivers the desktop web app only. Staff 
 
 | Option | Pro | Con |
 |--------|-----|-----|
-| Headless only | No frontend work | Cannot replace Milano; no Phase 1 value |
+| Headless only | No frontend work | No staff-facing UI; no Phase 1 value |
 | Jinja2 + HTMX | Single codebase, Python-native | Poor fit for the appointment book's interactive grid |
 | React SPA | Full control over calendar grid; large ecosystem | Context switch for backend-focused developer |
 | Low-code admin | Fast for CRUD screens | Cannot implement the appointment book grid; vendor lock-in |

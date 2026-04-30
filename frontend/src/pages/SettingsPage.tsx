@@ -15,7 +15,7 @@ import {
   getRequestNotifications,
   updateRequestNotifications,
 } from '@/api/settings'
-import { getEmailConfig, saveEmailConfig, testEmailConfig } from '@/api/admin'
+import { getEmailConfig, saveEmailConfig, testEmailConfig, getPayrollConfig, savePayrollConfig } from '@/api/admin'
 import {
   listPaymentMethods,
   createPaymentMethod,
@@ -92,7 +92,7 @@ export default function SettingsPage() {
     },
   })
 
-  const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'promotions' | 'email'>('branding')
+  const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'promotions' | 'email' | 'payroll'>('branding')
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
 
@@ -102,6 +102,7 @@ export default function SettingsPage() {
     ...(isAdmin ? [{ id: 'payment-methods', label: 'Payment methods' }] : []),
     ...(isAdmin ? [{ id: 'promotions', label: 'Promotions' }] : []),
     ...(isAdmin ? [{ id: 'email', label: 'Email' }] : []),
+    ...(isAdmin ? [{ id: 'payroll', label: 'Payroll' }] : []),
   ] as const
 
   return (
@@ -369,6 +370,9 @@ export default function SettingsPage() {
             <RemindersSection />
           </>
         )}
+
+        {/* Payroll tab — admin only */}
+        {tab === 'payroll' && isAdmin && <PayrollSection />}
       </div>
     </div>
   )
@@ -799,6 +803,7 @@ function EmailSection() {
   const [useTls, setUseTls] = useState(true)
   // Shared
   const [fromAddress, setFromAddress] = useState('')
+  const [accountingFromAddress, setAccountingFromAddress] = useState('')
   const [testTo, setTestTo] = useState('')
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [testMsg, setTestMsg] = useState<string | null>(null)
@@ -811,6 +816,7 @@ function EmailSection() {
       setUsername(cfg.smtp_username)
       setUseTls(cfg.smtp_use_tls)
       setFromAddress(cfg.from_address)
+      setAccountingFromAddress(cfg.accounting_from_address ?? '')
     }
   }, [cfg])
 
@@ -821,6 +827,7 @@ function EmailSection() {
             send_mode: 'resend_api',
             resend_api_key: resendApiKey || undefined,
             from_address: fromAddress.trim(),
+            accounting_from_address: accountingFromAddress.trim() || null,
           }
         : {
             send_mode: 'smtp',
@@ -830,6 +837,7 @@ function EmailSection() {
             smtp_password: password || undefined,
             smtp_use_tls: useTls,
             from_address: fromAddress.trim(),
+            accounting_from_address: accountingFromAddress.trim() || null,
           }
     ),
     onSuccess: updated => {
@@ -978,15 +986,29 @@ function EmailSection() {
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="from-address">From address</Label>
+        <Label htmlFor="from-address">Client communications — From address</Label>
         <Input
           id="from-address"
           value={fromAddress}
           onChange={e => setFromAddress(e.target.value)}
-          placeholder="Salon Name <noreply@yourdomain.com>"
+          placeholder="Salon Name <info@yourdomain.com>"
         />
         <p className="text-xs text-muted-foreground">
-          Use the format <code className="bg-muted px-1 rounded">Name &lt;email@domain.com&gt;</code>
+          Used for appointment confirmations, receipts, and welcome emails.
+          Format: <code className="bg-muted px-1 rounded">Name &lt;email@domain.com&gt;</code>
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="accounting-from-address">Accounting / payroll — From address</Label>
+        <Input
+          id="accounting-from-address"
+          value={accountingFromAddress}
+          onChange={e => setAccountingFromAddress(e.target.value)}
+          placeholder="Salon Name Accounting <accounting@yourdomain.com>"
+        />
+        <p className="text-xs text-muted-foreground">
+          Used when sending payroll reports to your payroll provider. Falls back to the client address above if blank.
         </p>
       </div>
 
@@ -1217,6 +1239,107 @@ function RequestNotificationsSection() {
           {mutation.isPending ? 'Saving…' : 'Save'}
         </Button>
         {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
+      </div>
+    </section>
+  )
+}
+
+// ── Payroll Section ───────────────────────────────────────────────────────────
+
+function PayrollSection() {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['payroll-config'],
+    queryFn: getPayrollConfig,
+  })
+
+  const [form, setForm] = useState({
+    provider_name: '',
+    provider_email: '',
+    client_id: '',
+    signature: '',
+    footer: '',
+  })
+  const [pSaved, setPSaved] = useState(false)
+
+  useEffect(() => {
+    if (data) {
+      setForm({
+        provider_name: data.provider_name ?? '',
+        provider_email: data.provider_email ?? '',
+        client_id: data.client_id ?? '',
+        signature: data.signature ?? '',
+        footer: data.footer ?? '',
+      })
+    }
+  }, [data])
+
+  const mutation = useMutation({
+    mutationFn: () => savePayrollConfig({
+      provider_name: form.provider_name || null,
+      provider_email: form.provider_email || null,
+      client_id: form.client_id || null,
+      signature: form.signature || null,
+      footer: form.footer || null,
+    }),
+    onSuccess: updated => {
+      qc.setQueryData(['payroll-config'], updated)
+      setPSaved(true)
+      setTimeout(() => setPSaved(false), 3000)
+    },
+  })
+
+  function setField(field: string, value: string) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  if (isLoading) return null
+
+  return (
+    <section className="border rounded-lg p-5 space-y-5 bg-white">
+      <div>
+        <h2 className="text-sm font-semibold">Payroll Provider</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          These details pre-fill the Payroll Report page each month.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Provider name</Label>
+          <Input value={form.provider_name} onChange={e => setField('provider_name', e.target.value)} placeholder="e.g. Paytrak" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Provider email</Label>
+          <Input type="email" value={form.provider_email} onChange={e => setField('provider_email', e.target.value)} placeholder="e.g. Team1@paytrak.ca" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Client ID</Label>
+          <Input value={form.client_id} onChange={e => setField('client_id', e.target.value)} placeholder="e.g. 998-XU1" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Signature name</Label>
+          <Input value={form.signature} onChange={e => setField('signature', e.target.value)} placeholder="e.g. JJ" />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Email footer</Label>
+        <textarea
+          value={form.footer}
+          onChange={e => setField('footer', e.target.value)}
+          rows={4}
+          placeholder={'Salon Lyol\n1452 Yonge Street, Toronto, ON M4T 1Y5\n(416) 922-0611\ninfo@salonlyol.ca'}
+          className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none font-mono"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          <Save size={14} className="mr-1.5" />
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
+        {pSaved && <span className="text-sm text-green-600">Saved.</span>}
       </div>
     </section>
   )
