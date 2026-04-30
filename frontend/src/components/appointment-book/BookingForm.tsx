@@ -192,6 +192,7 @@ export default function BookingForm({
           <div className="space-y-3">
             <input
               autoFocus
+              autoComplete="off"
               placeholder="Search by name, phone, or email…"
               value={clientQuery}
               onChange={(e) => setClientQuery(e.target.value)}
