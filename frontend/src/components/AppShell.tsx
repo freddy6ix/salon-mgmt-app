@@ -5,7 +5,7 @@ import { useAuth } from '@/store/auth'
 import {
   Home, CalendarDays, Users, ClipboardList, BarChart2, Settings, LogOut,
   ShieldCheck, Scissors, Vault, ShoppingBag, DollarSign, UserCog,
-  UsersRound, ChevronRight,
+  UsersRound, ChevronRight, Receipt, Coins,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
@@ -34,12 +34,13 @@ export default function AppShell() {
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
   const location = useLocation()
 
-  const isHrRoute = location.pathname.startsWith('/staff') || location.pathname.startsWith('/payroll')
+  const isHrRoute = location.pathname.startsWith('/staff')
+  const isReportsRoute = location.pathname.startsWith('/reports')
   const [hrOpen, setHrOpen] = useState(isHrRoute)
+  const [reportsOpen, setReportsOpen] = useState(isReportsRoute)
 
-  useEffect(() => {
-    if (isHrRoute) setHrOpen(true)
-  }, [isHrRoute])
+  useEffect(() => { if (isHrRoute) setHrOpen(true) }, [isHrRoute])
+  useEffect(() => { if (isReportsRoute) setReportsOpen(true) }, [isReportsRoute])
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
@@ -68,7 +69,6 @@ export default function AppShell() {
 
   const BOTTOM_NAV = [
     { to: '/retail',   icon: ShoppingBag, label: 'Retail',   badge: 0 },
-    { to: '/reports',  icon: BarChart2,   label: 'Reports',  badge: 0 },
     { to: '/till',     icon: Vault,       label: 'Till',     badge: 0 },
     { to: '/settings', icon: Settings,    label: 'Settings', badge: 0 },
     ...(isAdmin ? [{ to: '/users', icon: ShieldCheck, label: 'Users', badge: 0 }] : []),
@@ -116,9 +116,26 @@ export default function AppShell() {
             />
           </button>
           {hrOpen && (
+            <SubNavLink to="/staff" icon={UserCog} label="Staff" />
+          )}
+
+          {/* Reports group */}
+          <button
+            onClick={() => setReportsOpen(o => !o)}
+            className={`${NAV_LINK} w-full ${isReportsRoute ? ACTIVE : INACTIVE}`}
+          >
+            <BarChart2 size={16} className="flex-shrink-0" />
+            <span className="flex-1 text-left">Reports</span>
+            <ChevronRight
+              size={14}
+              className={`flex-shrink-0 transition-transform duration-150 ${reportsOpen ? 'rotate-90' : ''}`}
+            />
+          </button>
+          {reportsOpen && (
             <>
-              <SubNavLink to="/staff"   icon={UserCog}    label="Staff"   />
-              {isAdmin && <SubNavLink to="/payroll" icon={DollarSign} label="Payroll" />}
+              <SubNavLink to="/reports/sales"      icon={Receipt}    label="Sales"      />
+              <SubNavLink to="/reports/payroll"    icon={DollarSign} label="Payroll"    />
+              <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash" />
             </>
           )}
 

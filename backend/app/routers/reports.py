@@ -222,3 +222,54 @@ async def monthly_report(
             for day, cnt, amt in day_rows
         ],
     )
+
+
+# ── GET /reports/petty-cash ───────────────────────────────────────────────────
+
+class PettyCashEntryRow(BaseModel):
+    date: str
+    description: str
+    amount: str
+
+
+class PettyCashReport(BaseModel):
+    year: int
+    month: int
+    entries: list[PettyCashEntryRow]
+    total: str
+
+
+@router.get("/petty-cash", response_model=PettyCashReport)
+async def petty_cash_report(
+    current_user: StaffUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+) -> PettyCashReport:
+    tid = current_user.tenant_id
+    _, last_day = monthrange(year, month)
+
+    rows = (
+        await db.execute(
+            select(
+                CashReconciliation.business_date,
+                PettyCashEntry.description,
+                PettyCashEntry.amount,
+            )
+            .join(PettyCashEntry, PettyCashEntry.reconciliation_id == CashReconciliation.id)
+            .where(
+                CashReconciliation.tenant_id == tid,
+                CashReconciliation.business_date >= date(year, month, 1),
+                CashReconciliation.business_date <= date(year, month, last_day),
+            )
+            .order_by(CashReconciliation.business_date, PettyCashEntry.created_at)
+        )
+    ).all()
+
+    entries = [
+        PettyCashEntryRow(date=str(biz_date), description=desc, amount=_d(amt))
+        for biz_date, desc, amt in rows
+    ]
+    total = sum((Decimal(e.amount) for e in entries), Decimal("0"))
+
+    return PettyCashReport(year=year, month=month, entries=entries, total=_d(total))

@@ -43,3 +43,20 @@ export interface MonthlyReport {
 export function getMonthlyReport(year: number, month: number): Promise<MonthlyReport> {
   return api.get<MonthlyReport>(`/reports/monthly?year=${year}&month=${month}`)
 }
+
+export interface PettyCashEntryRow {
+  date: string
+  description: string
+  amount: string
+}
+
+export interface PettyCashReport {
+  year: number
+  month: number
+  entries: PettyCashEntryRow[]
+  total: string
+}
+
+export function getPettyCashReport(year: number, month: number): Promise<PettyCashReport> {
+  return api.get<PettyCashReport>(`/reports/petty-cash?year=${year}&month=${month}`)
+}

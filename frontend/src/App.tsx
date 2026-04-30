@@ -9,6 +9,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import AppointmentBookPage from '@/pages/AppointmentBookPage'
 import StaffManagementPage from '@/pages/StaffManagementPage'
 import PayrollReportPage from '@/pages/PayrollReportPage'
+import PettyCashReportPage from '@/pages/PettyCashReportPage'
 import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
@@ -60,10 +61,13 @@ export default function App() {
         <Route path="/appointments" element={<AppointmentBookPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/staff" element={<StaffManagementPage />} />
-        <Route path="/payroll" element={<PayrollReportPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/services" element={<ServicesPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports" element={<Navigate to="/reports/sales" replace />} />
+        <Route path="/reports/sales" element={<ReportsPage />} />
+        <Route path="/reports/payroll" element={<PayrollReportPage />} />
+        <Route path="/reports/petty-cash" element={<PettyCashReportPage />} />
+        <Route path="/payroll" element={<Navigate to="/reports/payroll" replace />} />
         <Route path="/retail" element={<RetailPage />} />
         <Route path="/till" element={<TillPage />} />
         <Route path="/settings" element={<SettingsPage />} />
