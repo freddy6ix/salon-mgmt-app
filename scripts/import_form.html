@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Legacy Data Import</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    label { display: block; margin-top: 16px; font-weight: bold; }
+    input[type=file] { margin-top: 6px; }
+    input[type=text] { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+    button { margin-top: 24px; padding: 10px 24px; font-size: 16px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 16px; white-space: pre-wrap; word-break: break-all; margin-top: 24px; }
+    .note { color: #666; font-size: 13px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h2>Legacy Data Import</h2>
+  <p>Upload the CSV files exported from the legacy system. Safe to run multiple times.</p>
+
+  <label>API Base URL</label>
+  <input type="text" id="apiUrl" value="https://salon-api-XXXX.run.app" />
+  <p class="note">Replace with your actual Cloud Run API URL (no trailing slash)</p>
+
+  <label>JWT Token (from browser dev tools → Application → Local Storage → token)</label>
+  <input type="text" id="token" placeholder="eyJ..." />
+
+  <label>Client Details.txt <span style="font-weight:normal">(required)</span></label>
+  <input type="file" id="clientsFile" accept=".txt,.csv" />
+
+  <label>All Bookings.txt <span style="font-weight:normal">(optional — run after clients)</span></label>
+  <input type="file" id="bookingsFile" accept=".txt,.csv" />
+
+  <button onclick="runImport()">Run Import</button>
+
+  <pre id="output">Results will appear here…</pre>
+
+  <script>
+    async function runImport() {
+      const apiUrl = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+      const token = document.getElementById('token').value.trim();
+      const clientsFile = document.getElementById('clientsFile').files[0];
+      const bookingsFile = document.getElementById('bookingsFile').files[0];
+      const output = document.getElementById('output');
+
+      if (!clientsFile) { alert('Client Details.txt is required'); return; }
+      if (!token) { alert('JWT token is required'); return; }
+
+      output.textContent = 'Running…';
+
+      const form = new FormData();
+      form.append('clients_csv', clientsFile);
+      if (bookingsFile) form.append('bookings_csv', bookingsFile);
+
+      try {
+        const resp = await fetch(`${apiUrl}/admin/import-legacy`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: form,
+        });
+        const data = await resp.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        output.textContent = 'Error: ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>

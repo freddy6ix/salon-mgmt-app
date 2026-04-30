@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.auth import hash_password
 from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
+from app.legacy_import import import_clients, import_bookings
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentRequest, AppointmentStatus
 from app.models.client import Client
@@ -561,3 +562,28 @@ async def save_payroll_config(
     await db.commit()
     await db.refresh(row)
     return _payroll_config_out(row)
+
+
+# ── Legacy data import ────────────────────────────────────────────────────────
+
+@router.post("/import-legacy")
+async def import_legacy_data(
+    clients_csv: UploadFile,
+    current_user: AdminUser,
+    db: AsyncSession = Depends(get_db),
+    bookings_csv: UploadFile | None = None,
+) -> dict:
+    """
+    One-time import of legacy CSV data. Safe to run multiple times.
+    Upload Client Details.txt as clients_csv and All Bookings.txt as bookings_csv.
+    """
+    result: dict = {}
+
+    clients_content = await clients_csv.read()
+    result["clients"] = await import_clients(db, current_user.tenant_id, clients_content)
+
+    if bookings_csv is not None:
+        bookings_content = await bookings_csv.read()
+        result["bookings"] = await import_bookings(db, current_user.tenant_id, bookings_content)
+
+    return result

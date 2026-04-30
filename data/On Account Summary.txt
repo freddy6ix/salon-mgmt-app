@@ -1,0 +1,16 @@
+ClientCode,ClientName,Debit,Credit,LastAmountPayed,LastDatePayed,StaffCode
+BALA02,Alexandra Ballyk,,450.9,750,07/22/2021,
+FINB01,Brenda Finlayson,,33.95,150,12/09/2020,JOANNE
+MACB01,Bryn MacPherson,,0.55,350,05/10/2020,JJ
+OZDC02,Chala Ozdemir,,100,100,07/04/2018,
+CHUC01,Cindy Chung,,2.63,2.63,06/23/2022,JJ
+HLEH01,Haleem Chowdhury,,22.6,22.6,07/31/2020,JJ
+RETJ01,Janice Retterath,,100,100,06/02/2020,
+NORJ01,Jeffrey Norman,,149.04,400,09/15/2021,JJ
+SNOJ01,Jennifer Snowball,,219.96,500,11/16/2022,OLGA
+RINJ01,Jordan Rinaldi,,200,200,03/24/2022,
+CONK01,Kim Condon,,0.2,180.65,07/12/2021,BECKY
+CHAM06,Michele Charlton,,118.65,-21.36,07/24/2022,
+RETM01,Michelle Retterath,100,,,,
+STEP01,Pam Stern,,0.7,-180.65,07/12/2021,
+JEAR01,Rachel Jeavons,,25.45,75,09/23/2020,ASAMI
