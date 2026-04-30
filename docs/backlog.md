@@ -507,17 +507,15 @@ Permanently removes a user account and all directly owned data from the database
 **Frontend:** "Delete" action on each row in the Users page (separate from Edit); two-step confirmation dialog that names the user and warns about permanent deletion; on success removes the row from the list.
 
 
-### P-CLEAN · Remove remaining Milano reference (provider code column)
+### P-CLEAN · ✅ Complete
 
-The documentation, backlog, and screenshot files have already been cleansed. One code reference remains:
-
-*Code:*
-- `providers.milano_code` column — rename to `provider_code` or `staff_code` (migration required). Update all references in models, routers, seed script, and any frontend that reads it.
-
-*Seed data:*
-- `scripts/seed.py` — the `milano_code` key in `provider_data` must be renamed to match once the column is renamed. The values (e.g. `"GUMI"`, `"RYAN"`) are fine to keep.
-
-**What to preserve:** The underlying feature specs and UI designs are independent of any third-party product — only the column name needs to change.
+All references to the previous salon software have been removed:
+- Screenshots and UI reference docs deleted
+- Backlog, README, ADRs, go-live checklist rewritten
+- `providers.milano_code` renamed to `providers.provider_code` (migration `z1a2b3c4d5e6`)
+- `clients.milano_code` renamed to `clients.legacy_id`
+- ERM, reports annotations, CGI worked-examples doc cleaned
+- UI label updated to "Provider code"
 
 ### P2-24 · Staff check-in / check-out
 

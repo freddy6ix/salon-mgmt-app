@@ -1,6 +1,6 @@
-# Milano Reports Reference — Daily Sales & Petty Cash
+# Reports Reference — Daily Sales & Petty Cash
 
-Source: Milano reports exported from Salon Lyol installation.
+Source: Reports exported from Salon Lyol's previous salon management system.
 Period covered: March 1–31, 2026.
 Captured: 2026-04-20.
 
@@ -204,16 +204,16 @@ The Daily Sales Report drives the following reporting dimensions required in Pha
 
 URL: https://docs.google.com/spreadsheets/d/1h70PrzlAneeaU9jAI39GvD8DpwKIv-PoGJH47W07CGQ
 
-This is a manually maintained financial management workbook running alongside Milano. Its primary purpose is cash flow tracking, payroll calculation, and reconciliation between Milano (POS) and the external accounting journal. It is **not** replaced by our system — it informs what reports our system must produce.
+This is a manually maintained financial management workbook running alongside the previous POS system. Its primary purpose is cash flow tracking, payroll calculation, and reconciliation between the POS system and the external accounting journal. It is **not** replaced by our system — it informs what reports our system must produce.
 
 ### Sheets
 
 | Sheet | Purpose |
 |-------|---------|
-| **Daily** | Date-level sales summary manually populated from Milano |
-| **Transactions** | Individual service/retail transactions exported from Milano |
+| **Daily** | Date-level sales summary manually populated from the previous POS |
+| **Transactions** | Individual service/retail transactions exported from the previous POS |
 | **Monthly** | Monthly rollup: Total Sales, Payroll, Ending Balance, Payroll % |
-| **Performance** | Multi-year reconciliation: Milano vs. Journal, HST tracking |
+| **Performance** | Multi-year reconciliation: POS vs. Journal, HST tracking |
 | **Journal** | External accounting journal entries |
 | **Expense Ledger** | Vendor-level expense tracking (L'Oreal, utilities, Paytrak, etc.) |
 | **Expense Categories** | Category lookup for expenses |
@@ -240,7 +240,7 @@ Clients | Rev/Client | Items | Open? | Rev. Day? | Weekday |
 - **Open? / Rev. Day?**: Boolean flags (Y/N)
 - **7-Day Avg**: Rolling averages (calculated)
 
-This sheet is populated **manually** from Milano's daily report. In our system, this data is directly queryable from the `Sale` + `SaleItem` tables — no manual export required.
+This sheet is populated **manually** from the previous system's daily report. In our system, this data is directly queryable from the `Sale` + `SaleItem` tables — no manual export required.
 
 ### Transactions Sheet (key columns)
 
@@ -249,9 +249,9 @@ Receipt | Date | Description | Client | Staff | Quantity | Amount | GST | PST |
 Staff2 | Comstaff1 | Comstaff2 | TillCode
 ```
 
-- **Receipt**: Milano receipt/sale number — maps to `Sale.receipt_number`
-- **Description**: Service or product name (free text from Milano)
-- **Client**: Milano client code, format `LASTNAME3_FIRSTNAME2_SEQ` (e.g. `ZIMJ01`)
+- **Receipt**: receipt/sale number — maps to `Sale.receipt_number`
+- **Description**: Service or product name (free text from the previous POS)
+- **Client**: legacy client code, format `LASTNAME3_FIRSTNAME2_SEQ` (e.g. `ZIMJ01`)
 - **Staff / Staff2**: Primary and secondary provider codes
 - **Comstaff1 / Comstaff2**: Commission amounts for each provider — confirms split commission model
 - **TillCode**: Payment type code (VISA, CASH, DEBIT, etc.) or till identifier
@@ -259,7 +259,7 @@ Staff2 | Comstaff1 | Comstaff2 | TillCode
 Multiple rows share the same Receipt number = multi-item sale (confirmed appointment model).
 Negative Amount rows = adjustments, reversals, or consultation entries.
 
-**Client code format `ZIMJ01`:** 3 chars last name + 2 chars first name + sequence. Milano's generated code. Our system uses UUIDs; a `Client.milano_code` migration field preserves lookup during cutover.
+**Client code format `ZIMJ01`:** 3 chars last name + 2 chars first name + sequence. Legacy system's generated code format. Our system uses UUIDs; a `Client.legacy_id` migration field preserves lookup during cutover.
 
 ### Monthly Sheet
 
@@ -274,14 +274,14 @@ Max Balance | Net Sales | Payroll % Blended Net Sales
 
 ### Performance Sheet
 
-Monthly reconciliation between **Milano** (POS source of truth) and the **Journal** (accounting system — likely Wave or similar). A person named **Christina** does monthly reconciliation. Tracks:
+Monthly reconciliation between the **previous POS system** (source of truth) and the **Journal** (accounting system — likely Wave or similar). A person named **Christina** does monthly reconciliation. Tracks:
 - Total Merchant Sales (from payment processor)
-- Net Sales, HST Collected (Milano figures)
+- Net Sales, HST Collected (POS figures)
 - HST Inputs (claimable tax on expenses)
 - HST Net (remittance amount = HST collected − HST inputs)
 - Cash Float variance
 
-**HST vs. GST+PST:** Ontario charges HST at 13% (= 5% federal GST + 8% provincial component). Milano records them split; the Google Sheet reconciles them combined as HST. Both representations are correct; our reports need to support both.
+**HST vs. GST+PST:** Ontario charges HST at 13% (= 5% federal GST + 8% provincial component). The previous system recorded them split; the Google Sheet reconciles them combined as HST. Both representations are correct; our reports need to support both.
 
 ### Expense Ledger
 
@@ -317,7 +317,7 @@ PettyCashCategory
 
 ```
 Sale additions:
-├── receipt_number      (Milano-compatible receipt number for display)
+├── receipt_number      (receipt number for display)
 ├── gst_collected
 └── pst_collected
 ```
@@ -348,12 +348,12 @@ OnAccountTransaction
 
 ```
 Client addition:
-└── milano_code         (nullable text — e.g. "ZIMJ01", for cutover lookup)
+└── legacy_id         (nullable text — e.g. "ZIMJ01", for cutover lookup)
 ```
 
 ### 5.6 Reporting Requirements (Phase 2 targets)
 
-The Google Sheet and Milano reports define the reporting surface our system must replace:
+The Google Sheet and legacy reports define the reporting surface our system must replace:
 
 | Report | Granularity | Key Outputs |
 |--------|-------------|-------------|

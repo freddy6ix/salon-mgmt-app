@@ -3,7 +3,7 @@
 > **Status:** Working draft v0.3 — 2026-04-20
 > Phase 1 entities are fully attributed. Phase 2–4 entities are skeletons (named, primary relationships, minimal attributes). Expect 10–20% of Phase 1 schema to evolve through real-world use.
 >
-> **v0.3 changes:** Added PaymentType, PaymentTypeCategory, PettyCashCategory, PettyCashEntry, GiftCertificateType, Series, ClientSeries, RetailProduct, ProfessionalProduct, RetailPackage, OnAccountTransaction, InventoryTransfer, LoyaltyTransaction as Phase 2 skeletons; split Product into RetailProduct + ProfessionalProduct; expanded Sale/SaleItem with tax and adjustment fields; added Client.milano_code; expanded Promotion with full constraint/discount fields; added PaymentType.display_order and category FK.
+> **v0.3 changes:** Added PaymentType, PaymentTypeCategory, PettyCashCategory, PettyCashEntry, GiftCertificateType, Series, ClientSeries, RetailProduct, ProfessionalProduct, RetailPackage, OnAccountTransaction, InventoryTransfer, LoyaltyTransaction as Phase 2 skeletons; split Product into RetailProduct + ProfessionalProduct; expanded Sale/SaleItem with tax and adjustment fields; added Client.legacy_id; expanded Promotion with full constraint/discount fields; added PaymentType.display_order and category FK.
 
 ---
 
@@ -109,7 +109,7 @@ erDiagram
         string first_name
         string last_name
         string display_name
-        string milano_code
+        string legacy_id
         enum provider_type
         boolean is_owner
         boolean is_active
@@ -783,10 +783,10 @@ Anyone who can log into the system. In Phase 1, all Users are staff members.
 
 **role enum:**
 - `super_admin` — platform operator (no tenant_id)
-- `tenant_admin` — salon owner / manager (maps to Milano's OWNER/MANAGER security groups)
-- `staff` — service providers and reception (maps to Milano's STAFF/RECEPTION security groups)
+- `tenant_admin` — salon owner / manager (maps to the legacy system's owner/manager roles)
+- `staff` — service providers and reception (maps to the legacy system's staff/reception roles)
 
-**Phase 2 note:** Full per-permission granularity (Milano's Security Groups + individual overrides) will be modelled in the `SecurityGroup` entity. For Phase 1, the three-value role enum is sufficient.
+**Phase 2 note:** Full per-permission granularity will be modelled in the `SecurityGroup` entity. For Phase 1, the three-value role enum is sufficient.
 
 ---
 
@@ -822,7 +822,7 @@ A staff member. May deliver services (has_appointments = true) or be admin/recep
 | first_name | string | |
 | last_name | string | |
 | display_name | string | Column header in appointment book (e.g., "JJ", "Joanne") |
-| milano_code | string | Milano's identifier (e.g., "JOANNE"); kept for migration reference |
+| provider_code | string | Legacy system identifier (e.g., "JOANNE"); kept for migration reference |
 | provider_type | enum | `stylist`, `colourist`, `dualist` — informational; capability governed by ProviderServicePrice |
 | is_owner | boolean | True for Jini (JJ) |
 | is_active | boolean | Inactive providers do not appear in the appointment book |
@@ -875,7 +875,7 @@ The provider's recurring weekly working schedule. Stored as a template that repe
 | end_time | time | Working end for this block |
 | is_working | boolean | False = day off (block = 1, no block 2 needed) |
 | effective_from | date | When this schedule version takes effect |
-| effective_to | date | Nullable — null = currently active; set from the Milano "Until" date |
+| effective_to | date | Nullable — null = currently active; set from the legacy schedule end date |
 
 **Split shift example:** A provider working 9am–1pm and 3pm–6pm on Tuesday has two rows: `(Tuesday, block=1, 09:00, 13:00)` and `(Tuesday, block=2, 15:00, 18:00)`.
 
@@ -1049,7 +1049,7 @@ The person receiving services. No system login in Phase 1.
 | preferred_provider_id | uuid FK → Provider | Nullable |
 | referred_by_client_id | uuid FK → Client | Nullable — self-referential |
 | client_code | string | Short identifier, unique per tenant (e.g., FERGF1) |
-| milano_code | string | Nullable — Milano's generated code (e.g., FERGF01); populated during migration cutover for lookup |
+| legacy_id | string | Nullable — Legacy client code (e.g., FERGF01); populated during migration cutover for lookup |
 | first_name | string | |
 | last_name | string | |
 | pronouns | string | Nullable |
@@ -1230,7 +1230,7 @@ Marketing campaign for attributing appointments to a promotional source (e.g., I
 - Relationships: Appointment `}o--o|` Campaign
 
 ### Promotion
-Structured discount rules applied at POS checkout. Three discount types: `amount` (flat $ off), `percentage` (% off), `tax` (discount = tax amount). Can be constrained by day of week (bitmask), date range, or time window. `per_item` flag applies the discount to each service item rather than the appointment total. `commission_on_full_price` determines whether commission is calculated on the pre-discount price. Examples from Milano: DC $10, VIP 10%, REFERRAL $20, STAFF D/C, REFILL 25%.
+Structured discount rules applied at POS checkout. Three discount types: `amount` (flat $ off), `percentage` (% off), `tax` (discount = tax amount). Can be constrained by day of week (bitmask), date range, or time window. `per_item` flag applies the discount to each service item rather than the appointment total. `commission_on_full_price` determines whether commission is calculated on the pre-discount price. Examples: DC $10, VIP 10%, REFERRAL $20, STAFF D/C, REFILL 25%.
 - Relationships: SaleItem `}o--o|` Promotion (applied at line-item level)
 
 ### GiftCertificateType
@@ -1253,7 +1253,7 @@ Non-refundable client deposit against a future appointment. Transferable if resc
 - Relationships: Client `||--o{` Deposit, Appointment `||--o{` Deposit
 
 ### Sale
-POS transaction closing an appointment. Tracks gross service/retail revenue, total discounts, returns, and separately reported GST/PST for the Daily Sales Report. `receipt_number` is the Milano-compatible display reference (e.g., 50391).
+POS transaction closing an appointment. Tracks gross service/retail revenue, total discounts, returns, and separately reported GST/PST for the Daily Sales Report. `receipt_number` is the display reference (e.g., 50391).
 - Relationships: Appointment `|o--||` Sale, Sale `||--o{` SaleItem, Sale `||--o{` Payment
 
 ### SaleItem
@@ -1344,13 +1344,13 @@ Client details on `AppointmentRequest` are strings, not FKs. The requesting pers
 Color correction is priced per hour. `Service.pricing_type = hourly` signals `AppointmentItem.price_is_locked = false` until checkout.
 
 ### 7. no_show_count / late_cancellation_count as counters on Client
-Maintained as integer counters, incremented on status change. Surfaced to staff at booking time (equivalent of Milano's Special Instructions popup). Not recomputed from history on each read.
+Maintained as integer counters, incremented on status change. Surfaced to staff at booking time alongside special instructions. Not recomputed from history on each read.
 
 ### 8. ProviderSchedule as a weekly template with split-shift support
-Weekly template keyed by `(provider_id, day_of_week, block)`. Block 1 and 2 support split shifts. `effective_to` corresponds to Milano's "Until" date on the repeat schedule. One-off exceptions go into `ProviderScheduleException`.
+Weekly template keyed by `(provider_id, day_of_week, block)`. Block 1 and 2 support split shifts. `effective_to` corresponds to the legacy schedule end date. One-off exceptions go into `ProviderScheduleException`.
 
 ### 9. Department is informational in Phase 1
-`Provider.department_id` FK is included but departments do not gate service capability in Phase 1. ProviderServicePrice remains the sole capability gate. Department-level service associations (from Milano's Departments screen) are a Phase 2 constraint if needed.
+`Provider.department_id` FK is included but departments do not gate service capability in Phase 1. ProviderServicePrice remains the sole capability gate. Department-level service associations (from the legacy system's department configuration) are a Phase 2 constraint if needed.
 
 ### 10. SIN stored encrypted at application level
 `Provider.sin_encrypted` uses application-level encryption (not just disk encryption). Access restricted to `tenant_admin` role. Phase 2 consideration: move to a `ProviderSensitiveInfo` table with audit logging.
