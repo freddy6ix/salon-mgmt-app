@@ -110,6 +110,8 @@ interface Props {
   date: string
   slotMinutes: number
   providerHours?: ProviderWorkStatus[]
+  tsi?: { providerId: string; slotTopPx: number } | null
+  onTsiChange?: (tsi: { providerId: string; slotTopPx: number } | null) => void
   onItemClick?: (item: AppointmentItem, appointment: Appointment) => void
   onNewAppointment?: (time: string, providerId: string) => void
   onNewBlock?: (time: string, providerId: string) => void
@@ -117,7 +119,7 @@ interface Props {
   onClientClick?: (clientId: string) => void
 }
 
-export default function TimeGrid({ providers, appointments, timeBlocks, date, slotMinutes, providerHours = [], onItemClick, onNewAppointment, onNewBlock, onBlockClick, onClientClick }: Props) {
+export default function TimeGrid({ providers, appointments, timeBlocks, date, slotMinutes, providerHours = [], tsi = null, onTsiChange, onItemClick, onNewAppointment, onNewBlock, onBlockClick, onClientClick }: Props) {
   const qc = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -126,7 +128,6 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
   const [drag, setDrag] = useState<DragState | null>(null)
   const [nowPx, setNowPx] = useState<number | null>(null)
   const [slotMenu, setSlotMenu] = useState<SlotMenu | null>(null)
-  const [tsi, setTsi] = useState<{ providerId: string; slotTopPx: number } | null>(null)
 
   type PendingPatch = {
     appointmentId: string
@@ -573,7 +574,7 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
                 const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
-                setTsi({ providerId: provider.id, slotTopPx })
+                onTsiChange?.({ providerId: provider.id, slotTopPx })
               }}
               onDoubleClick={(e) => {
                 if (dragRef.current || didDragRef.current) return
@@ -581,7 +582,7 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
                 const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
-                setTsi({ providerId: provider.id, slotTopPx })
+                onTsiChange?.({ providerId: provider.id, slotTopPx })
                 const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
                 const h = Math.floor(totalMins / 60)
                 const m = totalMins % 60
@@ -593,7 +594,7 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                 const offsetY = e.clientY - rect.top
                 const slotTopPx = Math.max(0, Math.floor(offsetY / SLOT_HEIGHT) * SLOT_HEIGHT)
-                setTsi({ providerId: provider.id, slotTopPx })
+                onTsiChange?.({ providerId: provider.id, slotTopPx })
                 const totalMins = START_HOUR * 60 + Math.floor(offsetY / SLOT_HEIGHT) * SLOT_MINUTES
                 const h = Math.floor(totalMins / 60)
                 const m = totalMins % 60
@@ -674,11 +675,11 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                         onClick={(e) => {
                           if (didDragRef.current) return
                           e.stopPropagation()
-                          setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                          onTsiChange?.({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
                         }}
                         onDoubleClick={(e) => {
                           e.stopPropagation()
-                          setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                          onTsiChange?.({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
                           onItemClick?.(item, appointment)
                         }}
                         onPointerDown={(e) => onMovePointerDown(e, item, appointment, topPx, heightPx, providerIdx)}
@@ -735,7 +736,7 @@ export default function TimeGrid({ providers, appointments, timeBlocks, date, sl
                       onClick={(e) => {
                         if (didDragRef.current) return
                         e.stopPropagation()
-                        setTsi({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
+                        onTsiChange?.({ providerId: provider.id, slotTopPx: slotTopFromClientY(e.clientY, providerIdx) })
                         onBlockClick?.(block)
                       }}
                       onDoubleClick={(e) => {

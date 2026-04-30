@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { format, addDays, subDays, parseISO } from 'date-fns'
@@ -17,8 +17,67 @@ import ConvertRequestPanel from '@/components/ConvertRequestPanel'
 import ConfirmationDialog from '@/components/appointment-book/ConfirmationDialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Keyboard } from 'lucide-react'
 
+// ── Grid geometry (must match TimeGrid constants) ─────────────────────────────
+const SLOT_HEIGHT = 20
+const START_HOUR  = 8
+const END_HOUR    = 21
+
+type TSI = { providerId: string; slotTopPx: number }
+
+function tsiToTime(tsi: TSI, slotMinutes: number): string {
+  const totalMins = START_HOUR * 60 + (tsi.slotTopPx / SLOT_HEIGHT) * slotMinutes
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// ── Shortcuts panel ───────────────────────────────────────────────────────────
+interface ShortcutDef {
+  label: string
+  keys: string[]
+  action: () => void
+  disabled?: boolean
+}
+
+function Kbd({ k }: { k: string }) {
+  return (
+    <kbd className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-mono bg-muted border rounded">
+      {k}
+    </kbd>
+  )
+}
+
+function ShortcutsPanel({ shortcuts, onClose }: { shortcuts: ShortcutDef[]; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed bottom-16 right-6 z-50 bg-white border rounded-xl shadow-xl p-3 w-64">
+        <p className="text-xs font-semibold text-muted-foreground px-1 pb-2 uppercase tracking-wide">
+          Keyboard shortcuts
+        </p>
+        <div className="space-y-0.5">
+          {shortcuts.map(({ label, keys, action, disabled }) => (
+            <button
+              key={label}
+              disabled={disabled}
+              onClick={() => { action(); onClose() }}
+              className="flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md hover:bg-muted/60 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>{label}</span>
+              <span className="flex gap-1">
+                {keys.map(k => <Kbd key={k} k={k} />)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function AppointmentBookPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -30,8 +89,6 @@ export default function AppointmentBookPage() {
   const [booking, setBooking] = useState<{ time?: string; providerId?: string } | null>(null)
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null)
   const [creatingBlock, setCreatingBlock] = useState<{ time: string; providerId: string } | null>(null)
-  const { data: branding } = useQuery({ queryKey: ['branding'], queryFn: getBranding })
-  const slotMinutes: SlotMinutes = (branding?.slot_minutes ?? 10) as SlotMinutes
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [pendingConfirmation, setPendingConfirmation] = useState<{
     id: string; appointment_date: string; clientEmail: string | null
@@ -39,6 +96,11 @@ export default function AppointmentBookPage() {
   const [showCancelled, setShowCancelled] = useState(() =>
     localStorage.getItem('showCancelled') === 'true'
   )
+  const [tsi, setTsi] = useState<TSI | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  const { data: branding } = useQuery({ queryKey: ['branding'], queryFn: getBranding })
+  const slotMinutes: SlotMinutes = (branding?.slot_minutes ?? 10) as SlotMinutes
 
   const { data: convertRequest } = useQuery({
     queryKey: ['request', requestId],
@@ -46,17 +108,13 @@ export default function AppointmentBookPage() {
     enabled: !!requestId,
   })
 
-  // Sync date from URL ?date= param (e.g. when navigating from client card history)
   useEffect(() => {
     const urlDate = searchParams.get('date')
     if (urlDate && urlDate !== date) setDate(urlDate)
   }, [searchParams.get('date')])
 
-  // Auto-jump to the requested date when the request loads
   useEffect(() => {
-    if (convertRequest) {
-      setDate(convertRequest.desired_date)
-    }
+    if (convertRequest) setDate(convertRequest.desired_date)
   }, [convertRequest?.id])
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
@@ -69,7 +127,6 @@ export default function AppointmentBookPage() {
     queryFn: () => listAppointments(date),
   })
 
-  // Auto-open appointment detail when navigated here with ?appointment=ID
   useEffect(() => {
     if (!highlightApptId || appointments.length === 0) return
     const appt = appointments.find(a => a.id === highlightApptId)
@@ -89,29 +146,118 @@ export default function AppointmentBookPage() {
     queryFn: () => listTimeBlocks(date),
   })
 
-  const activeProviders = providers.filter((p) => p.has_appointments)
-  const workingProviderIds = new Set(
-    schedules.filter((s) => s.is_working).map((s) => s.provider_id)
-  )
-  // Show working providers only; if no schedule data yet, show all (schedules default to working)
+  const activeProviders = providers.filter(p => p.has_appointments)
+  const workingProviderIds = new Set(schedules.filter(s => s.is_working).map(s => s.provider_id))
   const visibleProviders = schedules.length === 0
     ? activeProviders
-    : activeProviders.filter((p) => workingProviderIds.has(p.id))
+    : activeProviders.filter(p => workingProviderIds.has(p.id))
   const displayDate = parseISO(date + 'T12:00:00')
 
-  function prev() { setDate(format(subDays(displayDate, 1), 'yyyy-MM-dd')) }
-  function next() { setDate(format(addDays(displayDate, 1), 'yyyy-MM-dd')) }
-  function today() { setDate(format(new Date(), 'yyyy-MM-dd')) }
+  const prev  = useCallback(() => setDate(format(subDays(displayDate, 1), 'yyyy-MM-dd')), [displayDate])
+  const next  = useCallback(() => setDate(format(addDays(displayDate, 1), 'yyyy-MM-dd')), [displayDate])
+  const goToday = useCallback(() => setDate(format(new Date(), 'yyyy-MM-dd')), [])
+
   function toggleCancelled() {
-    setShowCancelled(v => {
-      localStorage.setItem('showCancelled', String(!v))
-      return !v
-    })
+    setShowCancelled(v => { localStorage.setItem('showCancelled', String(!v)); return !v })
   }
 
   const displayedAppointments = showCancelled
     ? appointments
     : appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
+
+  // ── TSI helpers ─────────────────────────────────────────────────────────────
+  const totalSlots = ((END_HOUR - START_HOUR) * 60) / slotMinutes
+  const maxSlotTop = (totalSlots - 1) * SLOT_HEIGHT
+
+  function newApptAtTsi() {
+    if (!tsi) return
+    setBooking({ time: tsiToTime(tsi, slotMinutes), providerId: tsi.providerId })
+  }
+  function newBlockAtTsi() {
+    if (!tsi) return
+    setCreatingBlock({ time: tsiToTime(tsi, slotMinutes), providerId: tsi.providerId })
+  }
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  const tsiRef = useRef(tsi)
+  useEffect(() => { tsiRef.current = tsi }, [tsi])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+      // ? always toggles panel (unless typing)
+      if (e.key === '?' && !isTyping) {
+        setShowShortcuts(v => !v)
+        return
+      }
+      // Escape closes panel
+      if (e.key === 'Escape') {
+        setShowShortcuts(false)
+        return
+      }
+
+      if (isTyping) return
+
+      // Suppress grid shortcuts when any panel/dialog is open
+      const panelOpen = booking !== null || selected !== null || editingBlock !== null
+        || creatingBlock !== null || selectedClientId !== null || pendingConfirmation !== null
+        || !!convertRequest
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault()
+          if (!panelOpen) prev()
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          if (!panelOpen) next()
+          break
+        case 't': case 'T':
+          if (!panelOpen) goToday()
+          break
+        case 'n': case 'N':
+          if (!panelOpen && tsiRef.current) {
+            setBooking({ time: tsiToTime(tsiRef.current, slotMinutes), providerId: tsiRef.current.providerId })
+          }
+          break
+        case 'b': case 'B':
+          if (!panelOpen && tsiRef.current) {
+            setCreatingBlock({ time: tsiToTime(tsiRef.current, slotMinutes), providerId: tsiRef.current.providerId })
+          }
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          if (!panelOpen) setTsi(t => t ? { ...t, slotTopPx: Math.max(0, t.slotTopPx - SLOT_HEIGHT) } : t)
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          if (!panelOpen) setTsi(t => t ? { ...t, slotTopPx: Math.min(maxSlotTop, t.slotTopPx + SLOT_HEIGHT) } : t)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [booking, selected, editingBlock, creatingBlock, selectedClientId, pendingConfirmation,
+      convertRequest, prev, next, goToday, slotMinutes, maxSlotTop])
+
+  // ── Shortcut definitions (also used by panel buttons) ──────────────────────
+  const anyPanelOpen = booking !== null || selected !== null || editingBlock !== null
+    || creatingBlock !== null || selectedClientId !== null || pendingConfirmation !== null
+    || !!convertRequest
+
+  const shortcuts: ShortcutDef[] = [
+    { label: 'Previous day',     keys: ['←'],      action: prev,          disabled: anyPanelOpen },
+    { label: 'Next day',         keys: ['→'],      action: next,          disabled: anyPanelOpen },
+    { label: 'Go to today',      keys: ['T'],      action: goToday,       disabled: anyPanelOpen },
+    { label: 'New appointment',  keys: ['N'],      action: newApptAtTsi,  disabled: anyPanelOpen || !tsi },
+    { label: 'New block',        keys: ['B'],      action: newBlockAtTsi, disabled: anyPanelOpen || !tsi },
+    { label: 'Move slot up',     keys: ['↑'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.max(0, t.slotTopPx - SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
+    { label: 'Move slot down',   keys: ['↓'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.min(maxSlotTop, t.slotTopPx + SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
+    { label: 'Show shortcuts',   keys: ['?'],      action: () => setShowShortcuts(v => !v) },
+  ]
 
   const isLoading = providersLoading || apptLoading
 
@@ -120,7 +266,7 @@ export default function AppointmentBookPage() {
       <header className="flex items-center justify-between px-4 py-2 bg-white border-b gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={prev}>‹</Button>
-          <Button variant="outline" size="sm" onClick={today}>Today</Button>
+          <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
           <span className="text-sm font-medium w-40 text-center">
             {format(displayDate, 'EEEE, MMM d, yyyy')}
           </span>
@@ -156,6 +302,8 @@ export default function AppointmentBookPage() {
             date={date}
             slotMinutes={slotMinutes}
             providerHours={schedules}
+            tsi={tsi}
+            onTsiChange={setTsi}
             onItemClick={(item, appt) => setSelected({ item, appt })}
             onNewAppointment={(time, providerId) => setBooking({ time, providerId })}
             onNewBlock={(time, providerId) => setCreatingBlock({ time, providerId })}
@@ -164,6 +312,21 @@ export default function AppointmentBookPage() {
           />
         )}
       </main>
+
+      {/* Floating shortcuts toggle */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => setShowShortcuts(v => !v)}
+        className="fixed bottom-6 right-6 z-40 h-9 w-9 rounded-full shadow-md"
+        title="Keyboard shortcuts (?)"
+      >
+        <Keyboard size={16} />
+      </Button>
+
+      {showShortcuts && (
+        <ShortcutsPanel shortcuts={shortcuts} onClose={() => setShowShortcuts(false)} />
+      )}
 
       <AppointmentDetail
         item={selected?.item ?? null}
