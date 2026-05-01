@@ -5,7 +5,7 @@ import { useAuth } from '@/store/auth'
 import {
   Home, CalendarDays, Users, ClipboardList, BarChart2, Settings, LogOut,
   ShieldCheck, Scissors, Vault, ShoppingBag, DollarSign, UserCog,
-  UsersRound, ChevronRight, Receipt, Coins, Upload, ScrollText,
+  UsersRound, ChevronRight, Receipt, Coins, Upload, ScrollText, User,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
@@ -36,11 +36,14 @@ export default function AppShell() {
 
   const isHrRoute = location.pathname.startsWith('/staff')
   const isReportsRoute = location.pathname.startsWith('/reports')
+  const isUsersRoute = location.pathname.startsWith('/users') || location.pathname.startsWith('/login-log')
   const [hrOpen, setHrOpen] = useState(isHrRoute)
   const [reportsOpen, setReportsOpen] = useState(isReportsRoute)
+  const [usersOpen, setUsersOpen] = useState(isUsersRoute)
 
   useEffect(() => { if (isHrRoute) setHrOpen(true) }, [isHrRoute])
   useEffect(() => { if (isReportsRoute) setReportsOpen(true) }, [isReportsRoute])
+  useEffect(() => { if (isUsersRoute) setUsersOpen(true) }, [isUsersRoute])
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
@@ -71,9 +74,7 @@ export default function AppShell() {
     { to: '/retail',   icon: ShoppingBag, label: 'Retail',   badge: 0 },
     { to: '/till',     icon: Vault,       label: 'Till',     badge: 0 },
     { to: '/settings', icon: Settings,    label: 'Settings', badge: 0 },
-    ...(isAdmin ? [{ to: '/users',   icon: ShieldCheck, label: 'Users',   badge: 0 }] : []),
-    ...(isAdmin ? [{ to: '/import',    icon: Upload,     label: 'Import',    badge: 0 }] : []),
-    ...(isAdmin ? [{ to: '/login-log', icon: ScrollText, label: 'Login Log', badge: 0 }] : []),
+    ...(isAdmin ? [{ to: '/import', icon: Upload, label: 'Import', badge: 0 }] : []),
   ]
 
   return (
@@ -138,6 +139,29 @@ export default function AppShell() {
               <SubNavLink to="/reports/sales"      icon={Receipt}    label="Sales"      />
               <SubNavLink to="/reports/payroll"    icon={DollarSign} label="Payroll"    />
               <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash" />
+            </>
+          )}
+
+          {/* Users group (admin only) */}
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setUsersOpen(o => !o)}
+                className={`${NAV_LINK} w-full ${isUsersRoute ? ACTIVE : INACTIVE}`}
+              >
+                <ShieldCheck size={16} className="flex-shrink-0" />
+                <span className="flex-1 text-left">Users</span>
+                <ChevronRight
+                  size={14}
+                  className={`flex-shrink-0 transition-transform duration-150 ${usersOpen ? 'rotate-90' : ''}`}
+                />
+              </button>
+              {usersOpen && (
+                <>
+                  <SubNavLink to="/users"     icon={User}       label="Manage Users" />
+                  <SubNavLink to="/login-log" icon={ScrollText} label="Login Log"    />
+                </>
+              )}
             </>
           )}
 
