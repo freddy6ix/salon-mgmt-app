@@ -556,3 +556,95 @@ When onboarding a staff member (or owner), provide an "Annual salary" pay type o
 ### Docs · Update README with appointment book screenshots
 
 Retake the appointment book screenshots to show the new sub-slot gridlines, gutter time labels at each granularity increment, and the Time Slot Indicator highlight. Replace the current screenshots in the GitHub README.
+
+---
+
+## Phase 3 — AI / Briefing Engine
+
+### P3-1 · Briefing Engine — core infrastructure
+
+A configurable briefing pipeline that generates personalised daily briefings for multiple audiences using the Claude API. The same engine handles all audiences; only the config changes.
+
+**Architecture (`briefing_engine/`):**
+- `config.py` — `BriefingConfig` dataclass: `briefing_id`, `tenant_id`, `audience`, `topic_domains`, `cadence`, `delivery_channels`, `output_format`, `recipient_ids`, `schedule_cron`, `output_path`, `active`
+- `sources/web_search.py` — Claude API with `web_search` tool for market intelligence
+- `sources/client_db.py` — client/appointment queries for stylist and owner briefings
+- `sources/analytics.py` — revenue and booking trend queries
+- `synthesizer.py` — Claude API call producing the briefing document from a Jinja2 template
+- `delivery/email.py`, `delivery/in_app.py`, `delivery/file.py` — channel dispatch
+- `scheduler.py` — Cloud Scheduler HTTP trigger handler (`POST /briefings/trigger`)
+- `templates/` — per-audience Jinja2 prompt templates
+
+**Models:** `claude-sonnet-4-6` for briefings and CRM; `claude-haiku-4-5-20251001` for low-latency in-app suggestions.
+
+**Depends on:** Anthropic Python SDK added to backend dependencies; Cloud Scheduler job configured per tenant.
+
+---
+
+### P3-2 · Briefing Engine — `claude_code` audience (developer tool)
+
+Runs at 7 AM daily, one hour before Freddy's own briefing. Writes output to `.claude/rules/market-intelligence.md`. Claude Code auto-loads it at session start, giving it fresh market context to inform feature recommendations without manual prompting.
+
+**Topics:** `market`, `ai_features`, `industry`, `regulation`
+
+**Synthesizer instruction:** For each market development, state whether it influences the SalonOS roadmap, which phase, and how. Flag anything a competitor has shipped that SalonOS does not yet have. Be specific and brief.
+
+**Delivery:** `file` → `.claude/rules/market-intelligence.md`
+
+**Schedule:** `0 7 * * *` America/Toronto via Cloud Scheduler.
+
+**Depends on:** P3-1.
+
+---
+
+### P3-3 · Briefing Engine — `developer` audience (Freddy's daily briefing)
+
+Freddy's 8 AM daily email covering salon software market moves, AI feature launches, pricing changes, and regulatory developments relevant to SalonOS.
+
+**Topics:** `market`, `competitors`, `ai_features`, `industry`
+**Delivery:** `email`
+**Schedule:** `0 8 * * *` America/Toronto.
+
+**Depends on:** P3-1.
+
+---
+
+### P3-4 · Briefing Engine — `salon_owner` audience
+
+Daily in-app briefing for JJ on opening the app. Revenue trends, staff performance, booking patterns, and any competitor intel surfaced by the market sources.
+
+**Example output:** "Tuesday booking rate down 23% vs last month" · "Gumi has 3 open slots this week — consider a promotion"
+
+**Topics:** `clients`, `appointments`, `analytics`, `market`
+**Delivery:** `in_app` (dashboard widget)
+**Schedule:** `event_triggered` — generated fresh each morning, displayed on dashboard load.
+
+**Depends on:** P3-1, real appointment and sales data in production tenant.
+
+---
+
+### P3-5 · Briefing Engine — `stylist` audience
+
+Per-stylist daily briefing surfaced at login or dashboard load. Covers today's client list with colour formula notes, special instructions, upcoming bookings, and any flagged no-show history.
+
+**Example output:** "Your 2pm — Maria — balayage 8 weeks ago, Wella 9/0, sensitive scalp. Her last visit ran 15 min over — book buffer if possible."
+
+**Topics:** `clients`, `appointments`
+**Delivery:** `in_app` (dashboard, provider-scoped)
+**Schedule:** `event_triggered` — generated at login for that provider's day.
+
+**Depends on:** P3-1, colour formula / service notes data populated for real clients.
+
+---
+
+### P3-6 · Briefing Engine — `client` audience
+
+Client-facing briefing delivered before their appointment: upcoming service reminder, formula preview if applicable, loyalty status, and a personalised recommendation (e.g. toner touch-up worth adding).
+
+**Example output:** "You're due for a toner — worth adding before your cut. Your last visit was 7 weeks ago."
+
+**Topics:** `appointments`, `products`, `loyalty`
+**Delivery:** `email` or `sms` (pre-appointment, configurable lead time)
+**Schedule:** `event_triggered` — triggered by appointment reminder job.
+
+**Depends on:** P3-1, P2-3 (appointment reminders, already built — extend delivery).
