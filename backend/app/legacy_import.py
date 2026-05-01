@@ -314,8 +314,12 @@ async def import_bookings(
     today = datetime.now()
 
     if future_only:
-        rows = [r for r in rows if r.get("Date") and
-                datetime.strptime(r["Date"].strip(), "%m/%d/%Y") >= today]
+        def _safe_future(r: dict) -> bool:
+            try:
+                return bool(r.get("Date")) and datetime.strptime(r["Date"].strip(), "%m/%d/%Y") >= today
+            except (ValueError, AttributeError):
+                return False
+        rows = [r for r in rows if _safe_future(r)]
 
     provider_map = await _load_providers(db, tenant_id)
     service_detail = await _load_service_detail(db, tenant_id)
@@ -641,8 +645,13 @@ async def import_past_unreceipted_bookings(
     rows = _read_csv(content)
     today = datetime.now()
 
-    past_rows = [r for r in rows if r.get("Date") and
-                 datetime.strptime(r["Date"].strip(), "%m/%d/%Y") < today]
+    def _safe_past(r: dict) -> bool:
+        try:
+            return bool(r.get("Date")) and datetime.strptime(r["Date"].strip(), "%m/%d/%Y") < today
+        except (ValueError, AttributeError):
+            return False
+
+    past_rows = [r for r in rows if _safe_past(r)]
 
     provider_map = await _load_providers(db, tenant_id)
     service_detail = await _load_service_detail(db, tenant_id)
