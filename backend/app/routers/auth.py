@@ -14,7 +14,7 @@ from app.database import get_db
 from app.deps import CurrentUser
 from app.models.client import Client
 from app.models.tenant import Tenant
-from app.models.user import PasswordResetToken, User, UserRole
+from app.models.user import LoginLog, PasswordResetToken, User, UserRole
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -53,6 +53,9 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    db.add(LoginLog(tenant_id=user.tenant_id, user_id=user.id, email=user.email))
+    await db.commit()
 
     token = create_access_token(
         subject=str(user.id),

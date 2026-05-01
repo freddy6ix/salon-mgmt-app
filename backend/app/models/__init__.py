@@ -1,6 +1,6 @@
 # Import all models here so Alembic autogenerate can detect them.
 from app.models.tenant import Tenant  # noqa: F401
-from app.models.user import User, PasswordResetToken  # noqa: F401
+from app.models.user import User, PasswordResetToken, LoginLog  # noqa: F401
 from app.models.email_config import TenantEmailConfig  # noqa: F401
 from app.models.department import Department  # noqa: F401
 from app.models.service import ServiceCategory, Service  # noqa: F401

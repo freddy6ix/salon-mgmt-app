@@ -88,6 +88,19 @@ export function testEmailConfig(to: string): Promise<void> {
   return api.post<void>('/admin/email-config/test', { to })
 }
 
+// ── Login log ────────────────────────────────────────────────────────────────
+
+export interface LoginLogEntry {
+  id: string
+  email: string
+  role: string
+  logged_in_at: string
+}
+
+export function getLoginLogs(limit = 500): Promise<LoginLogEntry[]> {
+  return api.get<LoginLogEntry[]>(`/admin/login-logs?limit=${limit}`)
+}
+
 // ── Legacy data import ────────────────────────────────────────────────────────
 
 export interface ImportResult {

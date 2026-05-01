@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
 from app.legacy_import import import_clients, import_bookings, import_receipts, import_past_unreceipted_bookings, import_on_account_balances
+from app.models.user import LoginLog
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentRequest, AppointmentStatus
 from app.models.client import Client
@@ -606,3 +607,41 @@ async def import_legacy_data(
         result["error"] = traceback.format_exc()
     return result
 
+
+
+# ── Login log ─────────────────────────────────────────────────────────────────
+
+class LoginLogOut(BaseModel):
+    id: str
+    email: str
+    role: str
+    logged_in_at: str
+
+
+@router.get("/login-logs", response_model=list[LoginLogOut])
+async def get_login_logs(
+    current_user: AdminUser,
+    db: AsyncSession = Depends(get_db),
+    limit: int = 500,
+) -> list[LoginLogOut]:
+    from sqlalchemy import text as _text
+    rows = (await db.execute(
+        _text(
+            "SELECT l.id, l.email, u.role, l.created_at"
+            " FROM login_logs l"
+            " JOIN users u ON u.id = l.user_id"
+            " WHERE l.tenant_id = :tid"
+            " ORDER BY l.created_at DESC"
+            " LIMIT :limit"
+        ),
+        {"tid": current_user.tenant_id, "limit": limit},
+    )).fetchall()
+    return [
+        LoginLogOut(
+            id=str(r.id),
+            email=r.email,
+            role=r.role,
+            logged_in_at=r.created_at.isoformat(),
+        )
+        for r in rows
+    ]
