@@ -605,17 +605,22 @@ async def fix_item_status(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
+    import traceback as tb
     from sqlalchemy import text
-    result = await db.execute(text("""
-        UPDATE appointment_items
-        SET status = 'confirmed'::appointmentitemstatus
-        WHERE status = 'cancelled'::appointmentitemstatus
-          AND appointment_id IN (
-              SELECT id FROM appointments
-              WHERE tenant_id = :tid
-                AND source = 'staff_entered'
-                AND status = 'confirmed'::appointmentstatus
-          )
-    """), {"tid": current_user.tenant_id})
-    await db.commit()
-    return {"rows_updated": result.rowcount}
+    try:
+        await db.execute(text("""
+            UPDATE appointment_items
+            SET status = 'confirmed'::appointmentitemstatus
+            WHERE status = 'cancelled'::appointmentitemstatus
+              AND appointment_id IN (
+                  SELECT id FROM appointments
+                  WHERE tenant_id = :tid
+                    AND source = 'staff_entered'
+                    AND status = 'confirmed'::appointmentstatus
+              )
+        """), {"tid": current_user.tenant_id})
+        await db.commit()
+        return {"ok": True}
+    except Exception:
+        await db.rollback()
+        return {"error": tb.format_exc()}
