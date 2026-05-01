@@ -729,7 +729,7 @@ async def import_past_unreceipted_bookings(
             text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
                  " source, status, confirmation_status, is_recurring, created_at, updated_at)"
                  " VALUES (:id, :tid, :cid, :dt,"
-                 " 'staff_entered', 'confirmed', 'skipped', NOW(), NOW())"),
+                 " 'staff_entered', 'confirmed', 'skipped', false, NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id, "dt": appt_dt},
         )
         for ri in resolved:
