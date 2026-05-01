@@ -608,13 +608,13 @@ async def fix_item_status(
     from sqlalchemy import text
     result = await db.execute(text("""
         UPDATE appointment_items
-        SET status = 'confirmed'
-        WHERE status = 'cancelled'
+        SET status = 'confirmed'::appointmentitemstatus
+        WHERE status = 'cancelled'::appointmentitemstatus
           AND appointment_id IN (
               SELECT id FROM appointments
               WHERE tenant_id = :tid
                 AND source = 'staff_entered'
-                AND status = 'confirmed'
+                AND status = 'confirmed'::appointmentstatus
           )
     """), {"tid": current_user.tenant_id})
     await db.commit()
