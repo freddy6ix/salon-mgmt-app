@@ -510,7 +510,7 @@ async def import_receipts(
             text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
                  " source, status, confirmation_status, is_recurring, notes, created_at, updated_at)"
                  " VALUES (:id, :tid, :cid, :dt,"
-                 " 'staff_entered', 'completed', 'skipped', :note, NOW(), NOW())"),
+                 " 'staff_entered', 'completed', 'skipped', false, :note, NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id,
              "dt": appt_dt, "note": note_key},
         )
