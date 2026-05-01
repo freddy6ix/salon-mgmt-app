@@ -439,9 +439,9 @@ async def import_receipts(
     booking_time: dict[tuple[str, str], str] = {}
     booking_time_int: dict[tuple[str, str], int] = {}
     for r in booking_rows:
-        code = r.get("Code", "").strip()
-        date = r.get("Date", "").strip()
-        time_str = r.get("Time", "").strip()
+        code = (r.get("Code") or "").strip()
+        date = (r.get("Date") or "").strip()
+        time_str = (r.get("Time") or "").strip()
         if not code or not date or not time_str:
             continue
         try:
