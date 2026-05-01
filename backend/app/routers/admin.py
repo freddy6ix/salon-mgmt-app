@@ -595,3 +595,27 @@ async def import_legacy_data(
     except Exception:
         result["error"] = traceback.format_exc()
     return result
+
+
+# ── ONE-TIME FIX: correct imported future booking item status ─────────────────
+# Remove this endpoint after running once against production.
+
+@router.post("/fix-item-status", status_code=status.HTTP_200_OK)
+async def fix_item_status(
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        UPDATE appointment_items
+        SET status = 'confirmed'
+        WHERE status = 'cancelled'
+          AND appointment_id IN (
+              SELECT id FROM appointments
+              WHERE tenant_id = :tid
+                AND source = 'staff_entered'
+                AND status = 'confirmed'
+          )
+    """), {"tid": current_user.tenant_id})
+    await db.commit()
+    return {"rows_updated": result.rowcount}
