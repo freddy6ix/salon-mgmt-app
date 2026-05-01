@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, appointment_requests, appointments, auth, cash_reconciliation, clients, internal, payment_methods, promotions, provider_service_prices, providers, public, reports, retail_items, sales, schedules, service_categories, services, time_blocks
+from app.routers import admin, appointment_requests, appointments, auth, briefings, cash_reconciliation, clients, internal, payment_methods, promotions, provider_service_prices, providers, public, reports, retail_items, sales, schedules, service_categories, services, time_blocks
 from app.routers import settings as settings_router
 
 app = FastAPI(
@@ -40,6 +40,7 @@ app.include_router(retail_items.router)
 app.include_router(reports.router)
 app.include_router(public.router)
 app.include_router(internal.router)
+app.include_router(briefings.router)
 
 
 @app.get("/health")

@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # Internal endpoints — shared secret for Cloud Scheduler calls
     internal_secret: str = ""
 
+    # Anthropic — required for the Briefing Engine
+    anthropic_api_key: str = ""
+
+    # Briefing Engine — base directory for file delivery (defaults to project root)
+    briefing_base_dir: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
