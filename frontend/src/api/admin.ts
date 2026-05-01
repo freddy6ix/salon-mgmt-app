@@ -87,3 +87,31 @@ export function savePayrollConfig(data: PayrollConfig): Promise<PayrollConfig> {
 export function testEmailConfig(to: string): Promise<void> {
   return api.post<void>('/admin/email-config/test', { to })
 }
+
+// ── Legacy data import ────────────────────────────────────────────────────────
+
+export interface ImportResult {
+  clients?: { created: number; updated: number; skipped: number }
+  receipts?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_walk_in: number; errors: number }
+  past_unreceipted?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number }
+  future_bookings?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number; skipped_no_provider: number; unmapped_service_codes: string[] }
+  current_bookings?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number; skipped_no_provider: number; unmapped_service_codes: string[] }
+  on_account?: { updated: number; skipped: number }
+  error?: string
+}
+
+export async function importLegacyData(formData: FormData): Promise<ImportResult> {
+  const BASE_URL = (import.meta as Record<string, unknown> & { env: Record<string, string> }).env.VITE_API_URL ?? 'http://localhost:8000'
+  const token = localStorage.getItem('access_token')
+  const res = await fetch(`${BASE_URL}/admin/import-legacy`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (res.status === 401) throw new Error('Unauthorized')
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}

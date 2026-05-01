@@ -19,6 +19,7 @@ import UsersPage from '@/pages/UsersPage'
 import TillPage from '@/pages/TillPage'
 import RetailPage from '@/pages/RetailPage'
 import ReportsPage from '@/pages/ReportsPage'
+import DataImportPage from '@/pages/DataImportPage'
 
 function StaffShell() {
   const { user, loading } = useAuth()
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/till" element={<TillPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/import" element={<DataImportPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

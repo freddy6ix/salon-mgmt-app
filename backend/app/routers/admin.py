@@ -13,7 +13,7 @@ from app.auth import hash_password
 from app.config import settings
 from app.database import get_db
 from app.deps import AdminUser
-from app.legacy_import import import_clients, import_bookings, import_receipts, import_past_unreceipted_bookings
+from app.legacy_import import import_clients, import_bookings, import_receipts, import_past_unreceipted_bookings, import_on_account_balances
 from app.email import AnyEmailConfig, email_cfg_from_row, send_email, send_welcome_email
 from app.models.appointment import Appointment, AppointmentItem, AppointmentRequest, AppointmentStatus
 from app.models.client import Client
@@ -573,25 +573,35 @@ async def import_legacy_data(
     receipts_csv: UploadFile,
     current_user: AdminUser,
     db: AsyncSession = Depends(get_db),
+    current_bookings_csv: UploadFile | None = None,
+    on_account_csv: UploadFile | None = None,
 ) -> dict:
     """
-    Full one-time import of legacy CSV data. Safe to run multiple times.
-      clients_csv      → Client Details.txt
-      all_bookings_csv → Future and Past Bookings.txt
-      receipts_csv     → Receipt Transactions.txt
+    Import legacy CSV data. Safe to run multiple times — all functions are idempotent.
+      clients_csv          → Client Details.txt
+      all_bookings_csv     → Future and Past Bookings.txt
+      receipts_csv         → Receipt Transactions.txt
+      current_bookings_csv → All Bookings.txt (optional)
+      on_account_csv       → On Account Summary.txt (optional)
     Order: clients → receipts (completed appts) → past unreceipted → future bookings.
     """
+    import traceback
     clients_content = await clients_csv.read()
     bookings_content = await all_bookings_csv.read()
     receipts_content = await receipts_csv.read()
+    current_bookings_content = await current_bookings_csv.read() if current_bookings_csv else None
+    on_account_content = await on_account_csv.read() if on_account_csv else None
 
-    import traceback
     result: dict = {}
     try:
-        result["clients"]  = await import_clients(db, current_user.tenant_id, clients_content)
-        result["receipts"] = await import_receipts(db, current_user.tenant_id, receipts_content, bookings_content)
+        result["clients"]          = await import_clients(db, current_user.tenant_id, clients_content)
+        result["receipts"]         = await import_receipts(db, current_user.tenant_id, receipts_content, bookings_content)
         result["past_unreceipted"] = await import_past_unreceipted_bookings(db, current_user.tenant_id, bookings_content)
         result["future_bookings"]  = await import_bookings(db, current_user.tenant_id, bookings_content, future_only=True)
+        if current_bookings_content:
+            result["current_bookings"] = await import_bookings(db, current_user.tenant_id, current_bookings_content, future_only=True)
+        if on_account_content:
+            result["on_account"] = await import_on_account_balances(db, current_user.tenant_id, on_account_content)
     except Exception:
         result["error"] = traceback.format_exc()
     return result

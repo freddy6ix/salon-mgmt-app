@@ -754,3 +754,44 @@ async def import_past_unreceipted_bookings(
         "skipped_no_client": skipped_no_client,
         "skipped_no_service": skipped_no_service,
     }
+
+
+# ---------------------------------------------------------------------------
+# On Account Summary import  (client account balances)
+# ---------------------------------------------------------------------------
+
+async def import_on_account_balances(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    content: bytes,
+) -> dict:
+    rows = _read_csv(content)
+    updated = skipped = 0
+
+    for row in rows:
+        code = (row.get("ClientCode") or "").strip().lstrip("|")
+        if not code:
+            skipped += 1
+            continue
+        try:
+            debit = Decimal((row.get("Debit") or "0").strip().replace(",", "") or "0")
+            credit = Decimal((row.get("Credit") or "0").strip().replace(",", "") or "0")
+        except Exception:
+            skipped += 1
+            continue
+        # positive = client has credit (salon owes them), negative = client owes salon
+        balance = credit - debit
+        result = await db.execute(
+            text(
+                "UPDATE clients SET account_balance = :bal, updated_at = NOW()"
+                " WHERE tenant_id = :tid AND legacy_id = :code"
+            ),
+            {"bal": float(balance), "tid": tenant_id, "code": code},
+        )
+        if result.rowcount:
+            updated += 1
+        else:
+            skipped += 1
+
+    await db.commit()
+    return {"updated": updated, "skipped": skipped}

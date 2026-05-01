@@ -5,7 +5,7 @@ import { useAuth } from '@/store/auth'
 import {
   Home, CalendarDays, Users, ClipboardList, BarChart2, Settings, LogOut,
   ShieldCheck, Scissors, Vault, ShoppingBag, DollarSign, UserCog,
-  UsersRound, ChevronRight, Receipt, Coins,
+  UsersRound, ChevronRight, Receipt, Coins, Upload,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
@@ -71,7 +71,8 @@ export default function AppShell() {
     { to: '/retail',   icon: ShoppingBag, label: 'Retail',   badge: 0 },
     { to: '/till',     icon: Vault,       label: 'Till',     badge: 0 },
     { to: '/settings', icon: Settings,    label: 'Settings', badge: 0 },
-    ...(isAdmin ? [{ to: '/users', icon: ShieldCheck, label: 'Users', badge: 0 }] : []),
+    ...(isAdmin ? [{ to: '/users',   icon: ShieldCheck, label: 'Users',   badge: 0 }] : []),
+    ...(isAdmin ? [{ to: '/import',  icon: Upload,      label: 'Import',  badge: 0 }] : []),
   ]
 
   return (
