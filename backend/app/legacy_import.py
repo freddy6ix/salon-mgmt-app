@@ -385,7 +385,7 @@ async def import_bookings(
         appt_id = uuid.uuid4()
         await db.execute(
             text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
-                 " source, status, confirmation_status, created_at, updated_at)"
+                 " source, status, confirmation_status, is_recurring, created_at, updated_at)"
                  " VALUES (:id, :tid, :cid, :dt,"
                  " 'staff_entered', 'confirmed', 'not_sent', NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id, "dt": appt_dt},
@@ -508,7 +508,7 @@ async def import_receipts(
         completed_at = appt_dt.replace(tzinfo=timezone.utc)
         await db.execute(
             text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
-                 " source, status, confirmation_status, notes, created_at, updated_at)"
+                 " source, status, confirmation_status, is_recurring, notes, created_at, updated_at)"
                  " VALUES (:id, :tid, :cid, :dt,"
                  " 'staff_entered', 'completed', 'skipped', :note, NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id,
@@ -718,7 +718,7 @@ async def import_past_unreceipted_bookings(
         appt_id = uuid.uuid4()
         await db.execute(
             text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
-                 " source, status, confirmation_status, created_at, updated_at)"
+                 " source, status, confirmation_status, is_recurring, created_at, updated_at)"
                  " VALUES (:id, :tid, :cid, :dt,"
                  " 'staff_entered', 'confirmed', 'skipped', NOW(), NOW())"),
             {"id": appt_id, "tid": tenant_id, "cid": client_id, "dt": appt_dt},
