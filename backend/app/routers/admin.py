@@ -610,7 +610,7 @@ async def fix_item_status(
     try:
         await db.execute(text("""
             UPDATE appointment_items
-            SET status = 'confirmed'::appointmentitemstatus
+            SET status = 'pending'::appointmentitemstatus
             WHERE status = 'cancelled'::appointmentitemstatus
               AND appointment_id IN (
                   SELECT id FROM appointments
