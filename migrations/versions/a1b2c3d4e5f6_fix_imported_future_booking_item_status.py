@@ -12,7 +12,7 @@ Create Date: 2026-05-01
 from alembic import op
 
 revision = "a1b2c3d4e5f6"
-down_revision = "z1a2b3c4d5e6"
+down_revision = ("o8j3e6f9g4c2", "z1a2b3c4d5e6")
 branch_labels = None
 depends_on = None
 
