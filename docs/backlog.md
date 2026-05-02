@@ -401,6 +401,12 @@ When an appointment is cancelled from the client card (Clients → client → Ap
 
 ## Data Import (Migration from existing systems)
 
+### Milano import page · ✅ Complete
+
+`DataImportPage.tsx` + `POST /admin/import-legacy` endpoint. Accepts Milano's specific export files (Client Details.txt, Future and Past Bookings.txt, Receipt Transactions.txt, All Bookings.txt, On Account Summary.txt) and bulk-inserts clients, appointments, and receipts. Available to admins for re-runs. The structured P2-20–23 specs below (generic CSV/Excel with dry-run and deduplication for future migrations) remain open if ever needed.
+
+---
+
 ### P2-20 · Import client data (with history and future appointments)
 
 Bulk import client records from a CSV or Excel export of an existing salon system, including appointment history and any future bookings.
@@ -470,42 +476,20 @@ Staff and admin accounts currently show only their email address on the Users pa
 
 **Out of scope:** enforcing names on existing accounts, merging with the Provider `display_name` (providers have their own name field; this is just for the login account record).
 
-### P2-24 · Edit user (role and display name)
+### P2-24 · Edit user role · ✅ Complete
 
-Staff and admin accounts can be updated by an admin: display name and role. Email address is not editable — it is the account identity and changing it would break login and any outbound email references.
+`EditRoleDialog` in `UsersPage.tsx`; `PATCH /admin/users/{user_id}` (admin router). Role editing only; display name editing deferred to P2-26.
 
-**Scope:**
-- Editable fields: `display_name` (if the `User` model carries one; otherwise first + last name), `role` (`staff` | `tenant_admin`)
-- Email shown as read-only for reference — not in the form, just displayed
-- Cannot demote the last admin on the tenant to staff (guard: count active admins before allowing role change)
+### P2-25 · Hard-delete user · ✅ Complete
 
-**Backend:** `PATCH /users/{id}` — accepts `{ role?, display_name? }`, scoped to current tenant, admin-only. Returns updated user.
+Delete button + confirmation dialog in `UsersPage.tsx`; `DELETE /admin/users/{user_id}`. Guards against deleting self, last admin, and providers with future appointments. Cascades across 13+ tables; sale records preserved for audit.
 
-**Frontend:** "Edit" action on each row in the Users page; inline form or small dialog with the two editable fields + a read-only email label; Save / Cancel.
 
-### P2-25 · Hard-delete user
+### Login Log · ✅ Complete
 
-Permanently removes a user account and all directly owned data from the database. Distinct from the existing soft-delete on `Client` records — this targets `User` rows (staff login accounts and guest accounts created at booking time).
+Records every successful login (user, timestamp, IP). Viewable by admins under a collapsible **Users** nav group in the sidebar (`LoginLogsPage.tsx`; `login_log` table + backend router).
 
-**What gets deleted (cascade):**
-- `User` row
-- Associated `Client` record (if the user is a guest account linked to a client)
-- `AppointmentRequest` rows submitted by that guest user
-- Linked `Provider` row if the user was a provider (only safe if the provider has no future confirmed/in-progress appointments — enforce this guard)
-- Auth tokens / sessions for that user
-
-**What is preserved:**
-- `Appointment` and `AppointmentItem` history where the provider or client still exists — soft-reference, the provider/client names are already denormalized into the appointment items
-- `Sale` records — financial history must survive for audit purposes
-
-**Guards (return 409 if violated):**
-- User has future confirmed or in-progress appointments as a provider → block with clear message
-- User is the last active admin on the tenant → block
-
-**Backend:** `DELETE /users/{id}` (admin-only, tenant-scoped) — runs all deletes in a transaction; returns 204 on success.
-
-**Frontend:** "Delete" action on each row in the Users page (separate from Edit); two-step confirmation dialog that names the user and warns about permanent deletion; on success removes the row from the list.
-
+---
 
 ### P-CLEAN · ✅ Complete
 
@@ -561,37 +545,22 @@ Retake the appointment book screenshots to show the new sub-slot gridlines, gutt
 
 ## Phase 3 — AI / Briefing Engine
 
-### P3-1 · Briefing Engine — core infrastructure
+### P3-1 · Briefing Engine — core infrastructure · ✅ Bootstrapped (partial)
 
-A configurable briefing pipeline that generates personalised daily briefings for multiple audiences using the Claude API. The same engine handles all audiences; only the config changes.
+Foundation built alongside P3-2: `backend/briefing_engine/config.py` (`BriefingConfig` dataclass), `synthesizer.py` (Claude API call), `runner.py` (orchestrator), `delivery/file.py` (file channel), `app/routers/briefings.py` (`POST /run-briefing` endpoint), `scripts/run_briefing.py` (CLI trigger).
 
-**Architecture (`briefing_engine/`):**
-- `config.py` — `BriefingConfig` dataclass: `briefing_id`, `tenant_id`, `audience`, `topic_domains`, `cadence`, `delivery_channels`, `output_format`, `recipient_ids`, `schedule_cron`, `output_path`, `active`
-- `sources/web_search.py` — Claude API with `web_search` tool for market intelligence
-- `sources/client_db.py` — client/appointment queries for stylist and owner briefings
+**Remaining for P3-3 through P3-6:**
+- `sources/web_search.py` — Claude API with `web_search` tool
+- `sources/client_db.py` — client/appointment queries
 - `sources/analytics.py` — revenue and booking trend queries
-- `synthesizer.py` — Claude API call producing the briefing document from a Jinja2 template
-- `delivery/email.py`, `delivery/in_app.py`, `delivery/file.py` — channel dispatch
-- `scheduler.py` — Cloud Scheduler HTTP trigger handler (`POST /briefings/trigger`)
+- `delivery/email.py`, `delivery/in_app.py` — additional channels
 - `templates/` — per-audience Jinja2 prompt templates
-
-**Models:** `claude-sonnet-4-6` for briefings and CRM; `claude-haiku-4-5-20251001` for low-latency in-app suggestions.
-
-**Depends on:** Anthropic Python SDK added to backend dependencies; Cloud Scheduler job configured per tenant.
 
 ---
 
-### P3-2 · Briefing Engine — `claude_code` audience (developer tool)
+### P3-2 · Briefing Engine — `claude_code` audience · ✅ Complete
 
-Runs at 7 AM daily, one hour before Freddy's own briefing. Writes output to `.claude/rules/market-intelligence.md`. Claude Code auto-loads it at session start, giving it fresh market context to inform feature recommendations without manual prompting.
-
-**Topics:** `market`, `ai_features`, `industry`, `regulation`
-
-**Synthesizer instruction:** For each market development, state whether it influences the SalonOS roadmap, which phase, and how. Flag anything a competitor has shipped that SalonOS does not yet have. Be specific and brief.
-
-**Delivery:** `file` → `.claude/rules/market-intelligence.md`
-
-**Schedule:** `0 7 * * *` America/Toronto via Cloud Scheduler.
+Runs at 7 AM daily via `scripts/run_briefing.py` (trigger: `POST /run-briefing` + `INTERNAL_SECRET`). Writes to `.claude/rules/market-intelligence.md`, which Claude Code auto-loads at session start. Topics: `market`, `ai_features`, `industry`, `regulation`. Schedule: `0 7 * * *` America/Toronto via Cloud Scheduler.
 
 **Depends on:** P3-1.
 

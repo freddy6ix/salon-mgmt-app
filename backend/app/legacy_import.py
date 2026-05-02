@@ -467,7 +467,7 @@ async def import_receipts(
         if rnum:
             receipt_groups[rnum].append(r)
 
-    created = skipped_existing = skipped_no_client = skipped_walk_in = errors = 0
+    created = updated = skipped_existing = skipped_no_client = skipped_walk_in = errors = 0
 
     for receipt_num, items in receipt_groups.items():
         client_code = (items[0].get("Client") or "").strip()
@@ -482,16 +482,7 @@ async def import_receipts(
             skipped_no_client += 1
             continue
 
-        # Dedup: skip if this receipt was already imported
         note_key = f"legacy_receipt:{receipt_num}"
-        existing = (await db.execute(
-            text("SELECT id FROM appointments"
-                 " WHERE tenant_id = :tid AND notes = :note"),
-            {"tid": tenant_id, "note": note_key},
-        )).fetchone()
-        if existing:
-            skipped_existing += 1
-            continue
 
         # Appointment time: use booking record if available, else noon
         bk_time = booking_time.get((client_code, date_str))
@@ -500,59 +491,115 @@ async def import_receipts(
                        else _parse_date_noon(date_str))
         except ValueError:
             appt_dt = _parse_date_noon(date_str)
+        date_only = appt_dt.date()
+
+        # Dedup: check if this receipt was already imported
+        existing_receipt_appt = (await db.execute(
+            text("SELECT id FROM appointments WHERE tenant_id = :tid AND notes = :note"),
+            {"tid": tenant_id, "note": note_key},
+        )).fetchone()
+
+        if existing_receipt_appt:
+            # If there's also an un-processed confirmed appointment for the same client/date,
+            # this is a leftover duplicate from a previous import run. Clean it up so we
+            # can re-process the receipt against the correct appointment.
+            confirmed_dup = (await db.execute(
+                text("SELECT id FROM appointments"
+                     " WHERE tenant_id = :tid AND client_id = :cid"
+                     " AND appointment_date::date = :date"
+                     " AND status NOT IN ('completed', 'cancelled')"),
+                {"tid": tenant_id, "cid": client_id, "date": date_only},
+            )).fetchone()
+            if not confirmed_dup:
+                skipped_existing += 1
+                continue
+            # Delete the old receipt-created appointment and its sale so we can re-import
+            dup_id = existing_receipt_appt.id
+            sale_row = (await db.execute(
+                text("SELECT sale_id FROM sale_appointments WHERE appointment_id = :id"),
+                {"id": dup_id},
+            )).fetchone()
+            if sale_row:
+                sid = sale_row.sale_id
+                await db.execute(text("DELETE FROM sale_payments WHERE sale_id = :id"), {"id": sid})
+                await db.execute(text("DELETE FROM sale_items WHERE sale_id = :id"), {"id": sid})
+                await db.execute(text("DELETE FROM sale_appointments WHERE sale_id = :id"), {"id": sid})
+                await db.execute(text("DELETE FROM sales WHERE id = :id"), {"id": sid})
+            await db.execute(text("DELETE FROM appointment_items WHERE appointment_id = :id"), {"id": dup_id})
+            await db.execute(text("DELETE FROM appointments WHERE id = :id"), {"id": dup_id})
+            # Fall through to process the receipt against the confirmed appointment
+
+        # Prefer updating an existing confirmed/pending appointment over creating a new one
+        existing_appt = (await db.execute(
+            text("SELECT id FROM appointments"
+                 " WHERE tenant_id = :tid AND client_id = :cid"
+                 " AND appointment_date::date = :date"
+                 " AND status NOT IN ('completed', 'cancelled')"),
+            {"tid": tenant_id, "cid": client_id, "date": date_only},
+        )).fetchone()
+        use_existing = existing_appt is not None
 
         # Totals
         subtotal = sum(float(r.get("Amount") or 0) for r in items)
         gst_total = sum(float(r.get("GST") or 0) for r in items)
         pst_total = sum(float(r.get("PST") or 0) for r in items)
         total = subtotal + gst_total + pst_total
-
-        # Create appointment
-        appt_id = uuid.uuid4()
         completed_at = appt_dt.replace(tzinfo=timezone.utc)
-        await db.execute(
-            text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
-                 " source, status, confirmation_status, is_recurring, notes, created_at, updated_at)"
-                 " VALUES (:id, :tid, :cid, :dt,"
-                 " 'staff_entered', 'completed', 'skipped', false, :note, NOW(), NOW())"),
-            {"id": appt_id, "tid": tenant_id, "cid": client_id,
-             "dt": appt_dt, "note": note_key},
-        )
 
-        # Create appointment items for service lines
-        appt_item_seq = 1
-        receipt_item_to_appt_item: dict[int, uuid.UUID] = {}  # index → appt_item_id
+        receipt_item_to_appt_item: dict[int, uuid.UUID] = {}
 
-        for idx, item in enumerate(items):
-            desc = (item.get("Description") or "").strip()
-            staff = (item.get("Staff") or "").strip().upper()
-            amount = float(item.get("Amount") or 0)
-
-            if not _is_service(desc):
-                continue  # retail — no appointment item
-
-            db_code = RECEIPT_SERVICE_MAP.get(desc.lower())
-            svc = service_detail.get(db_code) if db_code else None
-
-            provider_id = provider_map.get(staff) if staff else house_id
-            if not provider_id:
-                provider_id = house_id
-
-            if svc:
-                ai_id = uuid.uuid4()
-                await db.execute(
-                    text("INSERT INTO appointment_items (id, tenant_id, appointment_id,"
-                         " service_id, provider_id, sequence, start_time, duration_minutes,"
-                         " price, price_is_locked, status, created_at, updated_at)"
-                         " VALUES (:id, :tid, :appt_id, :svc_id, :prov_id, :seq, :st, :dur,"
-                         " :price, true, 'completed', NOW(), NOW())"),
-                    {"id": ai_id, "tid": tenant_id, "appt_id": appt_id,
-                     "svc_id": svc["id"], "prov_id": provider_id,
-                     "seq": appt_item_seq, "st": appt_dt,
-                     "dur": svc["duration"], "price": amount},
-                )
-                receipt_item_to_appt_item[idx] = ai_id
-                appt_item_seq += 1
+        if use_existing:
+            appt_id = existing_appt.id
+            await db.execute(
+                text("UPDATE appointments SET status = 'completed', notes = :note, updated_at = NOW()"
+                     " WHERE id = :id"),
+                {"note": note_key, "id": appt_id},
+            )
+            await db.execute(
+                text("UPDATE appointment_items SET status = 'completed', updated_at = NOW()"
+                     " WHERE appointment_id = :id"),
+                {"id": appt_id},
+            )
+            updated += 1
+        else:
+            # No prior booking record — create a new completed appointment (historical data)
+            appt_id = uuid.uuid4()
+            await db.execute(
+                text("INSERT INTO appointments (id, tenant_id, client_id, appointment_date,"
+                     " source, status, confirmation_status, is_recurring, notes, created_at, updated_at)"
+                     " VALUES (:id, :tid, :cid, :dt,"
+                     " 'staff_entered', 'completed', 'skipped', false, :note, NOW(), NOW())"),
+                {"id": appt_id, "tid": tenant_id, "cid": client_id,
+                 "dt": appt_dt, "note": note_key},
+            )
+            appt_item_seq = 1
+            for idx, item in enumerate(items):
+                desc = (item.get("Description") or "").strip()
+                staff = (item.get("Staff") or "").strip().upper()
+                amount = float(item.get("Amount") or 0)
+                if not _is_service(desc):
+                    continue
+                db_code = RECEIPT_SERVICE_MAP.get(desc.lower())
+                svc = service_detail.get(db_code) if db_code else None
+                provider_id = provider_map.get(staff) if staff else house_id
+                if not provider_id:
+                    provider_id = house_id
+                if svc:
+                    ai_id = uuid.uuid4()
+                    await db.execute(
+                        text("INSERT INTO appointment_items (id, tenant_id, appointment_id,"
+                             " service_id, provider_id, sequence, start_time, duration_minutes,"
+                             " price, price_is_locked, status, created_at, updated_at)"
+                             " VALUES (:id, :tid, :appt_id, :svc_id, :prov_id, :seq, :st, :dur,"
+                             " :price, true, 'completed', NOW(), NOW())"),
+                        {"id": ai_id, "tid": tenant_id, "appt_id": appt_id,
+                         "svc_id": svc["id"], "prov_id": provider_id,
+                         "seq": appt_item_seq, "st": appt_dt,
+                         "dur": svc["duration"], "price": amount},
+                    )
+                    receipt_item_to_appt_item[idx] = ai_id
+                    appt_item_seq += 1
+            created += 1
 
         # Create sale
         sale_id = uuid.uuid4()
@@ -575,10 +622,10 @@ async def import_receipts(
             staff = (item.get("Staff") or "").strip().upper()
             amount = float(item.get("Amount") or 0)
             qty = int(item.get("Quantity") or 1)
-            is_svc = _is_service(desc)
-            kind = "service" if is_svc else "retail"
+            kind = "service" if _is_service(desc) else "retail"
             provider_id = provider_map.get(staff) if staff else None
-            ai_id = receipt_item_to_appt_item.get(idx)
+            # Only link to appointment_item when we created them (new appointment path)
+            ai_id = receipt_item_to_appt_item.get(idx) if not use_existing else None
 
             await db.execute(
                 text("INSERT INTO sale_items (id, tenant_id, sale_id, appointment_item_id,"
@@ -613,15 +660,14 @@ async def import_receipts(
              "amount": Decimal(str(round(total, 2)))},
         )
 
-        created += 1
-
         # Commit in batches of 200 to avoid huge transactions
-        if created % 200 == 0:
+        if (created + updated) % 200 == 0:
             await db.commit()
 
     await db.commit()
     return {
         "created": created,
+        "updated": updated,
         "skipped_existing": skipped_existing,
         "skipped_no_client": skipped_no_client,
         "skipped_walk_in": skipped_walk_in,

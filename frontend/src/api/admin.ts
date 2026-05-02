@@ -105,7 +105,7 @@ export function getLoginLogs(limit = 500): Promise<LoginLogEntry[]> {
 
 export interface ImportResult {
   clients?: { created: number; updated: number; skipped: number }
-  receipts?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_walk_in: number; errors: number }
+  receipts?: { created: number; updated: number; skipped_existing: number; skipped_no_client: number; skipped_walk_in: number; errors: number }
   past_unreceipted?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number }
   future_bookings?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number; skipped_no_provider: number; unmapped_service_codes: string[] }
   current_bookings?: { created: number; skipped_existing: number; skipped_no_client: number; skipped_no_service: number; skipped_no_provider: number; unmapped_service_codes: string[] }
