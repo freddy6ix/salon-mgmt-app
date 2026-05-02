@@ -3,9 +3,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
 import {
-  Home, CalendarDays, Users, ClipboardList, BarChart2, Settings, LogOut,
+  Home, CalendarDays, Users, ClipboardList, Settings, LogOut,
   ShieldCheck, Scissors, Vault, ShoppingBag, DollarSign, UserCog,
-  UsersRound, ChevronRight, Receipt, Coins, Upload, ScrollText, User,
+  ChevronRight, Receipt, Coins, Upload, ScrollText, User,
 } from 'lucide-react'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
@@ -34,18 +34,21 @@ export default function AppShell() {
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
   const location = useLocation()
 
-  const isHrRoute = location.pathname.startsWith('/staff')
-  const isReportsRoute = location.pathname.startsWith('/reports')
-  const isUsersRoute = location.pathname.startsWith('/users') || location.pathname.startsWith('/login-log')
+  const isAdminRoute = (
+    location.pathname.startsWith('/services') ||
+    location.pathname.startsWith('/staff') ||
+    location.pathname.startsWith('/retail') ||
+    location.pathname.startsWith('/till') ||
+    location.pathname.startsWith('/reports') ||
+    location.pathname.startsWith('/users') ||
+    location.pathname.startsWith('/login-log')
+  )
   const isSettingsRoute = location.pathname.startsWith('/settings') || location.pathname.startsWith('/import')
-  const [hrOpen, setHrOpen] = useState(isHrRoute)
-  const [reportsOpen, setReportsOpen] = useState(isReportsRoute)
-  const [usersOpen, setUsersOpen] = useState(isUsersRoute)
+
+  const [adminOpen, setAdminOpen] = useState(isAdminRoute)
   const [settingsOpen, setSettingsOpen] = useState(isSettingsRoute)
 
-  useEffect(() => { if (isHrRoute) setHrOpen(true) }, [isHrRoute])
-  useEffect(() => { if (isReportsRoute) setReportsOpen(true) }, [isReportsRoute])
-  useEffect(() => { if (isUsersRoute) setUsersOpen(true) }, [isUsersRoute])
+  useEffect(() => { if (isAdminRoute) setAdminOpen(true) }, [isAdminRoute])
   useEffect(() => { if (isSettingsRoute) setSettingsOpen(true) }, [isSettingsRoute])
 
   const { data: pendingRequests = [] } = useQuery({
@@ -69,13 +72,7 @@ export default function AppShell() {
     { to: '/dashboard',    icon: Home,          label: 'Home',             badge: 0 },
     { to: '/appointments', icon: CalendarDays,  label: 'Appointment Book', badge: 0 },
     { to: '/clients',      icon: Users,         label: 'Clients',          badge: 0 },
-    { to: '/services',     icon: Scissors,      label: 'Services',         badge: 0 },
     { to: '/requests',     icon: ClipboardList, label: 'Requests',         badge: pendingCount },
-  ]
-
-  const BOTTOM_NAV = [
-    { to: '/retail', icon: ShoppingBag, label: 'Retail', badge: 0 },
-    { to: '/till',   icon: Vault,       label: 'Till',   badge: 0 },
   ]
 
   return (
@@ -94,7 +91,6 @@ export default function AppShell() {
         </div>
 
         <div className="flex-1 py-2 overflow-auto">
-          {/* Top nav items */}
           {TOP_NAV.map(({ to, icon: Icon, label, badge }) => (
             <NavLink key={to} to={to} className={navClass}>
               <Icon size={16} className="flex-shrink-0" />
@@ -107,66 +103,37 @@ export default function AppShell() {
             </NavLink>
           ))}
 
-          {/* HR group */}
-          <button
-            onClick={() => setHrOpen(o => !o)}
-            className={`${NAV_LINK} w-full ${isHrRoute ? ACTIVE : INACTIVE}`}
-          >
-            <UsersRound size={16} className="flex-shrink-0" />
-            <span className="flex-1 text-left">HR</span>
-            <ChevronRight
-              size={14}
-              className={`flex-shrink-0 transition-transform duration-150 ${hrOpen ? 'rotate-90' : ''}`}
-            />
-          </button>
-          {hrOpen && (
-            <SubNavLink to="/staff" icon={UserCog} label="Staff" />
-          )}
-
-          {/* Reports group */}
-          <button
-            onClick={() => setReportsOpen(o => !o)}
-            className={`${NAV_LINK} w-full ${isReportsRoute ? ACTIVE : INACTIVE}`}
-          >
-            <BarChart2 size={16} className="flex-shrink-0" />
-            <span className="flex-1 text-left">Reports</span>
-            <ChevronRight
-              size={14}
-              className={`flex-shrink-0 transition-transform duration-150 ${reportsOpen ? 'rotate-90' : ''}`}
-            />
-          </button>
-          {reportsOpen && (
-            <>
-              <SubNavLink to="/reports/sales"      icon={Receipt}    label="Sales"      />
-              <SubNavLink to="/reports/payroll"    icon={DollarSign} label="Payroll"    />
-              <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash" />
-            </>
-          )}
-
-          {/* Users group (admin only) */}
+          {/* Admin group (admin only) */}
           {isAdmin && (
             <>
               <button
-                onClick={() => setUsersOpen(o => !o)}
-                className={`${NAV_LINK} w-full ${isUsersRoute ? ACTIVE : INACTIVE}`}
+                onClick={() => setAdminOpen(o => !o)}
+                className={`${NAV_LINK} w-full ${isAdminRoute ? ACTIVE : INACTIVE}`}
               >
                 <ShieldCheck size={16} className="flex-shrink-0" />
-                <span className="flex-1 text-left">Users</span>
+                <span className="flex-1 text-left">Admin</span>
                 <ChevronRight
                   size={14}
-                  className={`flex-shrink-0 transition-transform duration-150 ${usersOpen ? 'rotate-90' : ''}`}
+                  className={`flex-shrink-0 transition-transform duration-150 ${adminOpen ? 'rotate-90' : ''}`}
                 />
               </button>
-              {usersOpen && (
+              {adminOpen && (
                 <>
-                  <SubNavLink to="/users"     icon={User}       label="Manage Users" />
-                  <SubNavLink to="/login-log" icon={ScrollText} label="Login Log"    />
+                  <SubNavLink to="/services"          icon={Scissors}    label="Services"    />
+                  <SubNavLink to="/staff"             icon={UserCog}     label="Staff"       />
+                  <SubNavLink to="/retail"            icon={ShoppingBag} label="Retail"      />
+                  <SubNavLink to="/till"              icon={Vault}       label="Till"        />
+                  <SubNavLink to="/reports/sales"     icon={Receipt}     label="Sales"       />
+                  <SubNavLink to="/reports/payroll"   icon={DollarSign}  label="Payroll"     />
+                  <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash"  />
+                  <SubNavLink to="/users"             icon={User}        label="Users"       />
+                  <SubNavLink to="/login-log"         icon={ScrollText}  label="Login Log"   />
                 </>
               )}
             </>
           )}
 
-          {/* Settings group (collapsible for admins, direct link otherwise) */}
+          {/* Settings (collapsible for admins, direct link otherwise) */}
           {isAdmin ? (
             <>
               <button
@@ -193,19 +160,6 @@ export default function AppShell() {
               <span className="flex-1">Settings</span>
             </NavLink>
           )}
-
-          {/* Bottom nav items */}
-          {BOTTOM_NAV.map(({ to, icon: Icon, label, badge }) => (
-            <NavLink key={to} to={to} className={navClass}>
-              <Icon size={16} className="flex-shrink-0" />
-              <span className="flex-1">{label}</span>
-              {badge > 0 && (
-                <span className="ml-auto bg-amber-500 text-white text-xs font-medium rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center leading-none">
-                  {badge}
-                </span>
-              )}
-            </NavLink>
-          ))}
         </div>
 
         <div className="border-t p-3">
