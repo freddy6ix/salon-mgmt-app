@@ -25,6 +25,8 @@ class User(TenantScopedBase):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.staff)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
 class LoginLog(TenantScopedBase):

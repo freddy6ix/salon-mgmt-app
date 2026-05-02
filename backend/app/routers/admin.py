@@ -60,6 +60,8 @@ async def _user_out(user: User, db: AsyncSession) -> "UserOut":
         role=user.role.value,
         is_active=user.is_active,
         client_name=f"{client.first_name} {client.last_name}" if client else None,
+        first_name=user.first_name,
+        last_name=user.last_name,
     )
 
 
@@ -81,6 +83,8 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
     client_name: str | None
+    first_name: str | None
+    last_name: str | None
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -102,6 +106,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     role: str
     send_welcome: bool = True
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -136,6 +142,10 @@ async def create_user(
     if existing is not None:
         existing.is_active = True
         existing.role = role
+        if body.first_name is not None:
+            existing.first_name = body.first_name
+        if body.last_name is not None:
+            existing.last_name = body.last_name
         user = existing
     else:
         user = User(
@@ -144,6 +154,8 @@ async def create_user(
             password_hash=hash_password(secrets.token_hex(32)),
             role=role,
             is_active=True,
+            first_name=body.first_name,
+            last_name=body.last_name,
         )
         db.add(user)
     await db.flush()
@@ -168,6 +180,8 @@ async def create_user(
 class UserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -201,6 +215,11 @@ async def update_user(
         if not body.is_active and user.id == current_user.id:
             raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
         user.is_active = body.is_active
+
+    if body.first_name is not None:
+        user.first_name = body.first_name
+    if body.last_name is not None:
+        user.last_name = body.last_name
 
     await db.commit()
     await db.refresh(user)

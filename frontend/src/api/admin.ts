@@ -6,6 +6,8 @@ export interface AdminUser {
   role: 'super_admin' | 'tenant_admin' | 'staff' | 'guest'
   is_active: boolean
   client_name: string | null
+  first_name: string | null
+  last_name: string | null
 }
 
 export function listUsers(): Promise<AdminUser[]> {
@@ -16,13 +18,15 @@ export function createUser(data: {
   email: string
   role: string
   send_welcome: boolean
+  first_name?: string | null
+  last_name?: string | null
 }): Promise<AdminUser> {
   return api.post<AdminUser>('/admin/users', data)
 }
 
 export function updateUser(
   id: string,
-  data: { role?: string; is_active?: boolean },
+  data: { role?: string; is_active?: boolean; first_name?: string | null; last_name?: string | null },
 ): Promise<AdminUser> {
   return api.patch<AdminUser>(`/admin/users/${id}`, data)
 }

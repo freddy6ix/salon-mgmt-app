@@ -55,14 +55,24 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const qc = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('staff')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => createUser({ email: email.trim(), role, send_welcome: true }),
+    mutationFn: () => createUser({
+      email: email.trim(),
+      role,
+      send_welcome: true,
+      first_name: firstName.trim() || null,
+      last_name: lastName.trim() || null,
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
       setEmail('')
       setRole('staff')
+      setFirstName('')
+      setLastName('')
       setError(null)
       onClose()
     },
@@ -84,6 +94,26 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           <DialogTitle>Add user</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="first-name">First name</Label>
+              <Input
+                id="first-name"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="last-name">Last name</Label>
+              <Input
+                id="last-name"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -125,7 +155,7 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
 // ── Edit role dialog ──────────────────────────────────────────────────────────
 
-function EditRoleDialog({
+function EditUserDialog({
   user,
   onClose,
 }: {
@@ -134,10 +164,16 @@ function EditRoleDialog({
 }) {
   const qc = useQueryClient()
   const [role, setRole] = useState(user.role)
+  const [firstName, setFirstName] = useState(user.first_name ?? '')
+  const [lastName, setLastName] = useState(user.last_name ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => updateUser(user.id, { role }),
+    mutationFn: () => updateUser(user.id, {
+      role,
+      first_name: firstName.trim() || null,
+      last_name: lastName.trim() || null,
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
       onClose()
@@ -147,13 +183,28 @@ function EditRoleDialog({
     },
   })
 
+  const isDirty = role !== user.role
+    || firstName.trim() !== (user.first_name ?? '')
+    || lastName.trim() !== (user.last_name ?? '')
+
   return (
     <Dialog open onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit role — {user.email}</DialogTitle>
+          <DialogTitle>Edit user</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          <p className="text-xs text-muted-foreground">{user.email}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>First name</Label>
+              <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Last name</Label>
+              <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Optional" />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label>Role</Label>
             <Select value={role} onValueChange={v => { if (v) setRole(v as AdminUser['role']) }}>
@@ -169,7 +220,7 @@ function EditRoleDialog({
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || role === user.role}>
+            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !isDirty}>
               Save
             </Button>
           </div>
@@ -226,9 +277,13 @@ function UserRow({ user }: { user: AdminUser }) {
             }
             <div>
               <p className="text-sm font-medium">{user.email}</p>
-              {user.client_name && (
+              {(user.first_name || user.last_name) ? (
+                <p className="text-xs text-muted-foreground">
+                  {[user.first_name, user.last_name].filter(Boolean).join(' ')}
+                </p>
+              ) : user.client_name ? (
                 <p className="text-xs text-muted-foreground">{user.client_name}</p>
-              )}
+              ) : null}
             </div>
           </div>
         </td>
@@ -252,7 +307,7 @@ function UserRow({ user }: { user: AdminUser }) {
                 className="text-xs h-7"
                 onClick={() => setEditOpen(true)}
               >
-                Edit role
+                Edit
               </Button>
             )}
             {!isGuest && (
@@ -338,7 +393,7 @@ function UserRow({ user }: { user: AdminUser }) {
           </div>
         </td>
       </tr>
-      {editOpen && <EditRoleDialog user={user} onClose={() => setEditOpen(false)} />}
+      {editOpen && <EditUserDialog user={user} onClose={() => setEditOpen(false)} />}
     </>
   )
 }

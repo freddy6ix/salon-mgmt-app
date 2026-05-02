@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getLoginLogs } from '@/api/admin'
+import { useTimeFormat } from '@/lib/timeFormat'
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: 'Super Admin',
@@ -8,20 +9,13 @@ const ROLE_LABEL: Record<string, string> = {
   guest: 'Guest',
 }
 
-function fmt(iso: string): { date: string; time: string } {
-  const d = new Date(iso)
-  return {
-    date: d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }),
-    time: d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-  }
-}
-
 export default function LoginLogsPage() {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['login-logs'],
     queryFn: () => getLoginLogs(),
     refetchInterval: 60_000,
   })
+  const { formatTime } = useTimeFormat()
 
   return (
     <div className="h-full overflow-auto p-6">
@@ -48,11 +42,12 @@ export default function LoginLogsPage() {
               </thead>
               <tbody>
                 {logs.map((entry, i) => {
-                  const { date, time } = fmt(entry.logged_in_at)
+                  const d = new Date(entry.logged_in_at)
+                  const date = d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
                   return (
                     <tr key={entry.id} className={i % 2 === 1 ? 'bg-muted/20' : ''}>
                       <td className="px-4 py-2 tabular-nums">{date}</td>
-                      <td className="px-4 py-2 tabular-nums text-muted-foreground">{time}</td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground">{formatTime(d)}</td>
                       <td className="px-4 py-2">{entry.email}</td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {ROLE_LABEL[entry.role] ?? entry.role}
