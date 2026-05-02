@@ -37,13 +37,16 @@ export default function AppShell() {
   const isHrRoute = location.pathname.startsWith('/staff')
   const isReportsRoute = location.pathname.startsWith('/reports')
   const isUsersRoute = location.pathname.startsWith('/users') || location.pathname.startsWith('/login-log')
+  const isSettingsRoute = location.pathname.startsWith('/settings') || location.pathname.startsWith('/import')
   const [hrOpen, setHrOpen] = useState(isHrRoute)
   const [reportsOpen, setReportsOpen] = useState(isReportsRoute)
   const [usersOpen, setUsersOpen] = useState(isUsersRoute)
+  const [settingsOpen, setSettingsOpen] = useState(isSettingsRoute)
 
   useEffect(() => { if (isHrRoute) setHrOpen(true) }, [isHrRoute])
   useEffect(() => { if (isReportsRoute) setReportsOpen(true) }, [isReportsRoute])
   useEffect(() => { if (isUsersRoute) setUsersOpen(true) }, [isUsersRoute])
+  useEffect(() => { if (isSettingsRoute) setSettingsOpen(true) }, [isSettingsRoute])
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
@@ -71,10 +74,8 @@ export default function AppShell() {
   ]
 
   const BOTTOM_NAV = [
-    { to: '/retail',   icon: ShoppingBag, label: 'Retail',   badge: 0 },
-    { to: '/till',     icon: Vault,       label: 'Till',     badge: 0 },
-    { to: '/settings', icon: Settings,    label: 'Settings', badge: 0 },
-    ...(isAdmin ? [{ to: '/import', icon: Upload, label: 'Import', badge: 0 }] : []),
+    { to: '/retail', icon: ShoppingBag, label: 'Retail', badge: 0 },
+    { to: '/till',   icon: Vault,       label: 'Till',   badge: 0 },
   ]
 
   return (
@@ -163,6 +164,34 @@ export default function AppShell() {
                 </>
               )}
             </>
+          )}
+
+          {/* Settings group (collapsible for admins, direct link otherwise) */}
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => setSettingsOpen(o => !o)}
+                className={`${NAV_LINK} w-full ${isSettingsRoute ? ACTIVE : INACTIVE}`}
+              >
+                <Settings size={16} className="flex-shrink-0" />
+                <span className="flex-1 text-left">Settings</span>
+                <ChevronRight
+                  size={14}
+                  className={`flex-shrink-0 transition-transform duration-150 ${settingsOpen ? 'rotate-90' : ''}`}
+                />
+              </button>
+              {settingsOpen && (
+                <>
+                  <SubNavLink to="/settings" icon={Settings} label="Settings" />
+                  <SubNavLink to="/import"   icon={Upload}   label="Import"   />
+                </>
+              )}
+            </>
+          ) : (
+            <NavLink to="/settings" className={navClass}>
+              <Settings size={16} className="flex-shrink-0" />
+              <span className="flex-1">Settings</span>
+            </NavLink>
           )}
 
           {/* Bottom nav items */}
