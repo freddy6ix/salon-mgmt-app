@@ -55,7 +55,7 @@ export default function AppShell() {
   )
   const isSettingsRoute = location.pathname.startsWith('/settings')
 
-  const [adminOpen, setAdminOpen] = useState(isAdminRoute)
+  const [adminOpen, setAdminOpen] = useState(false)
 
   useEffect(() => { if (isAdminRoute) setAdminOpen(true) }, [isAdminRoute])
 
