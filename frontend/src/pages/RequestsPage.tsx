@@ -168,7 +168,8 @@ export default function RequestsPage() {
   const [reviewing, setReviewing] = useState<AppointmentRequest | null>(null)
 
   function openConvert(req: AppointmentRequest) {
-    navigate(`/appointments?request=${req.id}`)
+    const date = req.desired_date.slice(0, 10)
+    navigate(`/appointments?request=${req.id}&date=${date}`)
   }
 
   const { data: requests = [], isLoading } = useQuery({
