@@ -3,7 +3,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import or_, select, desc
+from sqlalchemy import or_, select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 
@@ -61,10 +61,14 @@ async def search_clients(
     )
     if q.strip():
         term = f"%{q.strip()}%"
+        full_name = func.concat(Client.first_name, ' ', Client.last_name)
+        last_first = func.concat(Client.last_name, ', ', Client.first_name)
         stmt = stmt.where(
             or_(
                 Client.first_name.ilike(term),
                 Client.last_name.ilike(term),
+                full_name.ilike(term),
+                last_first.ilike(term),
                 Client.cell_phone.ilike(term),
                 Client.email.ilike(term),
             )
