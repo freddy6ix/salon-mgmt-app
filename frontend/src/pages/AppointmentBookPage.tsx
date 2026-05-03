@@ -79,7 +79,7 @@ function ShortcutsPanel({ shortcuts, onClose }: { shortcuts: ShortcutDef[]; onCl
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AppointmentBookPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestId = searchParams.get('request')
   const highlightApptId = searchParams.get('appointment')
