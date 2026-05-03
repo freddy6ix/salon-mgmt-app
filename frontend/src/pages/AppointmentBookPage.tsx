@@ -8,6 +8,7 @@ import { getSchedule } from '@/api/schedules'
 import { getRequest } from '@/api/appointmentRequests'
 import { getBranding, type SlotMinutes } from '@/api/settings'
 import { listTimeBlocks, type TimeBlock } from '@/api/timeBlocks'
+import MiniCalendar from '@/components/MiniCalendar'
 import TimeGrid from '@/components/appointment-book/TimeGrid'
 import AppointmentDetail from '@/components/appointment-book/AppointmentDetail'
 import BookingForm from '@/components/appointment-book/BookingForm'
@@ -296,6 +297,12 @@ export default function AppointmentBookPage() {
         </div>
       </header>
 
+      <div className="flex flex-1 overflow-hidden">
+        {/* Mini calendar sidebar */}
+        <aside className="w-44 flex-shrink-0 bg-white border-r overflow-y-auto">
+          <MiniCalendar selectedDate={date} onDateChange={setDate} />
+        </aside>
+
       <main className="flex-1 overflow-hidden p-4">
         {isLoading ? (
           <div className="space-y-2">
@@ -320,6 +327,7 @@ export default function AppointmentBookPage() {
           />
         )}
       </main>
+      </div>
 
       {/* Floating shortcuts toggle */}
       <Button
