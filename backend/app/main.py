@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, appointment_requests, appointments, auth, briefings, cash_reconciliation, clients, internal, payment_methods, promotions, provider_service_prices, providers, public, reports, retail_items, sales, schedules, service_categories, services, time_blocks
+from app.routers import admin, appointment_requests, appointments, auth, briefings, cash_reconciliation, clients, households, internal, payment_methods, promotions, provider_service_prices, providers, public, reports, retail_items, sales, schedules, service_categories, services, time_blocks
 from app.routers import settings as settings_router
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app.include_router(appointments.router)
 app.include_router(appointment_requests.router)
 app.include_router(providers.router)
 app.include_router(clients.router)
+app.include_router(households.router)
 app.include_router(services.router)
 app.include_router(service_categories.router)
 app.include_router(provider_service_prices.router)

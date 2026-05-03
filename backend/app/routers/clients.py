@@ -3,17 +3,18 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import or_, select, desc, func
+from sqlalchemy import or_, select, desc, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 
 from app.database import get_db
 from app.deps import CurrentUser
-from app.models.client import Client, ClientColourNote
+from app.models.client import Client, ClientColourNote, ClientHousehold
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
 from app.models.user import User
 from app.models.provider import Provider
 from app.models.service import Service
+from app.models.sale import Sale
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -425,3 +426,236 @@ async def create_colour_note(
         note_text=note.note_text,
         created_at=note.created_at.isoformat(),
     )
+
+
+# ── Client cleanup: duplicate detection ──────────────────────────────────────
+
+class ClientDetail(BaseModel):
+    id: str
+    first_name: str
+    last_name: str
+    email: str | None
+    cell_phone: str | None
+    pronouns: str | None
+    special_instructions: str | None
+    no_show_count: int
+    late_cancellation_count: int
+    is_vip: bool
+    appointment_count: int
+    household_id: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class DuplicatePairOut(BaseModel):
+    reason: str          # "email" | "phone" | "name"
+    client_a: ClientDetail
+    client_b: ClientDetail
+    recommended_primary_id: str
+
+
+def _client_detail(c: Client, appt_count: int) -> ClientDetail:
+    return ClientDetail(
+        id=str(c.id),
+        first_name=c.first_name,
+        last_name=c.last_name,
+        email=c.email,
+        cell_phone=c.cell_phone,
+        pronouns=c.pronouns,
+        special_instructions=c.special_instructions,
+        no_show_count=c.no_show_count,
+        late_cancellation_count=c.late_cancellation_count,
+        is_vip=c.is_vip,
+        appointment_count=appt_count,
+        household_id=str(c.household_id) if c.household_id else None,
+    )
+
+
+@router.get("/duplicate-pairs", response_model=list[DuplicatePairOut])
+async def get_duplicate_pairs(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[DuplicatePairOut]:
+    tid = current_user.tenant_id
+
+    clients = (await db.execute(
+        select(Client).where(Client.tenant_id == tid, Client.is_active == True)  # noqa: E712
+    )).scalars().all()
+
+    # Appointment counts per client
+    count_rows = (await db.execute(
+        select(Appointment.client_id, func.count(Appointment.id).label("cnt"))
+        .where(Appointment.tenant_id == tid)
+        .group_by(Appointment.client_id)
+    )).all()
+    counts: dict[uuid.UUID, int] = {r.client_id: r.cnt for r in count_rows}
+
+    def detail(c: Client) -> ClientDetail:
+        return _client_detail(c, counts.get(c.id, 0))
+
+    # Build lookup maps
+    email_map: dict[str, list[Client]] = {}
+    phone_map: dict[str, list[Client]] = {}
+    name_map: dict[str, list[Client]] = {}
+
+    for c in clients:
+        if c.email:
+            key = c.email.lower().strip()
+            email_map.setdefault(key, []).append(c)
+        if c.cell_phone:
+            key = "".join(ch for ch in c.cell_phone if ch.isdigit())
+            if key:
+                phone_map.setdefault(key, []).append(c)
+        name_key = f"{c.first_name.lower().strip()}|{c.last_name.lower().strip()}"
+        name_map.setdefault(name_key, []).append(c)
+
+    seen_pairs: set[tuple[uuid.UUID, uuid.UUID]] = set()
+    pairs: list[DuplicatePairOut] = []
+
+    def _add_pairs(groups: dict[str, list[Client]], reason: str) -> None:
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    a, b = group[i], group[j]
+                    key = (min(a.id, b.id), max(a.id, b.id))
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+                    cnt_a = counts.get(a.id, 0)
+                    cnt_b = counts.get(b.id, 0)
+                    rec = str(a.id) if cnt_a >= cnt_b else str(b.id)
+                    # Put recommended (more history) as client_a
+                    primary, secondary = (a, b) if cnt_a >= cnt_b else (b, a)
+                    pairs.append(DuplicatePairOut(
+                        reason=reason,
+                        client_a=detail(primary),
+                        client_b=detail(secondary),
+                        recommended_primary_id=rec,
+                    ))
+
+    _add_pairs(email_map, "email")
+    _add_pairs(phone_map, "phone")
+    _add_pairs(name_map, "name")
+
+    return pairs
+
+
+# ── Client merge ──────────────────────────────────────────────────────────────
+
+class MergeBody(BaseModel):
+    source_id: str
+
+
+@router.post("/{primary_id}/merge", response_model=ClientDetail)
+async def merge_clients(
+    primary_id: str,
+    body: MergeBody,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClientDetail:
+    tid = current_user.tenant_id
+    pid = uuid.UUID(primary_id)
+    sid = uuid.UUID(body.source_id)
+
+    if pid == sid:
+        raise HTTPException(status_code=400, detail="Cannot merge a client with itself")
+
+    primary = (await db.execute(
+        select(Client).where(Client.id == pid, Client.tenant_id == tid)
+    )).scalar_one_or_none()
+    source = (await db.execute(
+        select(Client).where(Client.id == sid, Client.tenant_id == tid, Client.is_active == True)  # noqa: E712
+    )).scalar_one_or_none()
+
+    if not primary or not source:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Re-point appointments, colour notes, and sales
+    await db.execute(
+        update(Appointment)
+        .where(Appointment.client_id == sid, Appointment.tenant_id == tid)
+        .values(client_id=pid)
+    )
+    await db.execute(
+        update(ClientColourNote)
+        .where(ClientColourNote.client_id == sid, ClientColourNote.tenant_id == tid)
+        .values(client_id=pid)
+    )
+    await db.execute(
+        update(Sale)
+        .where(Sale.client_id == sid, Sale.tenant_id == tid)
+        .values(client_id=pid)
+    )
+
+    # Copy missing contact fields from source → primary
+    for field in ("email", "cell_phone", "home_phone", "work_phone",
+                  "address_line", "city", "province", "postal_code",
+                  "special_instructions", "pronouns", "photo_url"):
+        if not getattr(primary, field) and getattr(source, field):
+            setattr(primary, field, getattr(source, field))
+
+    # Sum counters
+    primary.no_show_count += source.no_show_count
+    primary.late_cancellation_count += source.late_cancellation_count
+
+    # Transfer household if primary has none
+    if not primary.household_id and source.household_id:
+        primary.household_id = source.household_id
+
+    # Soft-delete source
+    source.is_active = False
+
+    await db.commit()
+    await db.refresh(primary)
+
+    from sqlalchemy import func as sqlfunc
+    new_count = (await db.execute(
+        select(sqlfunc.count(Appointment.id))
+        .where(Appointment.client_id == pid, Appointment.tenant_id == tid)
+    )).scalar_one()
+
+    return _client_detail(primary, new_count)
+
+
+# ── Household membership ──────────────────────────────────────────────────────
+
+class HouseholdPatch(BaseModel):
+    household_id: str | None
+
+
+@router.patch("/{client_id}/household", response_model=ClientDetail)
+async def set_household(
+    client_id: str,
+    body: HouseholdPatch,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClientDetail:
+    tid = current_user.tenant_id
+    client = (await db.execute(
+        select(Client).where(Client.id == uuid.UUID(client_id), Client.tenant_id == tid)
+    )).scalar_one_or_none()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    if body.household_id:
+        hh = (await db.execute(
+            select(ClientHousehold).where(
+                ClientHousehold.id == uuid.UUID(body.household_id),
+                ClientHousehold.tenant_id == tid,
+            )
+        )).scalar_one_or_none()
+        if not hh:
+            raise HTTPException(status_code=404, detail="Household not found")
+        client.household_id = hh.id
+    else:
+        client.household_id = None
+
+    await db.commit()
+    await db.refresh(client)
+    cnt = (await db.execute(
+        select(func.count(Appointment.id))
+        .where(Appointment.client_id == client.id, Appointment.tenant_id == tid)
+    )).scalar_one()
+    return _client_detail(client, cnt)

@@ -14,6 +14,7 @@ import MyRequestsPage from '@/pages/MyRequestsPage'
 import RequestsPage from '@/pages/RequestsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ClientsPage from '@/pages/ClientsPage'
+import ClientCleanupPage from '@/pages/ClientCleanupPage'
 import ServicesPage from '@/pages/ServicesPage'
 import UsersPage from '@/pages/UsersPage'
 import TillPage from '@/pages/TillPage'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/staff" element={<StaffManagementPage />} />
         <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/clients/cleanup" element={<ClientCleanupPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/reports" element={<Navigate to="/reports/sales" replace />} />
         <Route path="/reports/sales" element={<ReportsPage />} />

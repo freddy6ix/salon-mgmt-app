@@ -44,9 +44,11 @@ function ClientList({
     queryFn: () => searchClients(debouncedQ),
   })
 
+  const navigate = useNavigate()
+
   return (
     <div className="flex flex-col h-full border-r bg-white">
-      <div className="p-3 border-b">
+      <div className="p-3 border-b space-y-2">
         <input
           type="search"
           placeholder="Search clients…"
@@ -54,6 +56,12 @@ function ClientList({
           onChange={e => setQuery(e.target.value)}
           className="w-full border border-input rounded-md px-3 py-1.5 text-sm bg-background"
         />
+        <button
+          onClick={() => navigate('/clients/cleanup')}
+          className="w-full text-xs text-muted-foreground hover:text-foreground text-left px-1 transition-colors"
+        >
+          Merge duplicates &amp; manage households →
+        </button>
       </div>
 
       <div className="flex-1 overflow-auto">
