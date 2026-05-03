@@ -41,15 +41,15 @@ export default function AppShell() {
     location.pathname.startsWith('/till') ||
     location.pathname.startsWith('/reports') ||
     location.pathname.startsWith('/users') ||
-    location.pathname.startsWith('/login-log')
+    location.pathname.startsWith('/login-log') ||
+    location.pathname.startsWith('/settings') ||
+    location.pathname.startsWith('/import')
   )
-  const isSettingsRoute = location.pathname.startsWith('/settings') || location.pathname.startsWith('/import')
+  const isSettingsRoute = location.pathname.startsWith('/settings')
 
   const [adminOpen, setAdminOpen] = useState(isAdminRoute)
-  const [settingsOpen, setSettingsOpen] = useState(isSettingsRoute)
 
   useEffect(() => { if (isAdminRoute) setAdminOpen(true) }, [isAdminRoute])
-  useEffect(() => { if (isSettingsRoute) setSettingsOpen(true) }, [isSettingsRoute])
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
@@ -126,35 +126,17 @@ export default function AppShell() {
                   <SubNavLink to="/reports/sales"     icon={Receipt}     label="Sales"       />
                   <SubNavLink to="/reports/payroll"   icon={DollarSign}  label="Payroll"     />
                   <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash"  />
-                  <SubNavLink to="/users"             icon={User}        label="Users"       />
-                  <SubNavLink to="/login-log"         icon={ScrollText}  label="Login Log"   />
+                  <SubNavLink to="/users"     icon={User}        label="Users"      />
+                  <SubNavLink to="/login-log" icon={ScrollText}  label="Login Log"  />
+                  <SubNavLink to="/settings"  icon={Settings}    label="Settings"   />
+                  <SubNavLink to="/import"    icon={Upload}      label="Import"     />
                 </>
               )}
             </>
           )}
 
-          {/* Settings (collapsible for admins, direct link otherwise) */}
-          {isAdmin ? (
-            <>
-              <button
-                onClick={() => setSettingsOpen(o => !o)}
-                className={`${NAV_LINK} w-full ${isSettingsRoute ? ACTIVE : INACTIVE}`}
-              >
-                <Settings size={16} className="flex-shrink-0" />
-                <span className="flex-1 text-left">Settings</span>
-                <ChevronRight
-                  size={14}
-                  className={`flex-shrink-0 transition-transform duration-150 ${settingsOpen ? 'rotate-90' : ''}`}
-                />
-              </button>
-              {settingsOpen && (
-                <>
-                  <SubNavLink to="/settings" icon={Settings} label="Settings" />
-                  <SubNavLink to="/import"   icon={Upload}   label="Import"   />
-                </>
-              )}
-            </>
-          ) : (
+          {/* Settings — direct link for non-admins */}
+          {!isAdmin && (
             <NavLink to="/settings" className={navClass}>
               <Settings size={16} className="flex-shrink-0" />
               <span className="flex-1">Settings</span>
