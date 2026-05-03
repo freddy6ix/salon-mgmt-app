@@ -29,6 +29,14 @@ function SubNavLink({ to, icon: Icon, label }: { to: string; icon: React.Element
   )
 }
 
+function SubNavLabel({ label }: { label: string }) {
+  return (
+    <div className="px-4 pt-3 pb-0.5">
+      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/50">{label}</span>
+    </div>
+  )
+}
+
 export default function AppShell() {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
@@ -119,17 +127,24 @@ export default function AppShell() {
               </button>
               {adminOpen && (
                 <>
-                  <SubNavLink to="/services"          icon={Scissors}    label="Services"    />
-                  <SubNavLink to="/staff"             icon={UserCog}     label="Staff"       />
-                  <SubNavLink to="/retail"            icon={ShoppingBag} label="Retail"      />
-                  <SubNavLink to="/till"              icon={Vault}       label="Till"        />
-                  <SubNavLink to="/reports/sales"     icon={Receipt}     label="Sales"       />
-                  <SubNavLink to="/reports/payroll"   icon={DollarSign}  label="Payroll"     />
-                  <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash"  />
-                  <SubNavLink to="/users"     icon={User}        label="Users"      />
-                  <SubNavLink to="/login-log" icon={ScrollText}  label="Login Log"  />
-                  <SubNavLink to="/settings"  icon={Settings}    label="Settings"   />
-                  <SubNavLink to="/import"    icon={Upload}      label="Import"     />
+                  <SubNavLabel label="Catalog" />
+                  <SubNavLink to="/services" icon={Scissors}    label="Services" />
+                  <SubNavLink to="/retail"   icon={ShoppingBag} label="Retail"   />
+
+                  <SubNavLabel label="Staff" />
+                  <SubNavLink to="/staff"     icon={UserCog}    label="Staff"     />
+                  <SubNavLink to="/users"     icon={User}       label="Users"     />
+                  <SubNavLink to="/login-log" icon={ScrollText} label="Login Log" />
+
+                  <SubNavLabel label="Finance" />
+                  <SubNavLink to="/till"              icon={Vault}       label="Till"       />
+                  <SubNavLink to="/reports/sales"     icon={Receipt}     label="Sales"      />
+                  <SubNavLink to="/reports/payroll"   icon={DollarSign}  label="Payroll"    />
+                  <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash" />
+
+                  <SubNavLabel label="Settings" />
+                  <SubNavLink to="/settings" icon={Settings} label="Settings" />
+                  <SubNavLink to="/import"   icon={Upload}   label="Import"   />
                 </>
               )}
             </>
