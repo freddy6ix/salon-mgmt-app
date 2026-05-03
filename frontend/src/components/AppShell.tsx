@@ -75,7 +75,6 @@ export default function AppShell() {
   )
 
   const [adminOpen, setAdminOpen] = useState(false)
-  useEffect(() => { if (isAdminRoute) setAdminOpen(true) }, [isAdminRoute])
 
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['requests', 'new'],
