@@ -38,6 +38,32 @@ resource "google_cloud_scheduler_job" "briefing_developer" {
   depends_on = [google_project_service.apis]
 }
 
+# ── Reminder dispatcher — every 15 minutes ──────────────────────────────────
+resource "google_cloud_scheduler_job" "dispatch_reminders" {
+  name             = "salon-dispatch-reminders"
+  description      = "Trigger appointment reminder emails every 15 minutes"
+  schedule         = "*/15 * * * *"
+  time_zone        = "America/Toronto"
+  attempt_deadline = "60s"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.api.uri}/internal/dispatch-reminders"
+    body        = base64encode("{}")
+    headers = {
+      "Content-Type"      = "application/json"
+      "X-Internal-Secret" = var.internal_secret
+    }
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler.email
+      audience              = google_cloud_run_v2_service.api.uri
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
 # ── Daily briefing job — claude_code audience, 7am Toronto ──────────────────
 resource "google_cloud_scheduler_job" "briefing_claude_code" {
   name             = "salon-briefing-claude-code"
