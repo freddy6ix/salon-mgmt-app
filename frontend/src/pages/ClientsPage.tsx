@@ -330,6 +330,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
   const [editLast, setEditLast] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editLangPref, setEditLangPref] = useState('en')
   const [editError, setEditError] = useState<string | null>(null)
 
   const { data: client, isLoading } = useQuery({
@@ -355,6 +356,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
       last_name: editLast.trim(),
       email: editEmail.trim() || null,
       cell_phone: editPhone.trim() || null,
+      language_preference: editLangPref,
     }),
     onSuccess: updated => {
       qc.setQueryData(['client', clientId], updated)
@@ -371,6 +373,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
     setEditLast(client.last_name)
     setEditEmail(client.email ?? '')
     setEditPhone(client.cell_phone ?? '')
+    setEditLangPref(client.language_preference ?? 'en')
     setEditError(null)
     setEditingProfile(true)
   }
@@ -423,6 +426,17 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
                 <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder={t('common.optional')} />
               </div>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('clients.language_preference')}</Label>
+              <select
+                value={editLangPref}
+                onChange={e => setEditLangPref(e.target.value)}
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              >
+                <option value="en">{t('translations.lang_en')}</option>
+                <option value="fr">{t('translations.lang_fr')}</option>
+              </select>
+            </div>
             {editError && <p className="text-xs text-destructive">{editError}</p>}
             <div className="flex gap-2">
               <Button size="sm" onClick={() => saveProfile()} disabled={savingProfile || !editFirst.trim() || !editLast.trim()}>
@@ -442,6 +456,9 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
                 </h2>
                 {client.is_vip && (
                   <Badge variant="outline" className="text-amber-600 border-amber-400 text-xs">VIP</Badge>
+                )}
+                {client.language_preference && client.language_preference !== 'en' && (
+                  <Badge variant="outline" className="text-xs uppercase">{client.language_preference}</Badge>
                 )}
                 {client.pronouns && (
                   <span className="text-xs text-muted-foreground">{client.pronouns}</span>
