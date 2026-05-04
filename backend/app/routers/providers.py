@@ -386,7 +386,7 @@ async def _calc_payroll_line(
         gross_before_vac = hourly_floor
     elif pay_type_val == "salary":
         pay_basis = "salary"
-        gross_before_vac = float(p.pay_amount or 0)
+        gross_before_vac = round(float(p.pay_amount or 0) / 12, 2)
     else:
         pay_basis = "n/a"
         gross_before_vac = 0.0

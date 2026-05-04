@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'profile' | 'compensation' | 'hr' | 'schedule' | 'payroll'
+type Tab = 'profile' | 'hr' | 'schedule' | 'payroll'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -473,8 +473,15 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
         <Input type="number" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-32" />
       ))}
 
-      {payType === 'salary' && fieldRow('Salary ($)', (
-        <Input type="number" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-40" />
+      {payType === 'salary' && fieldRow('Annual salary ($)', (
+        <div className="space-y-1">
+          <Input type="number" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-40" />
+          {payAmount && !isNaN(parseFloat(payAmount)) && (
+            <p className="text-xs text-muted-foreground">
+              Monthly: {(parseFloat(payAmount) / 12).toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 })}
+            </p>
+          )}
+        </div>
       ))}
 
       {payType === 'commission' && (
@@ -711,7 +718,34 @@ function HRBankingTab({ provider }: { provider: ProviderDetail }) {
   )
 }
 
-// ── Payroll Tab ───────────────────────────────────────────────────────────────
+// ── Payroll Tab (wrapper with Settings / Pay stub sub-tabs) ───────────────────
+
+function PayrollTab({ provider }: { provider: ProviderDetail }) {
+  const [subTab, setSubTab] = useState<'settings' | 'paystub'>('settings')
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-0 border-b">
+        {(['settings', 'paystub'] as const).map(key => (
+          <button
+            key={key}
+            onClick={() => setSubTab(key)}
+            className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors ${
+              subTab === key
+                ? 'border-foreground text-foreground font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {key === 'settings' ? 'Settings' : 'Pay stub'}
+          </button>
+        ))}
+      </div>
+      {subTab === 'settings' && <CompensationTab provider={provider} />}
+      {subTab === 'paystub' && <PaystubPanel provider={provider} />}
+    </div>
+  )
+}
+
+// ── Pay stub panel (was PayrollTab) ──────────────────────────────────────────
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -719,7 +753,7 @@ function fmt(n: number) {
   return n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 })
 }
 
-function PayrollTab({ provider }: { provider: ProviderDetail }) {
+function PaystubPanel({ provider }: { provider: ProviderDetail }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -846,7 +880,7 @@ function PayrollTab({ provider }: { provider: ProviderDetail }) {
               {data.pay_type === 'salary' && (
                 <>
                   {section('Pay')}
-                  {row('Monthly salary', fmt(data.gross_before_vacation), true)}
+                  {row('Annual salary ÷ 12', fmt(data.gross_before_vacation), true)}
                 </>
               )}
 
@@ -1005,7 +1039,6 @@ export default function StaffManagementPage() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'profile', label: 'Profile' },
-    { key: 'compensation', label: 'Compensation' },
     { key: 'hr', label: 'HR & Banking' },
     { key: 'schedule', label: 'Schedule' },
     { key: 'payroll', label: 'Payroll' },
@@ -1113,7 +1146,6 @@ export default function StaffManagementPage() {
           {/* Tab Content */}
           <div className="flex-1 overflow-auto p-6">
             {tab === 'profile' && <ProfileTab key={selected.id} provider={selected} />}
-            {tab === 'compensation' && <CompensationTab key={selected.id} provider={selected} />}
             {tab === 'hr' && <HRBankingTab key={selected.id} provider={selected} />}
             {tab === 'schedule' && <ScheduleTab key={selected.id} providerId={selected.id} />}
             {tab === 'payroll' && <PayrollTab key={selected.id} provider={selected} />}

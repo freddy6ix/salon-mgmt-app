@@ -1,11 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useTimeFormat } from '@/lib/timeFormat'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'
 import { type AppointmentRequest, listAllRequests } from '@/api/appointmentRequests'
+import { listTimeEntries, checkIn, checkOut, type TimeEntry } from '@/api/time_entries'
 import { Button } from '@/components/ui/button'
-import { CalendarDays, ClipboardList, ArrowRight } from 'lucide-react'
+import { CalendarDays, ClipboardList, ArrowRight, Clock, LogIn, LogOut } from 'lucide-react'
 
 function greeting() {
   const h = new Date().getHours()
@@ -79,6 +80,81 @@ function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
   )
 }
 
+// ── Staff clock widget ────────────────────────────────────────────────────────
+
+interface StaffClockWidgetProps {
+  providers: { id: string; display_name: string }[]
+  entries: TimeEntry[]
+  today: string
+}
+
+function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) {
+  const qc = useQueryClient()
+
+  const checkInMut = useMutation({
+    mutationFn: (provider_id: string) => checkIn(provider_id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['time-entries', today] }),
+  })
+
+  const checkOutMut = useMutation({
+    mutationFn: (entry_id: string) => checkOut(entry_id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['time-entries', today] }),
+  })
+
+  if (providers.length === 0) {
+    return <p className="text-sm text-muted-foreground py-4 text-center">No providers scheduled today.</p>
+  }
+
+  return (
+    <ul className="divide-y">
+      {providers.map(p => {
+        const entry = entries.find(e => e.provider_id === p.id && e.check_out_at === null)
+        const checkedOut = entries.find(e => e.provider_id === p.id && e.check_out_at !== null)
+        const active = entry ?? checkedOut
+
+        return (
+          <li key={p.id} className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">{p.display_name}</p>
+              {active && (
+                <p className="text-xs text-muted-foreground">
+                  In {new Date(active.check_in_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
+                  {active.check_out_at && ` · Out ${new Date(active.check_out_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })} · ${active.hours}h`}
+                </p>
+              )}
+            </div>
+            {!entry && !checkedOut && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7"
+                onClick={() => checkInMut.mutate(p.id)}
+                disabled={checkInMut.isPending}
+              >
+                <LogIn size={12} className="mr-1" /> Clock in
+              </Button>
+            )}
+            {entry && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                onClick={() => checkOutMut.mutate(entry.id)}
+                disabled={checkOutMut.isPending}
+              >
+                <LogOut size={12} className="mr-1" /> Clock out
+              </Button>
+            )}
+            {!entry && checkedOut && (
+              <span className="text-xs text-muted-foreground">Done</span>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 // ── Pending requests ──────────────────────────────────────────────────────────
 
 function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
@@ -134,6 +210,12 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   })
 
+  const { data: timeEntries = [] } = useQuery({
+    queryKey: ['time-entries', today],
+    queryFn: () => listTimeEntries(today),
+    refetchInterval: 60_000,
+  })
+
   const activeAppts = appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
   const serviceCount = activeAppts.reduce(
     (n, a) => n + a.items.filter(i => i.status !== 'cancelled').length, 0
@@ -141,6 +223,12 @@ export default function DashboardPage() {
   const providerSet = new Set(
     activeAppts.flatMap(a => a.items.map(i => i.provider.id))
   )
+
+  const scheduledProviders = Array.from(
+    new Map(
+      activeAppts.flatMap(a => a.items.map(i => [i.provider.id, i.provider] as [string, { id: string; display_name: string }]))
+    ).values()
+  ).sort((a, b) => a.display_name.localeCompare(b.display_name))
 
   return (
     <div className="h-full overflow-auto bg-muted/30">
@@ -238,6 +326,15 @@ export default function DashboardPage() {
             </Button>
           </div>
         )}
+
+        {/* Staff clock-in */}
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b">
+            <Clock size={14} className="text-muted-foreground" />
+            <h2 className="text-sm font-medium">Staff attendance</h2>
+          </div>
+          <StaffClockWidget providers={scheduledProviders} entries={timeEntries} today={today} />
+        </div>
 
       </div>
     </div>
