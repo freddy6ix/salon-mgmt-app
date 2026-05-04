@@ -189,4 +189,5 @@ async def me(current_user: CurrentUser) -> MeResponse:
         email=current_user.email,
         role=current_user.role.value,
         tenant_id=str(current_user.tenant_id),
+        language_preference=current_user.language_preference or "en",
     )
