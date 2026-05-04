@@ -27,6 +27,7 @@ export function createClient(data: {
   last_name: string
   cell_phone?: string
   email?: string
+  language_preference?: string
 }): Promise<Client> {
   return api.post<Client>('/clients', data)
 }

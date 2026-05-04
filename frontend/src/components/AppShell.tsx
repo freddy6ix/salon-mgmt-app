@@ -198,9 +198,9 @@ export default function AppShell() {
                       <SubNavLink to="/services" icon={Scissors}    label={t('nav.services')} />
                       <SubNavLink to="/retail"   icon={ShoppingBag} label={t('nav.retail')}   />
 
-                      <SubNavLabel label={t('nav.staff')} />
+                      <SubNavLabel label={t('nav.users_group')} />
+                      <SubNavLink to="/users"     icon={User}       label={t('nav.admins')}     />
                       <SubNavLink to="/staff"     icon={UserCog}    label={t('nav.staff')}      />
-                      <SubNavLink to="/users"     icon={User}       label={t('nav.users')}      />
                       <SubNavLink to="/login-log" icon={ScrollText} label={t('nav.login_log')}  />
 
                       <SubNavLabel label={t('nav.finance')} />

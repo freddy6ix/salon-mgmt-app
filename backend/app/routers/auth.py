@@ -72,6 +72,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     phone: str
     password: str
+    language_preference: str = "en"
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -122,6 +123,7 @@ async def register(
             email=body.email,
             password_hash=hash_password(body.password),
             role=UserRole.guest,
+            language_preference=body.language_preference,
         )
         db.add(user)
     await db.flush()
@@ -135,6 +137,7 @@ async def register(
         email=body.email,
         cell_phone=body.phone,
         client_code=client_code,
+        language_preference=body.language_preference,
     )
     db.add(client)
     await db.commit()

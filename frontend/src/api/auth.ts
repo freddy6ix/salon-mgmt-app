@@ -23,6 +23,7 @@ export async function register(
   email: string,
   phone: string,
   password: string,
+  language_preference = 'en',
 ): Promise<MeResponse> {
   const { access_token } = await api.post<{ access_token: string }>('/auth/register', {
     first_name,
@@ -30,6 +31,7 @@ export async function register(
     email,
     phone,
     password,
+    language_preference,
   })
   setToken(access_token)
   return api.get<MeResponse>('/auth/me')

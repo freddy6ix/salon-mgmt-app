@@ -83,6 +83,7 @@ export default function BookingForm({
   const [newLast, setNewLast] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newLang, setNewLang] = useState('en')
   const [creatingClient, setCreatingClient] = useState(false)
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -119,7 +120,7 @@ export default function BookingForm({
       setClientQuery('')
       setSelectedClient(null)
       setShowNewClient(false)
-      setNewFirst(''); setNewLast(''); setNewPhone(''); setNewEmail('')
+      setNewFirst(''); setNewLast(''); setNewPhone(''); setNewEmail(''); setNewLang('en')
       setItems([])
       setServiceId('')
       setProviderId(initialProviderId ?? providers[0]?.id ?? '')
@@ -223,6 +224,11 @@ export default function BookingForm({
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
                   <input placeholder={t('common.email')} value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
+                  <select value={newLang} onChange={e => setNewLang(e.target.value)}
+                    className="col-span-2 border border-input rounded-md px-2 py-1.5 text-sm bg-background">
+                    <option value="en">{t('translations.lang_en')}</option>
+                    <option value="fr">{t('translations.lang_fr')}</option>
+                  </select>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="secondary" onClick={() => setShowNewClient(false)} className="flex-1">{t('common.cancel')}</Button>
@@ -238,6 +244,7 @@ export default function BookingForm({
                           last_name: newLast.trim(),
                           cell_phone: newPhone.trim() || undefined,
                           email: newEmail.trim() || undefined,
+                          language_preference: newLang,
                         })
                         setSelectedClient(client)
                         setShowNewClient(false)

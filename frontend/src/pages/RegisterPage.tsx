@@ -18,6 +18,7 @@ export default function RegisterPage() {
     password: '',
     confirm_password: '',
   })
+  const [langPref, setLangPref] = useState('en')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -40,7 +41,7 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      const user = await register(form.first_name, form.last_name, form.email, form.phone, form.password)
+      const user = await register(form.first_name, form.last_name, form.email, form.phone, form.password, langPref)
       setUser(user)
       navigate('/my-requests', { replace: true })
     } catch (err) {
@@ -117,6 +118,19 @@ export default function RegisterPage() {
             <div className="space-y-1">
               <label htmlFor="phone" className={labelClass}>{t('auth.cell_phone')}</label>
               <input id="phone" name="phone" type="tel" value={form.phone} onChange={handleChange} required autoComplete="tel" placeholder="416-555-0100" className={fieldClass} />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="lang_pref" className={labelClass}>{t('clients.language_preference')}</label>
+              <select
+                id="lang_pref"
+                value={langPref}
+                onChange={e => setLangPref(e.target.value)}
+                className="w-full border-0 border-b border-input bg-transparent px-0 py-2 text-sm focus:outline-none focus:border-foreground transition-colors"
+              >
+                <option value="en">{t('translations.lang_en')}</option>
+                <option value="fr">{t('translations.lang_fr')}</option>
+              </select>
             </div>
 
             <div className="space-y-1">

@@ -53,6 +53,8 @@
     "retail": "Produits",
     "staff": "Personnel",
     "users": "Utilisateurs",
+    "users_group": "Utilisateurs",
+    "admins": "Admins",
     "login_log": "Journal de connexion",
     "till": "Caisse",
     "sales": "Ventes",

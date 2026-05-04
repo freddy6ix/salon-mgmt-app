@@ -36,6 +36,7 @@ export default function ConvertRequestPanel({ request, date, onDateChange, onClo
   const [newLast, setNewLast] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newLangPref, setNewLangPref] = useState('en')
   const [clientQuery, setClientQuery] = useState('')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -160,6 +161,7 @@ export default function ConvertRequestPanel({ request, date, onDateChange, onClo
           last_name: newLast.trim(),
           cell_phone: newPhone.trim() || undefined,
           email: newEmail.trim() || undefined,
+          language_preference: newLangPref,
         })
         clientId = created.id
       }
@@ -295,14 +297,22 @@ export default function ConvertRequestPanel({ request, date, onDateChange, onClo
 
           {clientMode === 'new' && (
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <input placeholder="First name *" value={newFirst} onChange={e => setNewFirst(e.target.value)}
+              <input placeholder={t('auth.first_name') + ' *'} value={newFirst} onChange={e => setNewFirst(e.target.value)}
                 className="border border-input rounded-md px-3 py-1.5 text-sm bg-background" />
-              <input placeholder="Last name *" value={newLast} onChange={e => setNewLast(e.target.value)}
+              <input placeholder={t('auth.last_name') + ' *'} value={newLast} onChange={e => setNewLast(e.target.value)}
                 className="border border-input rounded-md px-3 py-1.5 text-sm bg-background" />
-              <input placeholder="Cell phone" value={newPhone} onChange={e => setNewPhone(e.target.value)}
+              <input placeholder={t('auth.cell_phone')} value={newPhone} onChange={e => setNewPhone(e.target.value)}
                 className="border border-input rounded-md px-3 py-1.5 text-sm bg-background" />
-              <input placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
+              <input placeholder={t('common.email')} value={newEmail} onChange={e => setNewEmail(e.target.value)}
                 className="border border-input rounded-md px-3 py-1.5 text-sm bg-background" />
+              <select
+                value={newLangPref}
+                onChange={e => setNewLangPref(e.target.value)}
+                className="col-span-2 border border-input rounded-md px-3 py-1.5 text-sm bg-background"
+              >
+                <option value="en">{t('translations.lang_en')}</option>
+                <option value="fr">{t('translations.lang_fr')}</option>
+              </select>
             </div>
           )}
 
