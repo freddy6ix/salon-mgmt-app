@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/store/auth'
+import { useLanguage } from '@/store/language'
 import {
   Home, CalendarDays, Users, ClipboardList, Settings, LogOut,
   ShieldCheck, Scissors, Vault, ShoppingBag, DollarSign, UserCog,
@@ -52,6 +53,8 @@ export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { sessionLanguage, setSessionLanguage } = useLanguage()
+  const qc = useQueryClient()
 
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     localStorage.getItem('sidebarOpen') !== 'false'
@@ -92,6 +95,18 @@ export default function AppShell() {
   useEffect(() => {
     if (branding) applyBranding(branding)
   }, [branding])
+
+  // Invalidate all queries when session language changes so they refetch in the new language
+  useEffect(() => {
+    qc.invalidateQueries()
+  }, [sessionLanguage])
+
+  const supportedLanguages = branding?.supported_languages ?? ['en', 'fr']
+  const effectiveLang = sessionLanguage ?? user?.language_preference ?? 'en'
+
+  function toggleLanguage(lang: string) {
+    setSessionLanguage(lang === effectiveLang && lang === (user?.language_preference ?? 'en') ? null : lang)
+  }
 
   const TOP_NAV = [
     { to: '/dashboard',    icon: Home,          label: 'Home',             badge: 0 },
@@ -253,7 +268,7 @@ export default function AppShell() {
           </div>
         )}
 
-        {/* Footer — toggle + sign out */}
+        {/* Footer — toggle + language + sign out */}
         <div className="border-t p-2 flex items-center justify-between gap-1">
           <button
             onClick={toggleSidebar}
@@ -262,7 +277,41 @@ export default function AppShell() {
           >
             {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </button>
-          {sidebarOpen && (
+
+          {/* Language toggle */}
+          {sidebarOpen ? (
+            <div className="flex items-center gap-0.5">
+              {supportedLanguages.map((lang, i) => (
+                <span key={lang} className="flex items-center gap-0.5">
+                  {i > 0 && <span className="text-muted-foreground/40 text-xs">·</span>}
+                  <button
+                    onClick={() => toggleLanguage(lang)}
+                    className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
+                      effectiveLang === lang
+                        ? 'font-semibold text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title={`Switch to ${lang.toUpperCase()}`}
+                  >
+                    {lang.toUpperCase()}
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                const next = supportedLanguages[(supportedLanguages.indexOf(effectiveLang) + 1) % supportedLanguages.length]
+                toggleLanguage(next)
+              }}
+              className="p-1 rounded text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              title={`Language: ${effectiveLang.toUpperCase()}`}
+            >
+              {effectiveLang.toUpperCase()}
+            </button>
+          )}
+
+          {sidebarOpen ? (
             <button
               onClick={logout}
               className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
@@ -270,8 +319,7 @@ export default function AppShell() {
               <LogOut size={15} />
               Sign out
             </button>
-          )}
-          {!sidebarOpen && (
+          ) : (
             <button
               onClick={logout}
               className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"

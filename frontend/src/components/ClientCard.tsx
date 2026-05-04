@@ -142,6 +142,11 @@ export default function ClientCard({ clientId, onClose }: Props) {
                 {client.is_vip && (
                   <Badge variant="default" className="text-xs">VIP</Badge>
                 )}
+                {client.language_preference && client.language_preference !== 'en' && (
+                  <Badge variant="outline" className="text-xs uppercase">
+                    {client.language_preference}
+                  </Badge>
+                )}
               </div>
               {client.pronouns && (
                 <p className="text-xs text-muted-foreground mt-0.5">{client.pronouns}</p>

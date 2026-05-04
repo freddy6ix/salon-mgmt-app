@@ -5,6 +5,7 @@ export interface MeResponse {
   email: string
   role: 'super_admin' | 'tenant_admin' | 'staff' | 'guest'
   tenant_id: string
+  language_preference: string
 }
 
 export async function login(email: string, password: string): Promise<MeResponse> {

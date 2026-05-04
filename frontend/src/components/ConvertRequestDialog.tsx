@@ -76,6 +76,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
         no_show_count: 0,
         late_cancellation_count: 0,
         is_vip: false,
+        language_preference: 'en',
       })
     } else {
       setClientMode('new')

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { type MeResponse, getMe } from '@/api/auth'
 import { clearToken } from '@/api/client'
+import { resetSessionLanguage } from '@/store/language'
 
 interface AuthState {
   user: MeResponse | null
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearToken()
+    resetSessionLanguage()
     setUser(null)
   }
 

@@ -11,6 +11,7 @@ export interface Client {
   no_show_count: number
   late_cancellation_count: number
   is_vip: boolean
+  language_preference: string
 }
 
 export function searchClients(q: string): Promise<Client[]> {

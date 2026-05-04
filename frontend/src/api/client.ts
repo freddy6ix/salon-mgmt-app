@@ -1,3 +1,5 @@
+import { getSessionLanguage } from '@/store/language'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 function getToken(): string | null {
@@ -14,11 +16,13 @@ export function clearToken() {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken()
+  const lang = getSessionLanguage()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> | undefined),
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
+  if (lang) headers['Accept-Language'] = lang
 
   const res = await fetch(`${BASE_URL}${path}`, { ...init, headers })
 

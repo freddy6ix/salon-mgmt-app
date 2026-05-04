@@ -34,6 +34,7 @@ class MeResponse(BaseModel):
     email: str
     role: str
     tenant_id: str
+    language_preference: str
 
     model_config = {"from_attributes": True}
 

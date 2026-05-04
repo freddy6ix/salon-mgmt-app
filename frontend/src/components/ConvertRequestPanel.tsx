@@ -68,6 +68,7 @@ export default function ConvertRequestPanel({ request, date, onDateChange, onClo
         no_show_count: 0,
         late_cancellation_count: 0,
         is_vip: false,
+        language_preference: 'en',
       })
     } else {
       setClientMode('new')

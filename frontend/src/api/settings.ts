@@ -22,6 +22,8 @@ export interface BrandingSettings extends ContactDetails {
   brand_color: string | null
   slot_minutes: SlotMinutes
   time_format: TimeFormat
+  default_language: string
+  supported_languages: string[]
 }
 
 export function getBranding(): Promise<BrandingSettings> {
