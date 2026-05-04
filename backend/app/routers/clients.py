@@ -108,6 +108,47 @@ async def check_duplicates(
     return [_client_out(c) for c in rows]
 
 
+class ClientDetail(BaseModel):
+    id: str
+    first_name: str
+    last_name: str
+    email: str | None
+    cell_phone: str | None
+    pronouns: str | None
+    special_instructions: str | None
+    no_show_count: int
+    late_cancellation_count: int
+    is_vip: bool
+    appointment_count: int
+    household_id: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class DuplicatePairOut(BaseModel):
+    reason: str          # "email" | "phone" | "name"
+    client_a: ClientDetail
+    client_b: ClientDetail
+    recommended_primary_id: str
+
+
+def _client_detail(c: Client, appt_count: int) -> ClientDetail:
+    return ClientDetail(
+        id=str(c.id),
+        first_name=c.first_name,
+        last_name=c.last_name,
+        email=c.email,
+        cell_phone=c.cell_phone,
+        pronouns=c.pronouns,
+        special_instructions=c.special_instructions,
+        no_show_count=c.no_show_count,
+        late_cancellation_count=c.late_cancellation_count,
+        is_vip=c.is_vip,
+        appointment_count=appt_count,
+        household_id=str(c.household_id) if c.household_id else None,
+    )
+
+
 @router.get("/duplicate-pairs", response_model=list[DuplicatePairOut])
 async def get_duplicate_pairs(
     current_user: CurrentUser,
@@ -511,47 +552,6 @@ async def create_colour_note(
 
 
 # ── Client cleanup: duplicate detection ──────────────────────────────────────
-
-class ClientDetail(BaseModel):
-    id: str
-    first_name: str
-    last_name: str
-    email: str | None
-    cell_phone: str | None
-    pronouns: str | None
-    special_instructions: str | None
-    no_show_count: int
-    late_cancellation_count: int
-    is_vip: bool
-    appointment_count: int
-    household_id: str | None
-
-    model_config = {"from_attributes": True}
-
-
-class DuplicatePairOut(BaseModel):
-    reason: str          # "email" | "phone" | "name"
-    client_a: ClientDetail
-    client_b: ClientDetail
-    recommended_primary_id: str
-
-
-def _client_detail(c: Client, appt_count: int) -> ClientDetail:
-    return ClientDetail(
-        id=str(c.id),
-        first_name=c.first_name,
-        last_name=c.last_name,
-        email=c.email,
-        cell_phone=c.cell_phone,
-        pronouns=c.pronouns,
-        special_instructions=c.special_instructions,
-        no_show_count=c.no_show_count,
-        late_cancellation_count=c.late_cancellation_count,
-        is_vip=c.is_vip,
-        appointment_count=appt_count,
-        household_id=str(c.household_id) if c.household_id else None,
-    )
-
 
 # ── Client merge ──────────────────────────────────────────────────────────────
 
