@@ -302,6 +302,7 @@
     "formula_placeholder": "p.ex. 7N + 20vol, papillotes, 35min...",
     "save_formula": "Enregistrer la formule",
     "no_colour_notes": "Aucune note couleur pour l'instant",
+    "language_preference": "Préférence de langue",
     "notes_tooltip": "Affiché comme alerte à chaque rendez-vous de ce client.",
     "notes_placeholder": "Allergies, préférences, instructions permanentes…",
     "save_notes": "Enregistrer les notes",
@@ -413,6 +414,20 @@
     "col_counted": "Compté",
     "col_variance": "Écart",
     "col_deposit": "Dépôt"
+  },
+  "translations": {
+    "tab": "Traductions",
+    "heading": "Traductions",
+    "lang_en": "Anglais",
+    "lang_fr": "Français",
+    "lang_ko": "Coréen",
+    "lang_ja": "Japonais",
+    "lang_ru": "Russe",
+    "col_language": "Langue",
+    "col_name": "Nom",
+    "col_description": "Description",
+    "save_all": "Enregistrer les traductions",
+    "saved": "Enregistré"
   },
   "services": {
     "page_title": "Services",
@@ -788,6 +803,7 @@
     "page_subtitle": "Gérez les comptes du personnel et des administrateurs.",
     "add_user": "+ Ajouter un utilisateur",
     "add_user_title": "Ajouter un utilisateur",
+    "language_preference": "Préférence de langue",
     "role_staff": "Personnel",
     "role_admin": "Admin",
     "welcome_email_help": "Un courriel de bienvenue avec un lien de configuration du mot de passe sera envoyé automatiquement.",

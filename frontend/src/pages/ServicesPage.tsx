@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   listServicesFull,
+  getService,
   createService,
   updateService,
   deactivateService,
@@ -14,6 +15,7 @@ import {
 } from '@/api/services'
 import {
   listServiceCategories,
+  getServiceCategory,
   createServiceCategory,
   updateServiceCategory,
   type ServiceCategory,
@@ -218,34 +220,101 @@ function CategoryManager({ categories, onChanged }: { categories: ServiceCategor
 
 function CategoryRow({ category, onSaved }: { category: ServiceCategory; onSaved: () => void }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const [name, setName] = useState(category.name)
   const [isActive, setIsActive] = useState(category.is_active)
-  const dirty = name !== category.name || isActive !== category.is_active
+  const [showTranslations, setShowTranslations] = useState(false)
+
+  const supportedLanguages =
+    qc.getQueryData<{ supported_languages: string[] }>(['branding'])?.supported_languages ?? ['en', 'fr']
+  const nonEnglishLanguages = supportedLanguages.filter(l => l !== 'en')
+
+  type TranslationRow = { name: string }
+  const [translationNames, setTranslationNames] = useState<Record<string, TranslationRow>>({})
+
+  const { data: catDetail } = useQuery({
+    queryKey: ['category-translations', category.id],
+    queryFn: () => getServiceCategory(category.id),
+    enabled: showTranslations,
+  })
+
+  useEffect(() => {
+    if (!catDetail) return
+    const initial: Record<string, TranslationRow> = {}
+    for (const lang of nonEnglishLanguages) {
+      const entry = catDetail.translations?.[lang] ?? {}
+      initial[lang] = { name: (entry as { name?: string }).name ?? '' }
+    }
+    setTranslationNames(initial)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catDetail])
+
+  const dirty =
+    name !== category.name ||
+    isActive !== category.is_active ||
+    (showTranslations && Object.keys(translationNames).length > 0)
 
   const mut = useMutation({
-    mutationFn: () => updateServiceCategory(category.id, { name, is_active: isActive }),
+    mutationFn: () => updateServiceCategory(category.id, {
+      name,
+      is_active: isActive,
+      ...(showTranslations && Object.keys(translationNames).length > 0
+        ? { translations: translationNames }
+        : {}),
+    }),
     onSuccess: () => onSaved(),
   })
 
   return (
-    <div className={`flex gap-2 items-center ${!isActive ? 'opacity-60' : ''}`}>
-      <input
-        value={name}
-        onChange={e => setName(e.target.value)}
-        className="flex-1 border border-input rounded-md px-2 py-1 text-sm bg-background"
-      />
-      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <div className={`space-y-2 ${!isActive ? 'opacity-60' : ''}`}>
+      <div className="flex gap-2 items-center">
         <input
-          type="checkbox"
-          checked={isActive}
-          onChange={e => setIsActive(e.target.checked)}
-          className="h-3.5 w-3.5"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="flex-1 border border-input rounded-md px-2 py-1 text-sm bg-background"
         />
-        {t('common.active')}
-      </label>
-      <Button size="sm" variant="outline" disabled={!dirty || mut.isPending} onClick={() => mut.mutate()}>
-        {mut.isPending ? '…' : t('common.save')}
-      </Button>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={e => setIsActive(e.target.checked)}
+            className="h-3.5 w-3.5"
+          />
+          {t('common.active')}
+        </label>
+        {nonEnglishLanguages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowTranslations(s => !s)}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+          >
+            {t('translations.tab')}
+            {showTranslations ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+        )}
+        <Button size="sm" variant="outline" disabled={!dirty || mut.isPending} onClick={() => mut.mutate()}>
+          {mut.isPending ? '…' : t('common.save')}
+        </Button>
+      </div>
+      {showTranslations && nonEnglishLanguages.length > 0 && (
+        <div className="pl-2 space-y-1.5 border-l-2 border-muted ml-1">
+          {nonEnglishLanguages.map(lang => (
+            <div key={lang} className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground w-20 shrink-0">
+                {t('translations.lang_' + lang)}
+              </span>
+              <input
+                value={translationNames[lang]?.name ?? ''}
+                onChange={e =>
+                  setTranslationNames(prev => ({ ...prev, [lang]: { name: e.target.value } }))
+                }
+                placeholder={name}
+                className="flex-1 border border-input rounded-md px-2 py-1 text-sm bg-background"
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -268,7 +337,7 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
   const cached = qc.getQueryData<ServiceDetail[]>(['services-full'])
   const initial = !isCreate ? cached?.find(s => s.id === serviceId) ?? null : null
 
-  const [tab, setTab] = useState<'details' | 'providers'>('details')
+  const [tab, setTab] = useState<'details' | 'providers' | 'translations'>('details')
   // When the dialog transitions from create-mode to edit-mode of the just-created
   // service, automatically jump to the Providers tab — that's where the user
   // typically wants to go next.
@@ -280,6 +349,12 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
     }
   }, [serviceId])
 
+  const tabLabel = (key: 'details' | 'providers' | 'translations') => {
+    if (key === 'details') return t('services.tab_details')
+    if (key === 'providers') return t('services.tab_providers')
+    return t('translations.tab')
+  }
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -288,16 +363,16 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
         </DialogHeader>
 
         <div className="flex border-b -mx-6 px-6">
-          {(['details', 'providers'] as const).map(tabKey => (
+          {(['details', 'providers', 'translations'] as const).map(tabKey => (
             <button
               key={tabKey}
               onClick={() => setTab(tabKey)}
-              disabled={tabKey === 'providers' && isCreate}
+              disabled={(tabKey === 'providers' || tabKey === 'translations') && isCreate}
               className={`px-4 py-2 text-sm border-b-2 -mb-px capitalize transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 tab === tabKey ? 'border-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tabKey === 'details' ? t('services.tab_details') : t('services.tab_providers')}
+              {tabLabel(tabKey)}
             </button>
           ))}
         </div>
@@ -314,6 +389,9 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
           )}
           {tab === 'providers' && !isCreate && initial && (
             <ProvidersMatrix service={initial} />
+          )}
+          {tab === 'translations' && !isCreate && serviceId && (
+            <TranslationsForm serviceId={serviceId} />
           )}
         </div>
       </DialogContent>
@@ -537,6 +615,97 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
       />
       {label}
     </label>
+  )
+}
+
+// ── Translations tab ─────────────────────────────────────────────────────────
+
+function TranslationsForm({ serviceId }: { serviceId: string }) {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+
+  const supportedLanguages =
+    qc.getQueryData<{ supported_languages: string[] }>(['branding'])?.supported_languages ?? ['en', 'fr']
+
+  const { data: svc, isLoading } = useQuery({
+    queryKey: ['service-translations', serviceId],
+    queryFn: () => getService(serviceId),
+  })
+
+  type TranslationRow = { name: string; description: string }
+  const [local, setLocal] = useState<Record<string, TranslationRow>>({})
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!svc) return
+    const initial: Record<string, TranslationRow> = {}
+    for (const lang of supportedLanguages) {
+      const entry = svc.translations?.[lang] ?? {}
+      initial[lang] = {
+        name: (entry as { name?: string }).name ?? '',
+        description: (entry as { description?: string }).description ?? '',
+      }
+    }
+    setLocal(initial)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svc])
+
+  const saveMut = useMutation({
+    mutationFn: () => updateService(serviceId, { translations: local }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['services-full'] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    },
+  })
+
+  function setField(lang: string, field: 'name' | 'description', value: string) {
+    setLocal(prev => ({ ...prev, [lang]: { ...prev[lang], [field]: value } }))
+  }
+
+  if (isLoading) return <p className="py-4 text-sm text-muted-foreground">{t('common.loading')}</p>
+
+  return (
+    <div className="py-4 space-y-4">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-xs text-muted-foreground">
+            <th className="text-left pb-2 pr-3 w-24">{t('translations.col_language')}</th>
+            <th className="text-left pb-2 pr-3">{t('translations.col_name')}</th>
+            <th className="text-left pb-2">{t('translations.col_description')}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {supportedLanguages.map(lang => (
+            <tr key={lang}>
+              <td className="py-2 pr-3 text-muted-foreground text-xs align-middle whitespace-nowrap">
+                {t('translations.lang_' + lang)}
+              </td>
+              <td className="py-2 pr-3">
+                <input
+                  value={local[lang]?.name ?? ''}
+                  onChange={e => setField(lang, 'name', e.target.value)}
+                  className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background"
+                />
+              </td>
+              <td className="py-2">
+                <input
+                  value={local[lang]?.description ?? ''}
+                  onChange={e => setField(lang, 'description', e.target.value)}
+                  className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="flex items-center gap-3 pt-2 border-t">
+        <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+          {saveMut.isPending ? t('common.saving') : t('translations.save_all')}
+        </Button>
+        {saved && <span className="text-xs text-green-600">{t('translations.saved')}</span>}
+      </div>
+    </div>
   )
 }
 

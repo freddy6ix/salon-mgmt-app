@@ -94,6 +94,26 @@ def _serialize(c: ServiceCategory, name: str, translations: dict) -> ServiceCate
     )
 
 
+@router.get("/{category_id}", response_model=ServiceCategoryOut)
+async def get_category(
+    category_id: str,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ServiceCategoryOut:
+    cat = (
+        await db.execute(
+            select(ServiceCategory).where(
+                ServiceCategory.id == uuid.UUID(category_id),
+                ServiceCategory.tenant_id == current_user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if cat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    all_tr = await _load_translations(cat.id, db)
+    return _serialize(cat, cat.name, all_tr)
+
+
 @router.get("", response_model=list[ServiceCategoryOut])
 async def list_categories(
     current_user: StaffUser,

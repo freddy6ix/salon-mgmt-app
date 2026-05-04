@@ -44,6 +44,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
   const [editLast, setEditLast] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editLangPref, setEditLangPref] = useState('en')
   const [editError, setEditError] = useState<string | null>(null)
   const [newNoteText, setNewNoteText] = useState('')
   const [newNoteDate, setNewNoteDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -75,6 +76,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
       last_name: editLast.trim(),
       email: editEmail.trim() || null,
       cell_phone: editPhone.trim() || null,
+      language_preference: editLangPref,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['client', clientId] })
@@ -91,6 +93,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
     setEditLast(client.last_name)
     setEditEmail(client.email ?? '')
     setEditPhone(client.cell_phone ?? '')
+    setEditLangPref(client.language_preference ?? 'en')
     setEditError(null)
     setEditing(true)
   }
@@ -215,6 +218,17 @@ export default function ClientCard({ clientId, onClose }: Props) {
                       <div className="space-y-1">
                         <Label className="text-xs">{t('common.phone')}</Label>
                         <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder={t('common.optional')} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t('clients.language_preference')}</Label>
+                        <select
+                          value={editLangPref}
+                          onChange={e => setEditLangPref(e.target.value)}
+                          className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                        >
+                          <option value="en">{t('translations.lang_en')}</option>
+                          <option value="fr">{t('translations.lang_fr')}</option>
+                        </select>
                       </div>
                       {editError && <p className="text-xs text-destructive">{editError}</p>}
                       <div className="flex gap-2">

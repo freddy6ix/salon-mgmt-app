@@ -36,6 +36,7 @@ export function updateClient(clientId: string, data: {
   last_name?: string
   email?: string | null
   cell_phone?: string | null
+  language_preference?: string
 }): Promise<Client> {
   return api.patch<Client>(`/clients/${clientId}`, data)
 }

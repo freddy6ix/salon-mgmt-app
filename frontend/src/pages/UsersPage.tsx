@@ -169,6 +169,7 @@ function EditUserDialog({
   const [role, setRole] = useState(user.role)
   const [firstName, setFirstName] = useState(user.first_name ?? '')
   const [lastName, setLastName] = useState(user.last_name ?? '')
+  const [langPref, setLangPref] = useState(user.language_preference ?? 'en')
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
@@ -176,6 +177,7 @@ function EditUserDialog({
       role,
       first_name: firstName.trim() || null,
       last_name: lastName.trim() || null,
+      language_preference: langPref,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
@@ -189,6 +191,7 @@ function EditUserDialog({
   const isDirty = role !== user.role
     || firstName.trim() !== (user.first_name ?? '')
     || lastName.trim() !== (user.last_name ?? '')
+    || langPref !== (user.language_preference ?? 'en')
 
   return (
     <Dialog open onOpenChange={v => { if (!v) onClose() }}>
@@ -219,6 +222,17 @@ function EditUserDialog({
                 <SelectItem value="tenant_admin">{t('users.role_admin')}</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t('users.language_preference')}</Label>
+            <select
+              value={langPref}
+              onChange={e => setLangPref(e.target.value)}
+              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+            >
+              <option value="en">{t('translations.lang_en')}</option>
+              <option value="fr">{t('translations.lang_fr')}</option>
+            </select>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">

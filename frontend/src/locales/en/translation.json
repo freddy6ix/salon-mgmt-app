@@ -302,6 +302,7 @@
     "formula_placeholder": "e.g. 7N + 20vol, foils, 35min...",
     "save_formula": "Save formula",
     "no_colour_notes": "No colour notes yet",
+    "language_preference": "Language preference",
     "notes_tooltip": "Shown as an alert whenever this client has an appointment.",
     "notes_placeholder": "Allergies, preferences, standing instructions…",
     "save_notes": "Save notes",
@@ -413,6 +414,20 @@
     "col_counted": "Counted",
     "col_variance": "Variance",
     "col_deposit": "Deposit"
+  },
+  "translations": {
+    "tab": "Translations",
+    "heading": "Translations",
+    "lang_en": "English",
+    "lang_fr": "French",
+    "lang_ko": "Korean",
+    "lang_ja": "Japanese",
+    "lang_ru": "Russian",
+    "col_language": "Language",
+    "col_name": "Name",
+    "col_description": "Description",
+    "save_all": "Save translations",
+    "saved": "Saved"
   },
   "services": {
     "page_title": "Services",
@@ -788,6 +803,7 @@
     "page_subtitle": "Manage staff and admin accounts.",
     "add_user": "+ Add user",
     "add_user_title": "Add user",
+    "language_preference": "Language preference",
     "role_staff": "Staff",
     "role_admin": "Admin",
     "welcome_email_help": "A welcome email with a password setup link will be sent automatically.",

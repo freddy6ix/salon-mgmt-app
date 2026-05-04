@@ -12,6 +12,12 @@ export interface Service {
   pricing_type: string
 }
 
+export interface ServiceTranslationEntry {
+  name?: string | null
+  description?: string | null
+  suggestions?: string | null
+}
+
 export interface ServiceDetail {
   id: string
   category_id: string
@@ -29,6 +35,7 @@ export interface ServiceDetail {
   suggestions: string | null
   is_active: boolean
   display_order: number
+  translations?: Record<string, ServiceTranslationEntry>
 }
 
 export interface ServiceIn {
@@ -46,6 +53,7 @@ export interface ServiceIn {
   suggestions?: string | null
   is_active?: boolean
   display_order?: number
+  translations?: Record<string, ServiceTranslationEntry>
 }
 
 export type ServicePatch = Partial<ServiceIn>

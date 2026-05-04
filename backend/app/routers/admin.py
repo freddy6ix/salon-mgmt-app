@@ -62,6 +62,7 @@ async def _user_out(user: User, db: AsyncSession) -> "UserOut":
         client_name=f"{client.first_name} {client.last_name}" if client else None,
         first_name=user.first_name,
         last_name=user.last_name,
+        language_preference=user.language_preference,
     )
 
 
@@ -85,6 +86,7 @@ class UserOut(BaseModel):
     client_name: str | None
     first_name: str | None
     last_name: str | None
+    language_preference: str
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -182,6 +184,7 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     first_name: str | None = None
     last_name: str | None = None
+    language_preference: str | None = None
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -220,6 +223,8 @@ async def update_user(
         user.first_name = body.first_name
     if body.last_name is not None:
         user.last_name = body.last_name
+    if body.language_preference is not None:
+        user.language_preference = body.language_preference
 
     await db.commit()
     await db.refresh(user)

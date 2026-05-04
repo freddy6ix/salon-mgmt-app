@@ -8,6 +8,7 @@ export interface AdminUser {
   client_name: string | null
   first_name: string | null
   last_name: string | null
+  language_preference: string
 }
 
 export function listUsers(): Promise<AdminUser[]> {
@@ -26,7 +27,7 @@ export function createUser(data: {
 
 export function updateUser(
   id: string,
-  data: { role?: string; is_active?: boolean; first_name?: string | null; last_name?: string | null },
+  data: { role?: string; is_active?: boolean; first_name?: string | null; last_name?: string | null; language_preference?: string },
 ): Promise<AdminUser> {
   return api.patch<AdminUser>(`/admin/users/${id}`, data)
 }
