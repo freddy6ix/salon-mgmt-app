@@ -67,6 +67,7 @@ class Client(TenantScopedBase):
     cancellation_policy_acknowledged_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    language_preference: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 

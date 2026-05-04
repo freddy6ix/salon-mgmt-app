@@ -27,6 +27,7 @@ class User(TenantScopedBase):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    language_preference: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
 
 
 class LoginLog(TenantScopedBase):

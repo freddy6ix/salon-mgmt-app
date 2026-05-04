@@ -22,6 +22,48 @@ from app.models.provider_service_price import ProviderServicePrice
 from app.models.schedule import TenantOperatingHours, ProviderSchedule
 from app.models.retail import RetailItem
 from app.models.promotion import TenantPromotion, PromotionKind
+from app.models.i18n import ServiceCategoryTranslation, ServiceTranslation
+
+# ── French translations ───────────────────────────────────────────────────────
+_CAT_FR: dict[str, str] = {
+    "Styling":    "Coiffure",
+    "Colouring":  "Coloration",
+    "Extensions": "Extensions",
+}
+
+_SVC_FR: dict[str, str] = {
+    "BLD":    "Brushing",
+    "ST1":    "Coupe de cheveux type 1",
+    "ST2":    "Coupe de cheveux type 2",
+    "ST2P":   "Coupe de cheveux type 2+",
+    "FRG":    "Coupe de frange",
+    "HTF":    "Finition aux outils chauffants",
+    "UPD":    "Chignon spécial",
+    "BOT":    "Botox capillaire (avec soins à domicile)",
+    "BOTNHC": "Botox capillaire (sans soins à domicile)",
+    "BOTEXP": "Botox capillaire express",
+    "MLB":    "Traitement Milbon",
+    "MLBA":   "Traitement Milbon (supplément)",
+    "CCAMO":  "Couleur camouflage",
+    "RTO":    "Retouche de racines",
+    "RTOB":   "Retouche de racines (décoloration/éclaircissement)",
+    "ACC":    "Mèches accent",
+    "PHL":    "Mèches partielles",
+    "FHL":    "Mèches complètes",
+    "BLT":    "Retouche balayage",
+    "BLY":    "Balayage complet",
+    "CFC":    "Couleur complète",
+    "CCR":    "Correction de couleur",
+    "CVC":    "Couleur vive",
+    "TNR":    "Tonique/Brillance",
+    "TNRA":   "Tonique/Brillance (supplément)",
+    "REF":    "Rafraîchissement des pointes",
+    "MDO":    "Détox des métaux/Olaplex (supplément)",
+    "EXF":    "Extensions – Fusion",
+    "EXM":    "Extensions – Microperle",
+    "EXT":    "Extensions – Adhésives",
+    "EXW":    "Extensions – Trame",
+}
 
 # Mirror the connection logic from app/database.py so the seed works both
 # locally (TCP to localhost) and on Cloud Run (Unix socket via Cloud SQL).
@@ -179,6 +221,24 @@ async def seed():
                 await db.flush()
             cats[c["name"]] = cat
 
+        # ── Service category translations (en + fr) ──────────────────────────
+        for en_name, cat in cats.items():
+            for lang, tr_name in [("en", en_name), ("fr", _CAT_FR.get(en_name, en_name))]:
+                existing_tr = await db.execute(
+                    select(ServiceCategoryTranslation).where(
+                        ServiceCategoryTranslation.category_id == cat.id,
+                        ServiceCategoryTranslation.language == lang,
+                    )
+                )
+                tr = existing_tr.scalar_one_or_none()
+                if tr is None:
+                    db.add(ServiceCategoryTranslation(
+                        tenant_id=tid, category_id=cat.id, language=lang, name=tr_name,
+                    ))
+                else:
+                    tr.name = tr_name
+        await db.flush()
+
         # ── Services ─────────────────────────────────────────────────────────
         service_data = [
             # Styling
@@ -249,6 +309,24 @@ async def seed():
                 if svc.default_price != s.get("default_price"):
                     svc.default_price = s.get("default_price")
             services[s["service_code"]] = svc
+
+        # ── Service translations (en + fr) ───────────────────────────────────
+        for svc_code, svc in services.items():
+            for lang, tr_name in [("en", svc.name), ("fr", _SVC_FR.get(svc_code, svc.name))]:
+                existing_tr = await db.execute(
+                    select(ServiceTranslation).where(
+                        ServiceTranslation.service_id == svc.id,
+                        ServiceTranslation.language == lang,
+                    )
+                )
+                tr = existing_tr.scalar_one_or_none()
+                if tr is None:
+                    db.add(ServiceTranslation(
+                        tenant_id=tid, service_id=svc.id, language=lang, name=tr_name,
+                    ))
+                else:
+                    tr.name = tr_name
+        await db.flush()
         print(f"Services: {len(services)} created/existing")
 
         # ── Operating Hours ──────────────────────────────────────────────────

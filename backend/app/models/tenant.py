@@ -22,6 +22,7 @@ class Tenant(Base):
     brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
     slot_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     time_format: Mapped[str] = mapped_column(String(3), nullable=False, default="12h")
+    default_language: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
     request_notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True
     )
