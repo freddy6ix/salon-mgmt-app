@@ -34,13 +34,27 @@ def all_configs() -> list[BriefingConfig]:
 
 # ── Registered configs ────────────────────────────────────────────────────────
 
+DEVELOPER_BRIEFING = _reg(BriefingConfig(
+    briefing_id="developer-market-daily",
+    tenant_id="salon-lyol",
+    audience="developer",
+    topic_domains=["market", "ai_features", "industry", "regulation"],
+    cadence="daily",
+    delivery_channels=["email"],
+    output_format="markdown",
+    recipient_ids=[],
+    schedule_cron="0 8 * * *",
+    output_path=None,
+    active=True,
+))
+
 CLAUDE_CODE_BRIEFING = _reg(BriefingConfig(
     briefing_id="claude-code-market-daily",
     tenant_id="salon-lyol",
     audience="claude_code",
     topic_domains=["market", "ai_features", "industry", "regulation"],
     cadence="daily",
-    delivery_channels=["file"],
+    delivery_channels=["file", "gcs"],
     output_format="markdown",
     recipient_ids=[],
     schedule_cron="0 7 * * *",

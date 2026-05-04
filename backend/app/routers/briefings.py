@@ -1,14 +1,9 @@
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
 
 router = APIRouter(prefix="/internal", tags=["briefings"])
-
-# Two levels up from routers/ → backend/, three → salon-mgmt-app/
-_FALLBACK_BASE_DIR = str(Path(__file__).resolve().parents[3])
 
 
 def _require_secret(x_internal_secret: str | None = Header(None)) -> None:
@@ -28,7 +23,13 @@ async def run_briefing(
     if not settings.anthropic_api_key:
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
 
-    base_dir = settings.briefing_base_dir or _FALLBACK_BASE_DIR
-
     from briefing_engine.runner import run
-    return await run(body.briefing_id, settings.anthropic_api_key, base_dir)
+    return await run(
+        body.briefing_id,
+        settings.anthropic_api_key,
+        settings.briefing_base_dir,
+        settings.briefing_gcs_bucket,
+        settings.briefing_email_to,
+        settings.briefing_from_address,
+        settings.briefing_resend_api_key,
+    )

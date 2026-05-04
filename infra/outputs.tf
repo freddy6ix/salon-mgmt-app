@@ -27,3 +27,8 @@ output "deployer_service_account" {
   description = "Deployer SA email — set as GCP_SERVICE_ACCOUNT in GitHub Actions variables"
   value       = google_service_account.deployer.email
 }
+
+output "briefing_gcs_bucket" {
+  description = "GCS bucket for briefing output — set as BRIEFING_GCS_BUCKET in .env to enable sync_briefing.sh"
+  value       = google_storage_bucket.briefings.name
+}

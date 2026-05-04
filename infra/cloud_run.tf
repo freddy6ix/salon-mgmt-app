@@ -66,6 +66,45 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
       env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "INTERNAL_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.internal_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name  = "BRIEFING_GCS_BUCKET"
+        value = google_storage_bucket.briefings.name
+      }
+      env {
+        name = "BRIEFING_RESEND_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.briefing_resend_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name  = "BRIEFING_FROM_ADDRESS"
+        value = var.briefing_from_address
+      }
+      env {
+        name  = "BRIEFING_EMAIL_TO"
+        value = var.briefing_email_to
+      }
+      env {
         name  = "CORS_ORIGINS"
         value = "https://salon-frontend-qc33oa7roq-pd.a.run.app"
       }
@@ -80,6 +119,10 @@ resource "google_cloud_run_v2_service" "api" {
     google_project_service.apis,
     google_secret_manager_secret_version.db_password,
     google_secret_manager_secret_version.secret_key,
+    google_secret_manager_secret_version.anthropic_api_key,
+    google_secret_manager_secret_version.internal_secret,
+    google_secret_manager_secret_version.briefing_resend_api_key,
+    google_storage_bucket.briefings,
   ]
 }
 

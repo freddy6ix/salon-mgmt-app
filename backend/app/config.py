@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     # Briefing Engine — base directory for file delivery (defaults to project root)
     briefing_base_dir: str = ""
 
+    # Briefing Engine — GCS bucket for cloud delivery (Cloud Run writes here; local script syncs down)
+    briefing_gcs_bucket: str = ""
+
+    # Briefing Engine — email delivery via Resend
+    briefing_resend_api_key: str = ""
+    briefing_from_address: str = ""
+    briefing_email_to: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
