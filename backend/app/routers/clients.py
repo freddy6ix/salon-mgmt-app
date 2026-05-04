@@ -108,6 +108,77 @@ async def check_duplicates(
     return [_client_out(c) for c in rows]
 
 
+@router.get("/duplicate-pairs", response_model=list[DuplicatePairOut])
+async def get_duplicate_pairs(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[DuplicatePairOut]:
+    tid = current_user.tenant_id
+
+    clients = (await db.execute(
+        select(Client).where(Client.tenant_id == tid, Client.is_active == True)  # noqa: E712
+    )).scalars().all()
+
+    # Appointment counts per client
+    count_rows = (await db.execute(
+        select(Appointment.client_id, func.count(Appointment.id).label("cnt"))
+        .where(Appointment.tenant_id == tid)
+        .group_by(Appointment.client_id)
+    )).all()
+    counts: dict[uuid.UUID, int] = {r.client_id: r.cnt for r in count_rows}
+
+    def detail(c: Client) -> ClientDetail:
+        return _client_detail(c, counts.get(c.id, 0))
+
+    # Build lookup maps
+    email_map: dict[str, list[Client]] = {}
+    phone_map: dict[str, list[Client]] = {}
+    name_map: dict[str, list[Client]] = {}
+
+    for c in clients:
+        if c.email:
+            key = c.email.lower().strip()
+            email_map.setdefault(key, []).append(c)
+        if c.cell_phone:
+            key = "".join(ch for ch in c.cell_phone if ch.isdigit())
+            if key:
+                phone_map.setdefault(key, []).append(c)
+        name_key = f"{c.first_name.lower().strip()}|{c.last_name.lower().strip()}"
+        name_map.setdefault(name_key, []).append(c)
+
+    seen_pairs: set[tuple[uuid.UUID, uuid.UUID]] = set()
+    pairs: list[DuplicatePairOut] = []
+
+    def _add_pairs(groups: dict[str, list[Client]], reason: str) -> None:
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    a, b = group[i], group[j]
+                    key = (min(a.id, b.id), max(a.id, b.id))
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+                    cnt_a = counts.get(a.id, 0)
+                    cnt_b = counts.get(b.id, 0)
+                    rec = str(a.id) if cnt_a >= cnt_b else str(b.id)
+                    # Put recommended (more history) as client_a
+                    primary, secondary = (a, b) if cnt_a >= cnt_b else (b, a)
+                    pairs.append(DuplicatePairOut(
+                        reason=reason,
+                        client_a=detail(primary),
+                        client_b=detail(secondary),
+                        recommended_primary_id=rec,
+                    ))
+
+    _add_pairs(email_map, "email")
+    _add_pairs(phone_map, "phone")
+    _add_pairs(name_map, "name")
+
+    return pairs
+
+
 @router.get("/{client_id}", response_model=ClientOut)
 async def get_client(
     client_id: str,
@@ -480,77 +551,6 @@ def _client_detail(c: Client, appt_count: int) -> ClientDetail:
         appointment_count=appt_count,
         household_id=str(c.household_id) if c.household_id else None,
     )
-
-
-@router.get("/duplicate-pairs", response_model=list[DuplicatePairOut])
-async def get_duplicate_pairs(
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> list[DuplicatePairOut]:
-    tid = current_user.tenant_id
-
-    clients = (await db.execute(
-        select(Client).where(Client.tenant_id == tid, Client.is_active == True)  # noqa: E712
-    )).scalars().all()
-
-    # Appointment counts per client
-    count_rows = (await db.execute(
-        select(Appointment.client_id, func.count(Appointment.id).label("cnt"))
-        .where(Appointment.tenant_id == tid)
-        .group_by(Appointment.client_id)
-    )).all()
-    counts: dict[uuid.UUID, int] = {r.client_id: r.cnt for r in count_rows}
-
-    def detail(c: Client) -> ClientDetail:
-        return _client_detail(c, counts.get(c.id, 0))
-
-    # Build lookup maps
-    email_map: dict[str, list[Client]] = {}
-    phone_map: dict[str, list[Client]] = {}
-    name_map: dict[str, list[Client]] = {}
-
-    for c in clients:
-        if c.email:
-            key = c.email.lower().strip()
-            email_map.setdefault(key, []).append(c)
-        if c.cell_phone:
-            key = "".join(ch for ch in c.cell_phone if ch.isdigit())
-            if key:
-                phone_map.setdefault(key, []).append(c)
-        name_key = f"{c.first_name.lower().strip()}|{c.last_name.lower().strip()}"
-        name_map.setdefault(name_key, []).append(c)
-
-    seen_pairs: set[tuple[uuid.UUID, uuid.UUID]] = set()
-    pairs: list[DuplicatePairOut] = []
-
-    def _add_pairs(groups: dict[str, list[Client]], reason: str) -> None:
-        for group in groups.values():
-            if len(group) < 2:
-                continue
-            for i in range(len(group)):
-                for j in range(i + 1, len(group)):
-                    a, b = group[i], group[j]
-                    key = (min(a.id, b.id), max(a.id, b.id))
-                    if key in seen_pairs:
-                        continue
-                    seen_pairs.add(key)
-                    cnt_a = counts.get(a.id, 0)
-                    cnt_b = counts.get(b.id, 0)
-                    rec = str(a.id) if cnt_a >= cnt_b else str(b.id)
-                    # Put recommended (more history) as client_a
-                    primary, secondary = (a, b) if cnt_a >= cnt_b else (b, a)
-                    pairs.append(DuplicatePairOut(
-                        reason=reason,
-                        client_a=detail(primary),
-                        client_b=detail(secondary),
-                        recommended_primary_id=rec,
-                    ))
-
-    _add_pairs(email_map, "email")
-    _add_pairs(phone_map, "phone")
-    _add_pairs(name_map, "name")
-
-    return pairs
 
 
 # ── Client merge ──────────────────────────────────────────────────────────────
