@@ -1,7 +1,7 @@
 """Add reminder_send_time to tenants
 
 Revision ID: c5d6e7f8a9b0
-Revises: a3b4c5d6e7f8
+Revises: e6f7a8b9c0d1
 Create Date: 2026-05-04
 
 """
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "c5d6e7f8a9b0"
-down_revision = "a3b4c5d6e7f8"
+down_revision = "e6f7a8b9c0d1"
 branch_labels = None
 depends_on = None
 
