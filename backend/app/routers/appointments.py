@@ -674,7 +674,7 @@ async def _build_default_template(appt: Appointment, db: AsyncSession) -> tuple[
     ]
     return (
         build_default_subject(tenant.name, appt.appointment_date),
-        build_default_body(tenant.name, client.first_name, appt.appointment_date, template_items),
+        build_default_body(tenant.name, client.first_name, appt.appointment_date, template_items, tenant.time_format),
     )
 
 

@@ -11,7 +11,9 @@ class ReminderItem:
     duration_minutes: int
 
 
-def _fmt_time(dt: datetime) -> str:
+def _fmt_time(dt: datetime, time_format: str = "12h") -> str:
+    if time_format == "24h":
+        return f"{dt.hour}:{dt.minute:02d}"
     h = dt.hour % 12 or 12
     return f"{h}:{dt.minute:02d} {'AM' if dt.hour < 12 else 'PM'}"
 
@@ -29,13 +31,14 @@ def build_reminder_body(
     client_first_name: str,
     appointment_date: datetime,
     items: list[ReminderItem],
+    time_format: str = "12h",
 ) -> str:
     items_sorted = sorted(items, key=lambda i: i.start_time)
 
     rows = "".join(
         f"""
         <tr>
-          <td style="padding:6px 0;color:#333;">{_fmt_time(it.start_time)}</td>
+          <td style="padding:6px 0;color:#333;">{_fmt_time(it.start_time, time_format)}</td>
           <td style="padding:6px 0 6px 16px;color:#333;">{it.service_name}</td>
           <td style="padding:6px 0 6px 16px;color:#555;">with {it.provider_name}</td>
         </tr>"""

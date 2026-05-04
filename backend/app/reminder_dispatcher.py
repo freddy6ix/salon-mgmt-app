@@ -197,6 +197,7 @@ async def dispatch_due_reminders(db: AsyncSession) -> dict:
                 client_first_name=client.first_name,
                 appointment_date=appt.appointment_date,
                 items=ri_list,
+                time_format=tenant.time_format,
             )
             branded_html = wrap_branded(body_html, tenant, subject=subject)
 
