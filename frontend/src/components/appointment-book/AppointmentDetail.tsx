@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { useTranslation } from 'react-i18next'
 import { useTimeFormat } from '@/lib/timeFormat'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -54,6 +55,7 @@ interface AddItemForm {
 }
 
 export default function AppointmentDetail({ item, appointment, date, onClose }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const { formatTime: ft } = useTimeFormat()
@@ -208,7 +210,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             <button
               onClick={() => { onClose(); navigate(`/clients?id=${client.id}`) }}
               className="text-muted-foreground hover:text-foreground transition-colors"
-              title="Open client profile"
+              title={t('appt.open_client_profile')}
             >
               <ExternalLink size={14} />
             </button>
@@ -222,17 +224,17 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
 
         {/* Tabs */}
         <div className="flex gap-1 border-b">
-          {(['appointment', 'history', 'notes'] as Tab[]).map((t) => (
+          {(['appointment', 'history', 'notes'] as Tab[]).map((tabKey) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
               className={`px-3 py-1.5 text-sm capitalize border-b-2 -mb-px transition-colors ${
-                tab === t
+                tab === tabKey
                   ? 'border-foreground font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'notes' ? 'Client notes' : t === 'history' ? 'Appointments' : 'Appointment'}
+              {tabKey === 'notes' ? t('appt.tab_client_notes') : tabKey === 'history' ? t('appt.tab_appointments') : t('appt.tab_appointment')}
             </button>
           ))}
         </div>
@@ -276,7 +278,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                               onClick={() => setPendingRemoveId(apptItem.id)}
                               disabled={removeMutation.isPending || statusMutation.isPending}
                               className="text-muted-foreground hover:text-destructive transition-colors"
-                              title="Remove service"
+                              title={t('appt.remove_service')}
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -310,7 +312,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                       disabled={removeMutation.isPending || statusMutation.isPending}
                       onClick={() => { removeMutation.mutate(pendingRemoveId); setPendingRemoveId(null) }}
                     >
-                      This service only
+                      {t('appt.this_service_only')}
                     </Button>
                     <Button
                       size="sm"
@@ -319,7 +321,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                       disabled={removeMutation.isPending || statusMutation.isPending}
                       onClick={() => { statusMutation.mutate('cancelled'); setPendingRemoveId(null) }}
                     >
-                      Cancel all services
+                      {t('appt.cancel_all_services')}
                     </Button>
                     <Button
                       size="sm"
@@ -327,7 +329,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                       disabled={removeMutation.isPending || statusMutation.isPending}
                       onClick={() => setPendingRemoveId(null)}
                     >
-                      Back
+                      {t('common.back')}
                     </Button>
                   </div>
                 </div>
@@ -350,7 +352,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                     onChange={e => handleServiceChange(e.target.value)}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background"
                   >
-                    <option value="">Select service…</option>
+                    <option value="">{t('appt.select_service')}</option>
                     {services.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -360,14 +362,14 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                     onChange={e => setAddForm(f => ({ ...f, providerId: e.target.value }))}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background"
                   >
-                    <option value="">Select provider…</option>
+                    <option value="">{t('appt.select_provider')}</option>
                     {providers.map(p => (
                       <option key={p.id} value={p.id}>{p.display_name}</option>
                     ))}
                   </select>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">Start time</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t('appt.start_time')}</p>
                       <input
                         type="time"
                         value={addForm.startTime}
@@ -376,7 +378,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                       />
                     </div>
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">Price ($)</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t('appt.price_label')}</p>
                       <input
                         type="number"
                         min="0"
@@ -391,16 +393,16 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                   {addError && <p className="text-xs text-destructive">{addError}</p>}
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1" onClick={handleAddSubmit} disabled={addMutation.isPending}>
-                      {addMutation.isPending ? 'Adding…' : 'Add service'}
+                      {addMutation.isPending ? t('common.saving') : t('appt.add_service')}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setShowAddForm(false); setAddError(null) }}>
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <Button variant="outline" size="sm" className="w-full" onClick={openAddForm}>
-                  + Add service
+                  {t('appt.add_service')}
                 </Button>
               )
             )}
@@ -434,18 +436,18 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate('in_progress')}
                 >
-                  Client arrived
+                  {t('appt.client_arrived')}
                 </Button>
                 {confirmCancel ? (
                   <span className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Sure?</span>
+                    <span className="text-xs text-muted-foreground">{t('common.sure')}</span>
                     <Button size="sm" variant="destructive" disabled={statusMutation.isPending}
-                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>Yes</Button>
-                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>No</Button>
+                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>{t('common.yes')}</Button>
+                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>{t('common.no')}</Button>
                   </span>
                 ) : (
                   <Button variant="destructive" disabled={statusMutation.isPending}
-                    onClick={() => setConfirmCancel(true)}>Cancel</Button>
+                    onClick={() => setConfirmCancel(true)}>{t('common.cancel')}</Button>
                 )}
               </div>
             )}
@@ -457,25 +459,25 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
                   disabled={statusMutation.isPending}
                   onClick={() => setCheckoutOpen(true)}
                 >
-                  Check out
+                  {t('appt.check_out')}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate('confirmed')}
                 >
-                  Not arrived
+                  {t('appt.not_arrived')}
                 </Button>
                 {confirmCancel ? (
                   <span className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Sure?</span>
+                    <span className="text-xs text-muted-foreground">{t('common.sure')}</span>
                     <Button size="sm" variant="destructive" disabled={statusMutation.isPending}
-                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>Yes</Button>
-                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>No</Button>
+                      onClick={() => { statusMutation.mutate('cancelled'); setConfirmCancel(false) }}>{t('common.yes')}</Button>
+                    <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>{t('common.no')}</Button>
                   </span>
                 ) : (
                   <Button variant="destructive" disabled={statusMutation.isPending}
-                    onClick={() => setConfirmCancel(true)}>Cancel</Button>
+                    onClick={() => setConfirmCancel(true)}>{t('common.cancel')}</Button>
                 )}
               </div>
             )}
@@ -483,20 +485,20 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
             {apptStatus === 'completed' && (
               <div className="pt-1">
                 <div className="flex gap-2 justify-center">
-                  <p className="text-xs text-muted-foreground">Checked out</p>
+                  <p className="text-xs text-muted-foreground">{t('appt.status_checked_out')}</p>
                   <button
                     className="text-xs text-muted-foreground hover:text-foreground underline"
                     disabled={statusMutation.isPending}
                     onClick={() => statusMutation.mutate('in_progress')}
                   >
-                    Undo
+                    {t('appt.undo')}
                   </button>
                 </div>
                 <SaleSummary appointmentId={appointment.id} />
               </div>
             )}
             {apptStatus === 'cancelled' && (
-              <p className="text-xs text-destructive text-center pt-1">Cancelled</p>
+              <p className="text-xs text-destructive text-center pt-1">{t('appt.status_cancelled')}</p>
             )}
           </div>
         )}
@@ -505,9 +507,9 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
         {tab === 'history' && (
           <div className="space-y-2 max-h-80 overflow-auto">
             {historyLoading ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('common.loading')}</p>
             ) : history.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No previous visits</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('appt.no_previous_visits')}</p>
             ) : (
               history.map((visit) => {
                 const isNavigable = visit.status !== 'cancelled' && visit.status !== 'no_show'
@@ -552,7 +554,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
               rows={5}
               value={currentNotes}
               onChange={(e) => setNotesValue(e.target.value)}
-              placeholder="Allergies, preferences, standing instructions…"
+              placeholder={t('appt.notes_placeholder')}
               className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
             />
             {notesMutation.isError && (
@@ -563,7 +565,7 @@ export default function AppointmentDetail({ item, appointment, date, onClose }: 
               disabled={notesMutation.isPending || currentNotes === (client.special_instructions ?? '')}
               onClick={() => notesMutation.mutate(currentNotes || null)}
             >
-              {notesMutation.isPending ? 'Saving…' : 'Save notes'}
+              {notesMutation.isPending ? t('common.saving') : t('appt.save_notes')}
             </Button>
           </div>
         )}
@@ -601,29 +603,30 @@ interface ConfirmationStatusRowProps {
 }
 
 function ConfirmationStatusRow({ status, sentAt, hasEmail, onOpen }: ConfirmationStatusRowProps) {
+  const { t } = useTranslation()
   let label: string
   let buttonLabel: string
   let tone: string
 
   switch (status) {
     case 'sent':
-      label = `Confirmation sent${sentAt ? ` ${new Date(sentAt).toLocaleDateString()}` : ''}`
-      buttonLabel = 'View'
+      label = `${t('appt.confirmation_sent')}${sentAt ? ` ${new Date(sentAt).toLocaleDateString()}` : ''}`
+      buttonLabel = t('appt.view_confirmation')
       tone = 'text-green-700'
       break
     case 'draft':
-      label = 'Confirmation draft saved'
-      buttonLabel = 'Open draft'
+      label = t('appt.confirmation_draft_saved')
+      buttonLabel = t('appt.open_draft')
       tone = 'text-amber-700'
       break
     case 'skipped':
-      label = 'Confirmation skipped'
-      buttonLabel = 'Send anyway'
+      label = t('appt.confirmation_skipped')
+      buttonLabel = t('appt.send_anyway')
       tone = 'text-muted-foreground'
       break
     default:
-      label = hasEmail ? 'No confirmation sent' : 'No confirmation sent (no client email)'
-      buttonLabel = 'Send confirmation'
+      label = hasEmail ? t('appt.no_confirmation_sent') : t('appt.no_confirmation_no_email')
+      buttonLabel = t('appt.send_confirmation')
       tone = 'text-muted-foreground'
   }
 

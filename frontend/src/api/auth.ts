@@ -42,3 +42,7 @@ export function getMe(): Promise<MeResponse> {
 export function resetPassword(token: string, password: string): Promise<void> {
   return api.post<void>('/auth/reset-password', { token, password })
 }
+
+export function updateLanguagePreference(language_preference: string): Promise<MeResponse> {
+  return api.patch<MeResponse>('/auth/me', { language_preference })
+}

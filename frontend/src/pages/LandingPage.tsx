@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getPublicTenantInfo, type PublicTenantInfo } from '@/api/settings'
 
 function formatAddress(t: PublicTenantInfo | undefined): string | null {
@@ -11,6 +12,7 @@ function formatAddress(t: PublicTenantInfo | undefined): string | null {
 }
 
 export default function LandingPage() {
+  const { t } = useTranslation()
   const { data: tenant } = useQuery({
     queryKey: ['public-tenant-info'],
     queryFn: getPublicTenantInfo,
@@ -44,7 +46,7 @@ export default function LandingPage() {
           to="/login"
           className="text-xs tracking-widest uppercase font-medium text-white border border-white/50 rounded-sm px-5 py-2 hover:bg-white hover:text-neutral-900 transition-colors"
         >
-          Sign in
+          {t('landing.sign_in')}
         </Link>
       </header>
 
@@ -63,7 +65,7 @@ export default function LandingPage() {
           <em className="font-normal">good hair day.</em>
         </h1>
         <p className="mt-6 text-base sm:text-lg text-white/80 font-light max-w-md">
-          Boutique colour, cuts, and styling — by appointment.
+          {t('landing.subtitle')}
         </p>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-3 w-full max-w-md">
@@ -71,13 +73,13 @@ export default function LandingPage() {
             to="/register"
             className="flex-1 inline-flex items-center justify-center rounded-sm bg-white text-neutral-900 text-sm tracking-widest uppercase font-medium px-8 py-4 hover:bg-white/90 transition-colors"
           >
-            Request an appointment
+            {t('landing.request_appointment')}
           </Link>
           <Link
             to="/login"
             className="sm:hidden flex-1 inline-flex items-center justify-center rounded-sm border border-white/40 text-sm tracking-widest uppercase font-medium px-8 py-4 hover:bg-white/10 transition-colors"
           >
-            Sign in
+            {t('landing.sign_in')}
           </Link>
         </div>
       </main>

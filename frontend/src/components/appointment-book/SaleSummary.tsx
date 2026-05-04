@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSaleByAppointment, editSalePayments } from '@/api/sales'
 import { listPaymentMethods } from '@/api/paymentMethods'
@@ -30,6 +31,7 @@ function EditPaymentsDialog({
   initialPayments: PaymentRow[]
   onDone: () => void
 }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: methods = [] } = useQuery({
     queryKey: ['payment-methods', 'active'],
@@ -73,7 +75,7 @@ function EditPaymentsDialog({
 
   return (
     <div className="mt-2 border rounded-md bg-white p-3 space-y-3">
-      <p className="text-xs font-medium">Edit payments</p>
+      <p className="text-xs font-medium">{t('checkout.edit_payments_title')}</p>
 
       <div className="space-y-2">
         {rows.map((row, idx) => (
@@ -121,11 +123,11 @@ function EditPaymentsDialog({
         onClick={addRow}
         className="text-xs text-muted-foreground hover:text-foreground underline"
       >
-        + Add payment line
+        {t('checkout.add_payment_line')}
       </button>
 
       <div className={`text-xs flex justify-between font-medium ${balanced ? 'text-green-600' : 'text-destructive'}`}>
-        <span>{balanced ? 'Balanced' : `${remaining > 0 ? 'Short' : 'Over'} by $${Math.abs(remaining).toFixed(2)}`}</span>
+        <span>{balanced ? t('checkout.balanced') : remaining > 0 ? t('checkout.short_by', { amount: Math.abs(remaining).toFixed(2) }) : t('checkout.over_by', { amount: Math.abs(remaining).toFixed(2) })}</span>
         <span>Total: ${fmt(saleTotal)}</span>
       </div>
 
@@ -137,15 +139,16 @@ function EditPaymentsDialog({
           disabled={!balanced || mutation.isPending}
           onClick={() => { setError(null); mutation.mutate() }}
         >
-          {mutation.isPending ? 'Saving…' : 'Save'}
+          {mutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
-        <Button size="sm" variant="outline" onClick={onDone}>Cancel</Button>
+        <Button size="sm" variant="outline" onClick={onDone}>{t('common.cancel')}</Button>
       </div>
     </div>
   )
 }
 
 export default function SaleSummary({ appointmentId }: Props) {
+  const { t } = useTranslation()
   const { data: sale, isLoading, error } = useQuery({
     queryKey: ['sale', 'by-appointment', appointmentId],
     queryFn: () => getSaleByAppointment(appointmentId),
@@ -154,7 +157,7 @@ export default function SaleSummary({ appointmentId }: Props) {
   const [editing, setEditing] = useState(false)
 
   if (isLoading) {
-    return <p className="text-xs text-muted-foreground text-center pt-2">Loading sale…</p>
+    return <p className="text-xs text-muted-foreground text-center pt-2">{t('common.loading')}</p>
   }
 
   if (error || !sale) return null
@@ -165,25 +168,25 @@ export default function SaleSummary({ appointmentId }: Props) {
   return (
     <div className="rounded-md border bg-muted/30 px-3 py-2 mt-2 space-y-1 text-xs">
       <div className="flex justify-between">
-        <span className="text-muted-foreground">Subtotal</span>
+        <span className="text-muted-foreground">{t('checkout.sale_subtotal')}</span>
         <span>${fmt(sale.subtotal)}</span>
       </div>
       {showDiscount && (
         <div className="flex justify-between text-muted-foreground">
-          <span>Discount</span>
+          <span>{t('checkout.sale_discount')}</span>
           <span>−${fmt(sale.discount_total)}</span>
         </div>
       )}
       <div className="flex justify-between text-muted-foreground">
-        <span>GST</span>
+        <span>{t('checkout.sale_gst')}</span>
         <span>${fmt(sale.gst_amount)}</span>
       </div>
       <div className="flex justify-between text-muted-foreground">
-        <span>PST</span>
+        <span>{t('checkout.sale_pst')}</span>
         <span>${fmt(sale.pst_amount)}</span>
       </div>
       <div className="flex justify-between font-semibold border-t pt-1 mt-1">
-        <span>Total</span>
+        <span>{t('checkout.sale_total')}</span>
         <span>${fmt(sale.total)}</span>
       </div>
 
@@ -208,7 +211,7 @@ export default function SaleSummary({ appointmentId }: Props) {
               onClick={() => setEditing(true)}
               className="text-[10px] text-muted-foreground hover:text-foreground underline pt-0.5"
             >
-              Edit payments
+              {t('checkout.edit_payments')}
             </button>
           )}
         </div>

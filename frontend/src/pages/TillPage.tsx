@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   getCurrentReconciliation,
   listReconciliations,
@@ -32,6 +33,7 @@ function fmtSigned(s: string | null | undefined): string {
 // ── Petty cash form ───────────────────────────────────────────────────────────
 
 function PettyCashForm({ date }: { date: string }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [amount, setAmount] = useState('')
   const [desc, setDesc] = useState('')
@@ -62,12 +64,12 @@ function PettyCashForm({ date }: { date: string }) {
             onClick={() => setSign(s)}
             className={`px-3 py-1.5 transition-colors ${sign === s ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}
           >
-            {s === 'out' ? '− Out' : '+ In'}
+            {s === 'out' ? t('till.petty_out') : t('till.petty_in')}
           </button>
         ))}
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Amount ($)</Label>
+        <Label className="text-xs">{t('till.amount_label')}</Label>
         <Input
           type="text"
           inputMode="decimal"
@@ -78,11 +80,11 @@ function PettyCashForm({ date }: { date: string }) {
         />
       </div>
       <div className="space-y-1 flex-1 min-w-[160px]">
-        <Label className="text-xs">Description</Label>
+        <Label className="text-xs">{t('common.description')}</Label>
         <Input
           value={desc}
           onChange={e => setDesc(e.target.value)}
-          placeholder="Coffee, supplies…"
+          placeholder={t('till.description_placeholder')}
         />
       </div>
       <Button
@@ -90,7 +92,7 @@ function PettyCashForm({ date }: { date: string }) {
         size="sm"
         disabled={!amount || !desc.trim() || mutation.isPending}
       >
-        {mutation.isPending ? 'Adding…' : 'Add'}
+        {mutation.isPending ? t('till.adding') : t('common.add')}
       </Button>
     </form>
   )
@@ -99,6 +101,7 @@ function PettyCashForm({ date }: { date: string }) {
 // ── Open period view ──────────────────────────────────────────────────────────
 
 function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [counted, setCounted] = useState('')
   const [deposit, setDeposit] = useState('0.00')
@@ -133,25 +136,25 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
       {/* Cash summary */}
       <section className="border rounded-lg bg-white overflow-hidden">
         <div className="px-5 py-3 border-b bg-muted/30">
-          <h2 className="text-sm font-medium">Cash position — {recon.business_date}</h2>
+          <h2 className="text-sm font-medium">{t('till.cash_position', { date: recon.business_date })}</h2>
         </div>
         <div className="p-5 space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Opening balance</span>
+            <span className="text-muted-foreground">{t('till.opening_balance_label')}</span>
             <span>{fmt(recon.opening_balance)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Cash sales today</span>
+            <span className="text-muted-foreground">{t('till.cash_sales')}</span>
             <span className="text-green-700">{fmt(recon.cash_in)}</span>
           </div>
           {parseFloat(recon.petty_cash_net) !== 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Petty cash net</span>
+              <span className="text-muted-foreground">{t('till.petty_cash_net')}</span>
               <span>{fmtSigned(recon.petty_cash_net)}</span>
             </div>
           )}
           <div className="flex justify-between font-semibold border-t pt-2 mt-1">
-            <span>Expected balance</span>
+            <span>{t('till.expected_balance')}</span>
             <span>{fmt(recon.expected_balance)}</span>
           </div>
         </div>
@@ -160,11 +163,11 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
       {/* Petty cash */}
       <section className="border rounded-lg bg-white overflow-hidden">
         <div className="px-5 py-3 border-b bg-muted/30">
-          <h2 className="text-sm font-medium">Petty cash entries</h2>
+          <h2 className="text-sm font-medium">{t('till.petty_cash_section')}</h2>
         </div>
         <div className="p-5 space-y-4">
           {recon.petty_cash_entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No entries yet.</p>
+            <p className="text-sm text-muted-foreground">{t('till.no_entries')}</p>
           ) : (
             <ul className="space-y-1.5 text-sm">
               {recon.petty_cash_entries.map(e => (
@@ -193,12 +196,12 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
       {/* Close till */}
       <section className="border rounded-lg bg-white overflow-hidden">
         <div className="px-5 py-3 border-b bg-muted/30">
-          <h2 className="text-sm font-medium">Close till</h2>
+          <h2 className="text-sm font-medium">{t('till.close_till_section')}</h2>
         </div>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Counted balance ($)</Label>
+              <Label>{t('till.counted_balance')}</Label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -208,7 +211,7 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Bank deposit ($)</Label>
+              <Label>{t('till.bank_deposit')}</Label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -224,18 +227,18 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
               variance === 0 ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'
             }`}>
               {variance === 0
-                ? 'Till balanced — no variance.'
-                : `Variance: ${fmtSigned(variance.toFixed(2))}`}
+                ? t('till.till_balanced')
+                : t('till.variance', { amount: fmtSigned(variance.toFixed(2)) })}
             </div>
           )}
 
           {variance !== null && variance !== 0 && (
             <div className="space-y-1.5">
-              <Label>Variance note <span className="text-destructive">*</span></Label>
+              <Label>{t('till.variance_note')} <span className="text-destructive">*</span></Label>
               <Input
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                placeholder="Explain the discrepancy…"
+                placeholder={t('till.variance_placeholder')}
               />
             </div>
           )}
@@ -246,7 +249,7 @@ function OpenPeriodView({ recon }: { recon: CashReconciliation }) {
             onClick={() => closeMutation.mutate()}
             disabled={!counted || closeMutation.isPending || (variance !== 0 && !note.trim())}
           >
-            {closeMutation.isPending ? 'Closing…' : 'Close till'}
+            {closeMutation.isPending ? t('till.closing') : t('till.close_till')}
           </Button>
         </div>
       </section>
@@ -299,6 +302,7 @@ function HistoryRow({ recon }: { recon: CashReconciliation }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TillPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [openingOverride, setOpeningOverride] = useState('')
   const [openError, setOpenError] = useState<string | null>(null)
@@ -334,8 +338,8 @@ export default function TillPage() {
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Till</h1>
-            <p className="text-sm text-muted-foreground mt-1">End-of-day cash reconciliation.</p>
+            <h1 className="text-xl font-semibold">{t('till.page_title')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t('till.page_subtitle')}</p>
           </div>
           {current && (
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${
@@ -343,21 +347,21 @@ export default function TillPage() {
                 ? 'bg-green-100 text-green-800'
                 : 'bg-muted text-muted-foreground'
             }`}>
-              {current.status === 'open' ? 'Open' : 'Closed'}
+              {current.status === 'open' ? t('till.status_open') : t('till.status_closed')}
             </span>
           )}
         </div>
 
         {currentLoading && (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         )}
 
         {noOpenPeriod && (
           <section className="border rounded-lg bg-white p-5 space-y-4">
-            <p className="text-sm text-muted-foreground">No open till for today. Open one to start tracking cash.</p>
+            <p className="text-sm text-muted-foreground">{t('till.no_till')}</p>
             <div className="flex gap-3 items-end flex-wrap">
               <div className="space-y-1">
-                <Label className="text-xs">Opening balance ($) <span className="text-muted-foreground">(leave blank to use previous close)</span></Label>
+                <Label className="text-xs">{t('till.opening_balance')}</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -368,7 +372,7 @@ export default function TillPage() {
                 />
               </div>
               <Button onClick={() => openMutation.mutate()} disabled={openMutation.isPending}>
-                {openMutation.isPending ? 'Opening…' : 'Open today\'s till'}
+                {openMutation.isPending ? t('till.opening') : t('till.open_till')}
               </Button>
             </div>
             {openError && <p className="text-sm text-destructive">{openError}</p>}
@@ -379,24 +383,24 @@ export default function TillPage() {
 
         {current && current.status === 'closed' && (
           <section className="border rounded-lg bg-white p-5">
-            <p className="text-sm text-muted-foreground">Today's till is closed. Closing balance: <strong>{fmt(current.closing_balance)}</strong></p>
+            <p className="text-sm text-muted-foreground">{t('till.till_closed', { amount: fmt(current.closing_balance) })}</p>
           </section>
         )}
 
         {history.filter(r => r.status === 'closed').length > 0 && (
           <section className="border rounded-lg bg-white overflow-hidden">
             <div className="px-5 py-3 border-b bg-muted/30">
-              <h2 className="text-sm font-medium">History (last 30 days)</h2>
+              <h2 className="text-sm font-medium">{t('till.history_section')}</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/20 text-xs text-muted-foreground">
-                    <th className="px-4 py-2 text-left">Date</th>
-                    <th className="px-4 py-2 text-left">Expected</th>
-                    <th className="px-4 py-2 text-left">Counted</th>
-                    <th className="px-4 py-2 text-left">Variance</th>
-                    <th className="px-4 py-2 text-left">Deposit</th>
+                    <th className="px-4 py-2 text-left">{t('till.col_date')}</th>
+                    <th className="px-4 py-2 text-left">{t('till.col_expected')}</th>
+                    <th className="px-4 py-2 text-left">{t('till.col_counted')}</th>
+                    <th className="px-4 py-2 text-left">{t('till.col_variance')}</th>
+                    <th className="px-4 py-2 text-left">{t('till.col_deposit')}</th>
                     <th className="px-4 py-2" />
                   </tr>
                 </thead>

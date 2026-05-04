@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose ps *)",
+      "Bash(docker compose logs *)",
+      "Bash(alembic current *)",
+      "Bash(alembic heads *)",
+      "Bash(alembic history *)"
+    ]
+  }
+}

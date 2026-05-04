@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { format, addDays, subDays, parseISO } from 'date-fns'
@@ -50,12 +51,13 @@ function Kbd({ k }: { k: string }) {
 }
 
 function ShortcutsPanel({ shortcuts, onClose }: { shortcuts: ShortcutDef[]; onClose: () => void }) {
+  const { t } = useTranslation()
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="fixed bottom-16 right-6 z-50 bg-white border rounded-xl shadow-xl p-3 w-64">
         <p className="text-xs font-semibold text-muted-foreground px-1 pb-2 uppercase tracking-wide">
-          Keyboard shortcuts
+          {t('appt.shortcuts_title')}
         </p>
         <div className="space-y-0.5">
           {shortcuts.map(({ label, keys, action, disabled }) => (
@@ -79,6 +81,7 @@ function ShortcutsPanel({ shortcuts, onClose }: { shortcuts: ShortcutDef[]; onCl
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AppointmentBookPage() {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestId = searchParams.get('request')
@@ -261,16 +264,16 @@ export default function AppointmentBookPage() {
     || !!convertRequest
 
   const shortcuts: ShortcutDef[] = [
-    { label: 'Previous day',     keys: ['←'],      action: prev,          disabled: anyPanelOpen },
-    { label: 'Next day',         keys: ['→'],      action: next,          disabled: anyPanelOpen },
-    { label: 'Go to today',      keys: ['H'],      action: goToday,            disabled: anyPanelOpen },
-    { label: 'Till',             keys: ['T'],      action: () => navigate('/till'),    disabled: anyPanelOpen },
-    { label: 'Clients',          keys: ['C'],      action: () => navigate('/clients'), disabled: anyPanelOpen },
-    { label: 'New appointment',  keys: ['N'],      action: newApptAtTsi,       disabled: anyPanelOpen || !tsi },
-    { label: 'New block',        keys: ['B'],      action: newBlockAtTsi,      disabled: anyPanelOpen || !tsi },
-    { label: 'Move slot up',     keys: ['↑'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.max(0, t.slotTopPx - SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
-    { label: 'Move slot down',   keys: ['↓'],      action: () => setTsi(t => t ? { ...t, slotTopPx: Math.min(maxSlotTop, t.slotTopPx + SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
-    { label: 'Show shortcuts',   keys: ['?'],      action: () => setShowShortcuts(v => !v) },
+    { label: t('appt.shortcut_prev_day'),   keys: ['←'], action: prev,          disabled: anyPanelOpen },
+    { label: t('appt.shortcut_next_day'),   keys: ['→'], action: next,          disabled: anyPanelOpen },
+    { label: t('appt.shortcut_today'),      keys: ['H'], action: goToday,       disabled: anyPanelOpen },
+    { label: t('nav.till'),                 keys: ['T'], action: () => navigate('/till'),    disabled: anyPanelOpen },
+    { label: t('nav.clients'),              keys: ['C'], action: () => navigate('/clients'), disabled: anyPanelOpen },
+    { label: t('appt.shortcut_new_appt'),   keys: ['N'], action: newApptAtTsi,  disabled: anyPanelOpen || !tsi },
+    { label: t('appt.shortcut_new_block'),  keys: ['B'], action: newBlockAtTsi, disabled: anyPanelOpen || !tsi },
+    { label: t('appt.shortcut_move_up'),    keys: ['↑'], action: () => setTsi(t => t ? { ...t, slotTopPx: Math.max(0, t.slotTopPx - SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
+    { label: t('appt.shortcut_move_down'),  keys: ['↓'], action: () => setTsi(t => t ? { ...t, slotTopPx: Math.min(maxSlotTop, t.slotTopPx + SLOT_HEIGHT) } : t), disabled: anyPanelOpen || !tsi },
+    { label: t('appt.shortcut_show'),       keys: ['?'], action: () => setShowShortcuts(v => !v) },
   ]
 
   const isLoading = providersLoading || apptLoading
@@ -280,7 +283,7 @@ export default function AppointmentBookPage() {
       <header className="flex items-center justify-between px-4 py-2 bg-white border-b gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={prev}>‹</Button>
-          <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
+          <Button variant="outline" size="sm" onClick={goToday}>{t('appt.today')}</Button>
           <span className="text-sm font-medium w-40 text-center">
             {format(displayDate, 'EEEE, MMM d, yyyy')}
           </span>
@@ -293,12 +296,12 @@ export default function AppointmentBookPage() {
             size="sm"
             onClick={toggleCancelled}
             className={showCancelled ? '' : 'text-muted-foreground'}
-            title={showCancelled ? 'Hide cancelled & no-show' : 'Show cancelled & no-show'}
+            title={showCancelled ? t('appt.hide_cancelled') : t('appt.show_cancelled')}
           >
             {showCancelled ? <Eye size={14} /> : <EyeOff size={14} />}
             <span className="ml-1.5">Cancelled</span>
           </Button>
-          <Button size="sm" onClick={() => setBooking({})}>+ New</Button>
+          <Button size="sm" onClick={() => setBooking({})}>{t('appt.new_button')}</Button>
         </div>
       </header>
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   type Visit,
   type ColourNote,
@@ -30,6 +31,7 @@ function ClientList({
   selectedId: string | null
   onSelect: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [debouncedQ, setDebouncedQ] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -51,7 +53,7 @@ function ClientList({
       <div className="p-3 border-b space-y-2">
         <input
           type="search"
-          placeholder="Search clients…"
+          placeholder={t('clients.search_placeholder')}
           value={query}
           onChange={e => setQuery(e.target.value)}
           className="w-full border border-input rounded-md px-3 py-1.5 text-sm bg-background"
@@ -60,16 +62,16 @@ function ClientList({
           onClick={() => navigate('/clients/cleanup')}
           className="w-full text-xs text-muted-foreground hover:text-foreground text-left px-1 transition-colors"
         >
-          Merge duplicates &amp; manage households →
+          {t('clients.manage_duplicates')}
         </button>
       </div>
 
       <div className="flex-1 overflow-auto">
         {isLoading ? (
-          <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+          <p className="p-4 text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : clients.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
-            {debouncedQ ? 'No clients found.' : 'No clients yet.'}
+            {debouncedQ ? t('clients.no_clients_found') : t('clients.no_clients_yet')}
           </p>
         ) : (
           <ul>
@@ -88,7 +90,7 @@ function ClientList({
                       {c.is_vip && <Star size={11} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {[c.cell_phone, c.email].filter(Boolean).join(' · ') || 'No contact info'}
+                      {[c.cell_phone, c.email].filter(Boolean).join(' · ') || t('clients.no_contact')}
                     </p>
                   </div>
                   {(c.no_show_count > 0 || c.late_cancellation_count > 0) && (
@@ -112,6 +114,7 @@ function ClientList({
 // ── Colour notes ──────────────────────────────────────────────────────────────
 
 function ColourNotes({ clientId }: { clientId: string }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [newText, setNewText] = useState('')
@@ -163,10 +166,10 @@ function ColourNotes({ clientId }: { clientId: string }) {
               onClick={() => mutate()}
               disabled={!newText.trim() || isPending}
             >
-              {isPending ? 'Saving…' : 'Save'}
+              {isPending ? t('common.saving') : t('common.save')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setAdding(false)} disabled={isPending}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -262,6 +265,7 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
 }
 
 function VisitHistory({ clientId }: { clientId: string }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const todayStr = new Date().toISOString().slice(0, 10)
 
@@ -278,7 +282,7 @@ function VisitHistory({ clientId }: { clientId: string }) {
     },
   })
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (isLoading) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
   if (visits.length === 0) return <p className="text-sm text-muted-foreground">No visits yet.</p>
 
   const upcoming = visits.filter(v => v.date >= todayStr).reverse()
@@ -288,7 +292,7 @@ function VisitHistory({ clientId }: { clientId: string }) {
     <div className="space-y-5">
       {upcoming.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Upcoming</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('clients.upcoming')}</h3>
           <ul className="space-y-2">
             {upcoming.map(v => <VisitRow key={v.appointment_id} visit={v} onCancel={id => cancelAppt(id)} />)}
           </ul>
@@ -296,7 +300,7 @@ function VisitHistory({ clientId }: { clientId: string }) {
       )}
       {past.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">History</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('clients.history')}</h3>
           <ul className="space-y-2">
             {past.map(v => <VisitRow key={v.appointment_id} visit={v} />)}
           </ul>
@@ -311,6 +315,7 @@ function VisitHistory({ clientId }: { clientId: string }) {
 type Tab = 'history' | 'colour' | 'notes'
 
 function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('history')
   const [editingNotes, setEditingNotes] = useState(false)
@@ -380,13 +385,13 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
   })
 
   if (isLoading || !client) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+    return <div className="p-6 text-sm text-muted-foreground">{t('common.loading')}</div>
   }
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: 'history', label: 'Appointments' },
-    { id: 'colour', label: 'Colour notes' },
-    { id: 'notes', label: 'Special instructions' },
+    { id: 'history', label: t('clients.tab_appointments') },
+    { id: 'colour', label: t('clients.tab_colour_notes') },
+    { id: 'notes', label: t('clients.tab_special_instructions') },
   ]
 
   return (
@@ -397,31 +402,31 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">First name</Label>
+                <Label className="text-xs">{t('auth.first_name')}</Label>
                 <Input value={editFirst} onChange={e => setEditFirst(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Last name</Label>
+                <Label className="text-xs">{t('auth.last_name')}</Label>
                 <Input value={editLast} onChange={e => setEditLast(e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Email</Label>
-                <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="optional" />
+                <Label className="text-xs">{t('common.email')}</Label>
+                <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder={t('common.optional')} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Phone</Label>
-                <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="optional" />
+                <Label className="text-xs">{t('common.phone')}</Label>
+                <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder={t('common.optional')} />
               </div>
             </div>
             {editError && <p className="text-xs text-destructive">{editError}</p>}
             <div className="flex gap-2">
               <Button size="sm" onClick={() => saveProfile()} disabled={savingProfile || !editFirst.trim() || !editLast.trim()}>
-                {savingProfile ? 'Saving…' : 'Save'}
+                {savingProfile ? t('common.saving') : t('common.save')}
               </Button>
               <Button size="sm" variant="outline" onClick={() => setEditingProfile(false)} disabled={savingProfile}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -442,7 +447,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground">
                 {client.cell_phone && <span>{client.cell_phone}</span>}
                 {client.email && <span>{client.email}</span>}
-                {!client.cell_phone && !client.email && <span>No contact info</span>}
+                {!client.cell_phone && !client.email && <span>{t('clients.no_contact')}</span>}
               </div>
             </div>
             <div className="flex items-start gap-4 flex-shrink-0">
@@ -461,7 +466,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
                 )}
               </div>
               <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={startEditProfile}>
-                Edit
+                {t('common.edit')}
               </Button>
               {confirmDelete ? (
                 <div className="flex items-center gap-2">
@@ -470,12 +475,12 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
                     {deleting ? 'Deleting…' : 'Confirm'}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteError(null) }} disabled={deleting}>
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               ) : (
                 <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => { setDeleteError(null); setConfirmDelete(true) }}>
-                  Delete
+                  {t('common.delete')}
                 </Button>
               )}
             </div>
@@ -521,13 +526,13 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => saveNotes()} disabled={savingNotes}>
-                    {savingNotes ? 'Saving…' : 'Save'}
+                    {savingNotes ? t('common.saving') : t('common.save')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     setNotesText(client.special_instructions ?? '')
                     setEditingNotes(false)
                   }} disabled={savingNotes}>
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </>
@@ -553,6 +558,7 @@ function ClientDetail({ clientId, onDeleted }: { clientId: string; onDeleted: ()
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ClientsPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'))
 
@@ -567,7 +573,7 @@ export default function ClientsPage() {
           <ClientDetail key={selectedId} clientId={selectedId} onDeleted={() => setSelectedId(null)} />
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-            Select a client to view their profile.
+            {t('clients.select_client')}
           </div>
         )}
       </div>

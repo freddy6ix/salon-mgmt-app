@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   listRetailItems, createRetailItem, updateRetailItem,
   getItemStock, receiveStock, adjustStock,
@@ -28,6 +29,7 @@ function kindColor(kind: StockMovement['kind']): string {
 // ── Stock panel ───────────────────────────────────────────────────────────────
 
 function StockPanel({ item, onClose }: { item: RetailItem; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [mode, setMode] = useState<'history' | 'receive' | 'adjust'>('history')
   const [qty, setQty] = useState('')
@@ -69,17 +71,17 @@ function StockPanel({ item, onClose }: { item: RetailItem; onClose: () => void }
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">{item.name} — Stock</span>
-              <span className="text-sm font-semibold">{isLoading ? '…' : (stock?.on_hand ?? 0)} on hand</span>
+              <span className="text-sm font-medium">{t('retail.stock_title', { name: item.name })}</span>
+              <span className="text-sm font-semibold">{isLoading ? '…' : t('retail.on_hand', { count: stock?.on_hand ?? 0 })}</span>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant={mode === 'receive' ? 'default' : 'outline'} className="text-xs h-7"
                 onClick={() => setMode(mode === 'receive' ? 'history' : 'receive')}>
-                + Receive
+                {t('retail.receive_button')}
               </Button>
               <Button size="sm" variant={mode === 'adjust' ? 'default' : 'outline'} className="text-xs h-7"
                 onClick={() => setMode(mode === 'adjust' ? 'history' : 'adjust')}>
-                Adjust
+                {t('retail.adjust_button')}
               </Button>
               <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground ml-2">✕</button>
             </div>
@@ -88,20 +90,20 @@ function StockPanel({ item, onClose }: { item: RetailItem; onClose: () => void }
           {mode === 'receive' && (
             <div className="flex gap-3 items-end flex-wrap">
               <div className="space-y-1">
-                <Label className="text-xs">Quantity *</Label>
+                <Label className="text-xs">{t('retail.quantity_label')}</Label>
                 <Input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} className="w-24" placeholder="0" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Unit cost ($)</Label>
+                <Label className="text-xs">{t('retail.unit_cost')}</Label>
                 <Input type="text" inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} className="w-28" placeholder="optional" />
               </div>
               <div className="space-y-1 flex-1 min-w-[160px]">
-                <Label className="text-xs">Note</Label>
-                <Input value={note} onChange={e => setNote(e.target.value)} placeholder="Shipment from supplier…" />
+                <Label className="text-xs">{t('retail.note_label')}</Label>
+                <Input value={note} onChange={e => setNote(e.target.value)} placeholder={t('retail.note_placeholder')} />
               </div>
               <Button size="sm" disabled={!qty || parseInt(qty, 10) < 1 || receiveMutation.isPending}
                 onClick={() => { setError(null); receiveMutation.mutate() }}>
-                {receiveMutation.isPending ? 'Saving…' : 'Save'}
+                {receiveMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
             </div>
           )}
@@ -109,16 +111,16 @@ function StockPanel({ item, onClose }: { item: RetailItem; onClose: () => void }
           {mode === 'adjust' && (
             <div className="flex gap-3 items-end flex-wrap">
               <div className="space-y-1">
-                <Label className="text-xs">Counted qty *</Label>
+                <Label className="text-xs">{t('retail.counted_qty')}</Label>
                 <Input type="number" min="0" value={counted} onChange={e => setCounted(e.target.value)} className="w-28" placeholder="0" />
               </div>
               <div className="space-y-1 flex-1 min-w-[200px]">
-                <Label className="text-xs">Reason *</Label>
-                <Input value={adjustNote} onChange={e => setAdjustNote(e.target.value)} placeholder="Physical count, shrinkage…" />
+                <Label className="text-xs">{t('retail.reason_label')}</Label>
+                <Input value={adjustNote} onChange={e => setAdjustNote(e.target.value)} placeholder={t('retail.reason_placeholder')} />
               </div>
               <Button size="sm" disabled={counted === '' || !adjustNote.trim() || adjustMutation.isPending}
                 onClick={() => { setError(null); adjustMutation.mutate() }}>
-                {adjustMutation.isPending ? 'Saving…' : 'Save'}
+                {adjustMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
             </div>
           )}
@@ -148,6 +150,7 @@ function StockPanel({ item, onClose }: { item: RetailItem; onClose: () => void }
 // ── Catalog row ───────────────────────────────────────────────────────────────
 
 function RetailItemRow({ item }: { item: RetailItem }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [stockOpen, setStockOpen] = useState(false)
@@ -180,31 +183,31 @@ function RetailItemRow({ item }: { item: RetailItem }) {
         <td className="px-4 py-2" colSpan={7}>
           <div className="space-y-3 py-1">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">Name</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.name_label')}</Label>
                 <Input value={name} onChange={e => setName(e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">SKU</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.sku_label')}</Label>
                 <Input value={sku} onChange={e => setSku(e.target.value)} placeholder="optional" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">Price ($)</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.col_price')}</Label>
                 <Input type="text" inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} /></div>
-              <div className="space-y-1"><Label className="text-xs">Cost ($)</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.cost_label')}</Label>
                 <Input type="text" inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder="optional" /></div>
             </div>
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={gstExempt} onChange={e => setGstExempt(e.target.checked)} /> GST exempt
+                <input type="checkbox" checked={gstExempt} onChange={e => setGstExempt(e.target.checked)} /> {t('retail.gst_exempt')}
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={pstExempt} onChange={e => setPstExempt(e.target.checked)} /> PST exempt
+                <input type="checkbox" checked={pstExempt} onChange={e => setPstExempt(e.target.checked)} /> {t('retail.pst_exempt')}
               </label>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex gap-2">
               <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving…' : 'Save'}
+                {saveMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
             </div>
           </div>
         </td>
@@ -227,12 +230,12 @@ function RetailItemRow({ item }: { item: RetailItem }) {
         </td>
         <td className="px-4 py-2.5 text-right whitespace-nowrap">
           <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => { setStockOpen(v => !v); setEditing(false) }}>
-            Stock
+            {t('retail.stock_action')}
           </Button>
-          <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => { setEditing(true); setStockOpen(false) }}>Edit</Button>
+          <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => { setEditing(true); setStockOpen(false) }}>{t('common.edit')}</Button>
           <Button size="sm" variant="ghost" className="text-xs h-7 text-muted-foreground ml-1"
             onClick={() => toggleMutation.mutate()} disabled={toggleMutation.isPending}>
-            {item.is_active ? 'Deactivate' : 'Activate'}
+            {item.is_active ? t('settings.deactivate') : t('settings.activate')}
           </Button>
         </td>
       </tr>
@@ -244,6 +247,7 @@ function RetailItemRow({ item }: { item: RetailItem }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RetailPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -286,60 +290,60 @@ export default function RetailPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Retail</h1>
-            <p className="text-sm text-muted-foreground mt-1">Product catalog and inventory.</p>
+            <h1 className="text-xl font-semibold">{t('retail.page_title')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t('retail.page_subtitle')}</p>
           </div>
-          {!adding && <Button onClick={() => setAdding(true)}>+ Add item</Button>}
+          {!adding && <Button onClick={() => setAdding(true)}>{t('retail.add_item')}</Button>}
         </div>
 
         {adding && (
           <form onSubmit={handleAdd} className="border rounded-lg bg-white p-5 space-y-4">
-            <h2 className="text-sm font-medium">New retail item</h2>
+            <h2 className="text-sm font-medium">{t('retail.new_item_title')}</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">Name *</Label>
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="L'Oréal Mythic Oil" /></div>
-              <div className="space-y-1"><Label className="text-xs">SKU</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.name_label')}</Label>
+                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('retail.name_placeholder')} /></div>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.sku_label')}</Label>
                 <Input value={newSku} onChange={e => setNewSku(e.target.value)} placeholder="optional" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">Retail price ($) *</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.retail_price')}</Label>
                 <Input type="text" inputMode="decimal" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="0.00" /></div>
-              <div className="space-y-1"><Label className="text-xs">Cost ($)</Label>
+              <div className="space-y-1"><Label className="text-xs">{t('retail.cost_label')}</Label>
                 <Input type="text" inputMode="decimal" value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="optional" /></div>
             </div>
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={newGst} onChange={e => setNewGst(e.target.checked)} /> GST exempt
+                <input type="checkbox" checked={newGst} onChange={e => setNewGst(e.target.checked)} /> {t('retail.gst_exempt')}
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={newPst} onChange={e => setNewPst(e.target.checked)} /> PST exempt
+                <input type="checkbox" checked={newPst} onChange={e => setNewPst(e.target.checked)} /> {t('retail.pst_exempt')}
               </label>
             </div>
             {formError && <p className="text-xs text-destructive">{formError}</p>}
             <div className="flex gap-2">
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Saving…' : 'Save'}
+                {createMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => { setAdding(false); setFormError(null) }}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { setAdding(false); setFormError(null) }}>{t('common.cancel')}</Button>
             </div>
           </form>
         )}
 
         <div className="border rounded-lg bg-white overflow-hidden">
           {isLoading ? (
-            <p className="p-6 text-sm text-muted-foreground">Loading…</p>
+            <p className="p-6 text-sm text-muted-foreground">{t('common.loading')}</p>
           ) : items.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground text-center">No retail items yet.</p>
+            <p className="p-6 text-sm text-muted-foreground text-center">{t('retail.no_items')}</p>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
-                  <th className="px-4 py-2 text-left">Name</th>
-                  <th className="px-4 py-2 text-left">SKU</th>
-                  <th className="px-4 py-2 text-left">Price</th>
-                  <th className="px-4 py-2 text-left">Cost</th>
-                  <th className="px-4 py-2 text-left">Tax</th>
-                  <th className="px-4 py-2 text-right">On hand</th>
+                  <th className="px-4 py-2 text-left">{t('retail.col_name')}</th>
+                  <th className="px-4 py-2 text-left">{t('retail.col_sku')}</th>
+                  <th className="px-4 py-2 text-left">{t('retail.col_price')}</th>
+                  <th className="px-4 py-2 text-left">{t('retail.col_cost')}</th>
+                  <th className="px-4 py-2 text-left">{t('retail.col_tax')}</th>
+                  <th className="px-4 py-2 text-right">{t('retail.col_on_hand')}</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>

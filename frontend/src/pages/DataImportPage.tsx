@@ -1,28 +1,30 @@
 import { useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, FileText, Upload } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { importLegacyData, type ImportResult } from '@/api/admin'
 
 const FILES = [
-  { key: 'clients_csv',          label: 'Client Details',          hint: 'Client Details.txt',            required: true  },
-  { key: 'all_bookings_csv',     label: 'Future & Past Bookings',  hint: 'Future and Past Bookings.txt',  required: true  },
-  { key: 'receipts_csv',         label: 'Receipt Transactions',    hint: 'Receipt Transactions.txt',      required: true  },
-  { key: 'current_bookings_csv', label: 'All Bookings',            hint: 'All Bookings.txt',              required: false },
-  { key: 'on_account_csv',       label: 'On Account Summary',      hint: 'On Account Summary.txt',        required: false },
+  { key: 'clients_csv',          labelKey: 'import.client_details',          hint: 'Client Details.txt',            required: true  },
+  { key: 'all_bookings_csv',     labelKey: 'import.future_past_bookings',     hint: 'Future and Past Bookings.txt',  required: true  },
+  { key: 'receipts_csv',         labelKey: 'import.receipt_transactions',     hint: 'Receipt Transactions.txt',      required: true  },
+  { key: 'current_bookings_csv', labelKey: 'import.all_bookings',             hint: 'All Bookings.txt',              required: false },
+  { key: 'on_account_csv',       labelKey: 'import.on_account',               hint: 'On Account Summary.txt',        required: false },
 ] as const
 
 type FileKey = typeof FILES[number]['key']
 
-const RESULT_LABELS: Record<string, string> = {
-  clients:          'Clients',
-  receipts:         'Receipt Transactions',
-  past_unreceipted: 'Past Unreceipted Bookings',
-  future_bookings:  'Future Bookings',
-  current_bookings: 'Current Bookings',
-  on_account:       'Account Balances',
+const RESULT_KEY_MAP: Record<string, string> = {
+  clients:          'import.result_clients',
+  receipts:         'import.result_receipts',
+  past_unreceipted: 'import.result_past_bookings',
+  future_bookings:  'import.result_future_bookings',
+  current_bookings: 'import.result_current_bookings',
+  on_account:       'import.result_account_balances',
 }
 
 export default function DataImportPage() {
+  const { t } = useTranslation()
   const [files, setFiles] = useState<Partial<Record<FileKey, File>>>({})
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -61,22 +63,22 @@ export default function DataImportPage() {
   return (
     <div className="h-full overflow-auto p-6">
       <div className="max-w-xl mx-auto">
-        <h1 className="text-xl font-semibold mb-1">Data Import</h1>
+        <h1 className="text-xl font-semibold mb-1">{t('import.page_title')}</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Upload the latest export files from Milano. The import is safe to run repeatedly — existing records are updated, not duplicated.
+          {t('import.page_subtitle')}
         </p>
 
         <div className="space-y-2 mb-6">
-          {FILES.map(({ key, label, hint, required }) => {
+          {FILES.map(({ key, labelKey, hint, required }) => {
             const file = files[key]
             return (
               <div key={key} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
                 <FileText size={16} className="text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-medium">{label}</span>
+                    <span className="text-sm font-medium">{t(labelKey)}</span>
                     {!required && (
-                      <span className="text-xs text-muted-foreground">(optional)</span>
+                      <span className="text-xs text-muted-foreground">{t('import.optional_marker')}</span>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
@@ -96,7 +98,7 @@ export default function DataImportPage() {
                   size="sm"
                   onClick={() => inputRefs.current[key]?.click()}
                 >
-                  {file ? 'Change' : 'Browse'}
+                  {file ? t('import.change_button') : t('import.browse_button')}
                 </Button>
               </div>
             )
@@ -109,7 +111,7 @@ export default function DataImportPage() {
           className="w-full gap-2"
         >
           <Upload size={15} />
-          {loading ? 'Importing…' : 'Run Import'}
+          {loading ? t('import.importing') : t('import.run_import')}
         </Button>
 
         {error && (
@@ -126,11 +128,12 @@ export default function DataImportPage() {
 }
 
 function ImportResults({ result }: { result: ImportResult }) {
+  const { t } = useTranslation()
   const entries = Object.entries(result).filter(([k]) => k !== 'error')
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold mb-3">Import Results</h2>
+      <h2 className="text-sm font-semibold mb-3">{t('import.results_section')}</h2>
 
       {result.error && (
         <div className="mb-3 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
@@ -142,7 +145,7 @@ function ImportResults({ result }: { result: ImportResult }) {
         {entries.map(([key, data]) => (
           <div key={key} className="border rounded-lg p-3 bg-white">
             <div className="text-sm font-medium mb-1.5">
-              {RESULT_LABELS[key] ?? key}
+              {RESULT_KEY_MAP[key] ? t(RESULT_KEY_MAP[key]) : key}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {Object.entries(data as Record<string, unknown>).map(([k, v]) => (

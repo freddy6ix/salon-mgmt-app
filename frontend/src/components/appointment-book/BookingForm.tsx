@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useTimeFormat } from '@/lib/timeFormat'
@@ -67,6 +68,7 @@ function isItemOutsideHours(startHHMM: string, durationMins: number, hours: Prov
 export default function BookingForm({
   open, date, initialTime, initialProviderId, providers, providerHours = [], slotMinutes = 10, onClose, onSaved,
 }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   // ── Step: 'client' | 'items' | 'confirm'
@@ -184,7 +186,7 @@ export default function BookingForm({
     <Dialog open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>New Appointment — {format(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</DialogTitle>
+          <DialogTitle>{t('appt.new_appt_title', { date: format(new Date(date + 'T12:00:00'), 'MMM d, yyyy') })}</DialogTitle>
         </DialogHeader>
 
         {/* ── Step 1: Client ───────────────────────── */}
@@ -193,7 +195,7 @@ export default function BookingForm({
             <input
               autoFocus
               autoComplete="off"
-              placeholder="Search by name, phone, or email…"
+              placeholder={t('appt.search_client')}
               value={clientQuery}
               onChange={(e) => setClientQuery(e.target.value)}
               className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
@@ -207,23 +209,23 @@ export default function BookingForm({
                     <span className="text-muted-foreground font-normal ml-2">{selectedClient.cell_phone}</span>
                   )}
                 </span>
-                <button onClick={() => setSelectedClient(null)} className="text-xs text-muted-foreground hover:text-foreground">change</button>
+                <button onClick={() => setSelectedClient(null)} className="text-xs text-muted-foreground hover:text-foreground">{t('appt.change_client')}</button>
               </div>
             ) : showNewClient ? (
               <div className="border rounded-md p-3 space-y-2 bg-muted/20">
-                <p className="text-xs font-medium text-muted-foreground">New client</p>
+                <p className="text-xs font-medium text-muted-foreground">{t('appt.new_client')}</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <input placeholder="First name *" value={newFirst} onChange={(e) => setNewFirst(e.target.value)}
+                  <input placeholder={t('auth.first_name') + ' *'} value={newFirst} onChange={(e) => setNewFirst(e.target.value)}
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
-                  <input placeholder="Last name *" value={newLast} onChange={(e) => setNewLast(e.target.value)}
+                  <input placeholder={t('auth.last_name') + ' *'} value={newLast} onChange={(e) => setNewLast(e.target.value)}
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
-                  <input placeholder="Cell phone" value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
+                  <input placeholder={t('auth.cell_phone')} value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
-                  <input placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                  <input placeholder={t('common.email')} value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
                     className="border border-input rounded-md px-2 py-1.5 text-sm bg-background" />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => setShowNewClient(false)} className="flex-1">Cancel</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setShowNewClient(false)} className="flex-1">{t('common.cancel')}</Button>
                   <Button
                     size="sm"
                     className="flex-1"
@@ -244,7 +246,7 @@ export default function BookingForm({
                       }
                     }}
                   >
-                    {creatingClient ? 'Saving…' : 'Create client'}
+                    {creatingClient ? t('common.saving') : t('appt.new_client')}
                   </Button>
                 </div>
               </div>
@@ -269,11 +271,11 @@ export default function BookingForm({
             <div className="flex justify-end gap-2">
               {!selectedClient && !showNewClient && (
                 <Button variant="outline" onClick={() => { setShowNewClient(true); setNewFirst(clientQuery); setClientQuery('') }}>
-                  + New client
+                  {t('appt.new_client_button')}
                 </Button>
               )}
               <Button disabled={!selectedClient} onClick={() => setStep('items')}>
-                Next →
+                {t('common.next')} →
               </Button>
             </div>
           </div>
@@ -311,7 +313,7 @@ export default function BookingForm({
             <div className="rounded-md border p-3 space-y-2 bg-muted/20">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-muted-foreground">Service</label>
+                  <label className="text-xs text-muted-foreground">{t('appt.service_label')}</label>
                   <select
                     value={serviceId}
                     onChange={(e) => {
@@ -321,7 +323,7 @@ export default function BookingForm({
                     }}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                   >
-                    <option value="">— select —</option>
+                    <option value="">{t('convert.select_provider')}</option>
                     {['Styling', 'Colouring', 'Extensions'].map((cat) => (
                       <optgroup key={cat} label={cat}>
                         {services.filter((s) => s.category_name === cat).map((s) => (
@@ -332,20 +334,20 @@ export default function BookingForm({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Provider</label>
+                  <label className="text-xs text-muted-foreground">{t('appt.provider_label')}</label>
                   <select
                     value={providerId}
                     onChange={(e) => setProviderId(e.target.value)}
                     className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                   >
-                    <option value="">— select —</option>
+                    <option value="">{t('convert.select_provider')}</option>
                     {providers.filter((p) => p.has_appointments).map((p) => (
                       <option key={p.id} value={p.id}>{p.display_name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Start time</label>
+                  <label className="text-xs text-muted-foreground">{t('appt.start_time')}</label>
                   <select
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
@@ -361,7 +363,7 @@ export default function BookingForm({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Price ($)</label>
+                  <label className="text-xs text-muted-foreground">{t('appt.price_label')}</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -379,23 +381,23 @@ export default function BookingForm({
                 onClick={addItem}
                 className="w-full"
               >
-                + Add service
+                {t('appt.add_service')}
               </Button>
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground">Notes</label>
+              <label className="text-xs text-muted-foreground">{t('common.notes')}</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                placeholder="Optional notes…"
+                placeholder={t('appt.notes_optional')}
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background mt-0.5 resize-none"
               />
             </div>
 
             <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep('client')}>← Back</Button>
+              <Button variant="ghost" onClick={() => setStep('client')}>← {t('common.back')}</Button>
               <Button
                 disabled={items.length === 0 && (!serviceId || !providerId)}
                 onClick={() => {
@@ -404,7 +406,7 @@ export default function BookingForm({
                   setStep('confirm')
                 }}
               >
-                Review →
+                {t('common.next')} →
               </Button>
             </div>
           </div>
@@ -432,7 +434,7 @@ export default function BookingForm({
               })
               return conflicts.length > 0 ? (
                 <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  <p className="font-medium mb-0.5">Outside scheduled hours</p>
+                  <p className="font-medium mb-0.5">{t('appt.outside_hours')}</p>
                   {conflicts.map((item, i) => (
                     <p key={i} className="text-xs">
                       {item.provider.display_name} · {item.startTime} · {item.service.name}
@@ -444,14 +446,14 @@ export default function BookingForm({
 
             {mutation.isError && (
               <p className="text-sm text-destructive">
-                {mutation.error instanceof Error ? mutation.error.message : 'Save failed'}
+                {mutation.error instanceof Error ? mutation.error.message : t('appt.save_failed')}
               </p>
             )}
 
             <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep('items')}>← Back</Button>
+              <Button variant="ghost" onClick={() => setStep('items')}>← {t('common.back')}</Button>
               <Button disabled={!canSave} onClick={() => mutation.mutate()}>
-                {mutation.isPending ? 'Saving…' : 'Confirm appointment'}
+                {mutation.isPending ? t('common.saving') : t('appt.confirm_appointment')}
               </Button>
             </div>
           </div>

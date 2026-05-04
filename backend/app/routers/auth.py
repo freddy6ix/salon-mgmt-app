@@ -191,3 +191,28 @@ async def me(current_user: CurrentUser) -> MeResponse:
         tenant_id=str(current_user.tenant_id),
         language_preference=current_user.language_preference or "en",
     )
+
+
+class UpdateMeRequest(BaseModel):
+    language_preference: str
+
+
+@router.patch("/me", response_model=MeResponse)
+async def update_me(
+    body: UpdateMeRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MeResponse:
+    from app.i18n import SUPPORTED_LANGUAGES
+    if body.language_preference not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported language")
+    current_user.language_preference = body.language_preference
+    await db.commit()
+    await db.refresh(current_user)
+    return MeResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        role=current_user.role.value,
+        tenant_id=str(current_user.tenant_id),
+        language_preference=current_user.language_preference,
+    )

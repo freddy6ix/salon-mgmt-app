@@ -1,23 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, Merge, Users, X, UserPlus, Trash2 } from 'lucide-react'
 import {
-  type ClientDetail, type DuplicatePair, type Household, type HouseholdMember,
+  type ClientDetail, type DuplicatePair, type Household,
   getDuplicatePairs, mergeClients, listHouseholds, createHousehold,
   deleteHousehold, setClientHousehold,
 } from '@/api/clientCleanup'
 import { searchClients } from '@/api/clients'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-
-// ── Shared ────────────────────────────────────────────────────────────────────
-
-const REASON_LABEL: Record<string, string> = {
-  email: 'Same email',
-  phone: 'Same phone',
-  name: 'Same name',
-}
 
 // ── Client card ───────────────────────────────────────────────────────────────
 
@@ -28,10 +21,11 @@ function ClientCard({
   client: ClientDetail
   recommended: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <div className={`flex-1 rounded-lg border p-4 space-y-1.5 ${recommended ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-white'}`}>
       {recommended && (
-        <Badge className="mb-1 text-xs">Recommended primary</Badge>
+        <Badge className="mb-1 text-xs">{t('clients.badge_primary')}</Badge>
       )}
       <p className="font-semibold text-sm">{client.first_name} {client.last_name}</p>
       {client.email && <p className="text-xs text-muted-foreground">{client.email}</p>}
@@ -56,8 +50,15 @@ function DuplicatePairCard({
   onMerged: () => void
   onSkip: () => void
 }) {
+  const { t } = useTranslation()
   const [swapped, setSwapped] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const REASON_LABEL: Record<string, string> = {
+    email: t('clients.reason_same_email'),
+    phone: t('clients.reason_same_phone'),
+    name: t('clients.reason_same_name'),
+  }
 
   const primary = swapped ? pair.client_b : pair.client_a
   const secondary = swapped ? pair.client_a : pair.client_b
@@ -73,7 +74,7 @@ function DuplicatePairCard({
     <div className="border rounded-xl p-4 bg-muted/20 space-y-3">
       <div className="flex items-center justify-between">
         <Badge variant="outline" className="text-xs">{REASON_LABEL[pair.reason] ?? pair.reason}</Badge>
-        <button onClick={onSkip} className="text-muted-foreground hover:text-foreground transition-colors" title="Skip">
+        <button onClick={onSkip} className="text-muted-foreground hover:text-foreground transition-colors" title={t('clients.skip')}>
           <X size={15} />
         </button>
       </div>
@@ -94,8 +95,7 @@ function DuplicatePairCard({
 
       <div className="flex items-center justify-between pt-1">
         <p className="text-xs text-muted-foreground">
-          Merging keeps <span className="font-medium">{primary.first_name} {primary.last_name}</span> and
-          moves all history from <span className="font-medium">{secondary.first_name} {secondary.last_name}</span>
+          {t('clients.merge_info', { primary: `${primary.first_name} ${primary.last_name}`, secondary: `${secondary.first_name} ${secondary.last_name}` })}
         </p>
         <div className="flex items-center gap-2 flex-shrink-0">
           {error && <span className="text-xs text-destructive">{error}</span>}
@@ -106,7 +106,7 @@ function DuplicatePairCard({
             className="gap-1.5"
           >
             <Merge size={13} />
-            {mutation.isPending ? 'Merging…' : 'Merge'}
+            {mutation.isPending ? t('clients.merging') : t('clients.merge')}
           </Button>
         </div>
       </div>
@@ -117,6 +117,7 @@ function DuplicatePairCard({
 // ── Duplicates tab ────────────────────────────────────────────────────────────
 
 function DuplicatesTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: pairs = [], isLoading } = useQuery({
     queryKey: ['duplicate-pairs'],
@@ -134,19 +135,19 @@ function DuplicatesTab() {
     qc.invalidateQueries({ queryKey: ['clients'] })
   }
 
-  if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Scanning for duplicates…</p>
+  if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">{t('clients.scanning')}</p>
 
   if (visible.length === 0)
     return (
       <div className="py-16 text-center">
-        <p className="text-sm font-medium mb-1">No duplicates found</p>
-        <p className="text-xs text-muted-foreground">All client records look unique.</p>
+        <p className="text-sm font-medium mb-1">{t('clients.no_duplicates')}</p>
+        <p className="text-xs text-muted-foreground">{t('clients.no_duplicates_message')}</p>
       </div>
     )
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">{visible.length} potential duplicate{visible.length !== 1 ? 's' : ''} found</p>
+      <p className="text-xs text-muted-foreground">{t('clients.duplicates_found', { count: visible.length })}</p>
       {visible.map(pair => (
         <DuplicatePairCard
           key={`${pair.client_a.id}:${pair.client_b.id}`}
@@ -207,6 +208,7 @@ function ClientSearch({
 // ── Household card ────────────────────────────────────────────────────────────
 
 function HouseholdCard({ household }: { household: Household }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   const removeMutation = useMutation({
@@ -248,14 +250,14 @@ function HouseholdCard({ household }: { household: Household }) {
           onClick={() => deleteMutation.mutate()}
           disabled={deleteMutation.isPending}
           className="p-1.5 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-          title="Delete household"
+          title={t('clients.delete_household')}
         >
           <Trash2 size={14} />
         </button>
       </div>
 
       <ClientSearch
-        placeholder="Add member…"
+        placeholder={t('clients.add_member')}
         excludeIds={memberIds}
         onSelect={(id) => addMutation.mutate(id)}
       />
@@ -266,6 +268,7 @@ function HouseholdCard({ household }: { household: Household }) {
 // ── Households tab ────────────────────────────────────────────────────────────
 
 function HouseholdsTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: households = [], isLoading } = useQuery({
     queryKey: ['households'],
@@ -284,7 +287,7 @@ function HouseholdsTab() {
     },
   })
 
-  if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
+  if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
 
   return (
     <div className="space-y-4">
@@ -292,13 +295,13 @@ function HouseholdsTab() {
         <p className="text-xs text-muted-foreground">{households.length} household{households.length !== 1 ? 's' : ''}</p>
         <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreate(s => !s)}>
           <UserPlus size={13} />
-          New household
+          {t('clients.new_household')}
         </Button>
       </div>
 
       {showCreate && (
         <div className="border rounded-xl p-4 bg-muted/20 space-y-3">
-          <p className="text-sm font-medium">New household</p>
+          <p className="text-sm font-medium">{t('clients.new_household_title')}</p>
           <div className="flex flex-wrap gap-2 min-h-[28px]">
             {newMembers.map(m => (
               <div key={m.id} className="flex items-center gap-1 bg-white border rounded-full pl-3 pr-1 py-0.5">
@@ -313,14 +316,14 @@ function HouseholdsTab() {
             ))}
           </div>
           <ClientSearch
-            placeholder="Search clients to add…"
+            placeholder={t('clients.search_placeholder')}
             excludeIds={newMembers.map(m => m.id)}
             onSelect={(id, name) => setNewMembers(ms => [...ms, { id, name }])}
           />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setNewMembers([]) }}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setNewMembers([]) }}>{t('common.cancel')}</Button>
             <Button size="sm" disabled={newMembers.length < 2 || createMutation.isPending} onClick={() => createMutation.mutate()}>
-              {createMutation.isPending ? 'Creating…' : 'Create'}
+              {createMutation.isPending ? t('convert.creating') : t('common.create')}
             </Button>
           </div>
         </div>
@@ -328,8 +331,8 @@ function HouseholdsTab() {
 
       {households.length === 0 && !showCreate && (
         <div className="py-16 text-center">
-          <p className="text-sm font-medium mb-1">No households yet</p>
-          <p className="text-xs text-muted-foreground">Link family members who often pay together.</p>
+          <p className="text-sm font-medium mb-1">{t('clients.no_households')}</p>
+          <p className="text-xs text-muted-foreground">{t('clients.households_info')}</p>
         </div>
       )}
 
@@ -345,12 +348,13 @@ function HouseholdsTab() {
 type Tab = 'duplicates' | 'households'
 
 export default function ClientCleanupPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('duplicates')
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'duplicates', label: 'Duplicates', icon: Merge },
-    { id: 'households', label: 'Households', icon: Users },
+    { id: 'duplicates', label: t('clients.tab_duplicates'), icon: Merge },
+    { id: 'households', label: t('clients.tab_households'), icon: Users },
   ]
 
   return (
@@ -361,9 +365,9 @@ export default function ClientCleanupPage() {
             onClick={() => navigate('/clients')}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            ← Clients
+            ← {t('nav.clients')}
           </button>
-          <h1 className="text-xl font-semibold">Client Cleanup</h1>
+          <h1 className="text-xl font-semibold">{t('clients.cleanup_title')}</h1>
         </div>
 
         {/* Tabs */}

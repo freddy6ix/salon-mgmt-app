@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, UserCircle2, CheckCircle2, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   listAllProviders,
   createProvider,
@@ -75,6 +76,7 @@ function sectionTitle(title: string) {
 // ── Schedule Tab ──────────────────────────────────────────────────────────────
 
 function ScheduleTab({ providerId }: { providerId: string }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [saving, setSaving] = useState(false)
   const [effectiveFrom, setEffectiveFrom] = useState(TODAY)
@@ -131,7 +133,7 @@ function ScheduleTab({ providerId }: { providerId: string }) {
   }
 
   if (schedLoading || hoursLoading) {
-    return <p className="text-sm text-muted-foreground">Loading schedule…</p>
+    return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
   }
 
   return (
@@ -153,7 +155,7 @@ function ScheduleTab({ providerId }: { providerId: string }) {
                 return (
                   <td key={day.day_of_week} className="px-3 py-3 align-top border-b">
                     {salonClosed ? (
-                      <span className="text-xs text-muted-foreground">Closed</span>
+                      <span className="text-xs text-muted-foreground">{t('settings.day_closed')}</span>
                     ) : (
                       <div className="flex flex-col gap-1.5">
                         <label className="flex items-center gap-1.5 cursor-pointer">
@@ -163,7 +165,7 @@ function ScheduleTab({ providerId }: { providerId: string }) {
                             onChange={e => toggleWorking(day.day_of_week, e.target.checked)}
                             className="accent-primary"
                           />
-                          <span className="text-xs">{day.is_working ? 'Working' : 'Off'}</span>
+                          <span className="text-xs">{day.is_working ? t('appt.status_in') : t('appt.status_off')}</span>
                         </label>
                         {day.is_working && (
                           <div className="flex flex-col gap-1">
@@ -201,7 +203,7 @@ function ScheduleTab({ providerId }: { providerId: string }) {
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground">Effective from</label>
+          <label className="text-xs text-muted-foreground">{t('staff.effective_from')}</label>
           <input
             type="date"
             value={effectiveFrom}
@@ -211,11 +213,11 @@ function ScheduleTab({ providerId }: { providerId: string }) {
           />
         </div>
         <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
-          {saving ? 'Saving…' : 'Save Schedule'}
+          {saving ? t('common.saving') : t('staff.save_schedule')}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Provider hours must fall within salon operating hours. Past schedules are locked.
+        {t('staff.schedule_help')}
       </p>
     </div>
   )
@@ -224,6 +226,7 @@ function ScheduleTab({ providerId }: { providerId: string }) {
 // ── Profile Tab ───────────────────────────────────────────────────────────────
 
 function ProfileTab({ provider }: { provider: ProviderDetail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [form, setForm] = useState({
     first_name: provider.first_name,
@@ -287,39 +290,39 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
 
   return (
     <div className="max-w-2xl space-y-1">
-      {sectionTitle('Identity')}
-      {fieldRow('First name', <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} />)}
-      {fieldRow('Last name', <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} />)}
-      {fieldRow('Display name', <Input value={form.display_name} onChange={e => set('display_name', e.target.value)} />)}
-      {fieldRow('Job title', <Input value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder="e.g. Senior Stylist" />)}
-      {fieldRow('Type', (
+      {sectionTitle(t('staff.section_identity'))}
+      {fieldRow(t('auth.first_name'), <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} />)}
+      {fieldRow(t('auth.last_name'), <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} />)}
+      {fieldRow(t('staff.display_name_label'), <Input value={form.display_name} onChange={e => set('display_name', e.target.value)} />)}
+      {fieldRow(t('staff.job_title_label'), <Input value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder={t('staff.job_title_placeholder')} />)}
+      {fieldRow(t('staff.type_label'), (
         <select
           value={form.provider_type}
           onChange={e => set('provider_type', e.target.value)}
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
         >
-          <option value="stylist">Stylist</option>
-          <option value="colourist">Colourist</option>
-          <option value="dualist">Dualist</option>
+          <option value="stylist">{t('staff.type_stylist')}</option>
+          <option value="colourist">{t('staff.type_colourist')}</option>
+          <option value="dualist">{t('staff.type_dualist')}</option>
         </select>
       ))}
-      {fieldRow('Provider code', <Input value={form.provider_code} onChange={e => set('provider_code', e.target.value)} placeholder="e.g. GUMI" />)}
-      {fieldRow('Login account', (
+      {fieldRow(t('staff.provider_code'), <Input value={form.provider_code} onChange={e => set('provider_code', e.target.value)} placeholder="e.g. GUMI" />)}
+      {fieldRow(t('staff.login_account'), (
         <div className="space-y-1">
           <select
             value={form.user_id}
             onChange={e => set('user_id', e.target.value)}
             className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
           >
-            <option value="">— Not linked —</option>
+            <option value="">{t('staff.not_linked')}</option>
             {users.filter(u => u.role !== 'guest' && u.is_active).map(u => (
               <option key={u.id} value={u.id}>{u.email} ({u.role})</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">Links this provider profile to a staff login account</p>
+          <p className="text-xs text-muted-foreground">{t('staff.login_help')}</p>
         </div>
       ))}
-      {fieldRow('Photo URL', (
+      {fieldRow(t('staff.photo_url'), (
         <div className="space-y-1">
           <Input value={form.provider_photo_url} onChange={e => set('provider_photo_url', e.target.value)} placeholder="https://…" />
           {form.provider_photo_url && (
@@ -328,29 +331,29 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
         </div>
       ))}
 
-      {sectionTitle('Personal')}
-      {fieldRow('Sex', (
+      {sectionTitle(t('staff.section_personal'))}
+      {fieldRow(t('staff.sex_label'), (
         <select
           value={form.sex}
           onChange={e => set('sex', e.target.value)}
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
         >
           <option value="">—</option>
-          <option value="Female">Female</option>
-          <option value="Male">Male</option>
-          <option value="Non-binary">Non-binary</option>
-          <option value="Prefer not to say">Prefer not to say</option>
+          <option value="Female">{t('staff.option_female')}</option>
+          <option value="Male">{t('staff.option_male')}</option>
+          <option value="Non-binary">{t('staff.option_non_binary')}</option>
+          <option value="Prefer not to say">{t('staff.option_prefer_not')}</option>
         </select>
       ))}
-      {fieldRow('Birthday', <Input type="date" value={form.birthday} onChange={e => set('birthday', e.target.value)} />)}
-      {fieldRow('Personal email', <Input type="email" value={form.personal_email} onChange={e => set('personal_email', e.target.value)} />)}
-      {fieldRow('Cell phone', <Input value={form.cell_phone} onChange={e => set('cell_phone', e.target.value)} />)}
-      {fieldRow('Home phone', <Input value={form.home_phone} onChange={e => set('home_phone', e.target.value)} />)}
-      {fieldRow('Address', <Input value={form.address_line} onChange={e => set('address_line', e.target.value)} />)}
-      {fieldRow('City', <Input value={form.city} onChange={e => set('city', e.target.value)} />)}
-      {fieldRow('Province', <Input value={form.province} onChange={e => set('province', e.target.value)} maxLength={2} placeholder="ON" />)}
-      {fieldRow('Postal code', <Input value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />)}
-      {fieldRow('Notes', (
+      {fieldRow(t('staff.birthday_label'), <Input type="date" value={form.birthday} onChange={e => set('birthday', e.target.value)} />)}
+      {fieldRow(t('staff.personal_email'), <Input type="email" value={form.personal_email} onChange={e => set('personal_email', e.target.value)} />)}
+      {fieldRow(t('auth.cell_phone'), <Input value={form.cell_phone} onChange={e => set('cell_phone', e.target.value)} />)}
+      {fieldRow(t('staff.home_phone'), <Input value={form.home_phone} onChange={e => set('home_phone', e.target.value)} />)}
+      {fieldRow(t('settings.address_label'), <Input value={form.address_line} onChange={e => set('address_line', e.target.value)} />)}
+      {fieldRow(t('settings.city_label'), <Input value={form.city} onChange={e => set('city', e.target.value)} />)}
+      {fieldRow(t('settings.province_label'), <Input value={form.province} onChange={e => set('province', e.target.value)} maxLength={2} placeholder="ON" />)}
+      {fieldRow(t('settings.postal_label'), <Input value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />)}
+      {fieldRow(t('common.notes'), (
         <textarea
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
@@ -359,27 +362,27 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
         />
       ))}
 
-      {sectionTitle('Booking')}
-      {fieldRow('Booking order', <Input type="number" value={form.booking_order} onChange={e => set('booking_order', parseInt(e.target.value) || 0)} className="w-24" />)}
-      {fieldRow('Online booking', (
+      {sectionTitle(t('staff.section_booking'))}
+      {fieldRow(t('staff.booking_order'), <Input type="number" value={form.booking_order} onChange={e => set('booking_order', parseInt(e.target.value) || 0)} className="w-24" />)}
+      {fieldRow(t('staff.online_booking'), (
         <select
           value={form.online_booking_visibility}
           onChange={e => set('online_booking_visibility', e.target.value)}
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
         >
-          <option value="not_available">Not available</option>
-          <option value="available_to_my_clients">My clients only</option>
-          <option value="available_to_all">Available to all</option>
+          <option value="not_available">{t('staff.booking_not_available')}</option>
+          <option value="available_to_my_clients">{t('staff.booking_my_clients')}</option>
+          <option value="available_to_all">{t('staff.booking_available')}</option>
         </select>
       ))}
-      {fieldRow('Flags', (
+      {fieldRow(t('staff.flags_label'), (
         <div className="flex flex-wrap gap-4 text-sm">
           {([
-            ['has_appointments', 'Has appointments'],
-            ['makes_appointments', 'Makes appointments'],
-            ['can_be_cashier', 'Can be cashier'],
-            ['is_owner', 'Owner'],
-            ['is_active', 'Active'],
+            ['has_appointments', t('staff.has_appointments')],
+            ['makes_appointments', t('staff.makes_appointments')],
+            ['can_be_cashier', t('staff.cashier')],
+            ['is_owner', t('staff.owner')],
+            ['is_active', t('common.active')],
           ] as [string, string][]).map(([field, label]) => (
             <label key={field} className="flex items-center gap-2 cursor-pointer">
               <input
@@ -396,9 +399,9 @@ function ProfileTab({ provider }: { provider: ProviderDetail }) {
 
       <div className="pt-4">
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? 'Saving…' : 'Save Profile'}
+          {mutation.isPending ? t('common.saving') : t('staff.save_profile')}
         </Button>
-        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">Saved</span>}
+        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">{t('common.saved')}</span>}
       </div>
     </div>
   )
@@ -415,6 +418,7 @@ const DEFAULT_TIERS: CommissionTier[] = [
 ]
 
 function CompensationTab({ provider }: { provider: ProviderDetail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [payType, setPayType] = useState(provider.pay_type ?? '')
   const [payAmount, setPayAmount] = useState(String(provider.pay_amount ?? ''))
@@ -428,7 +432,7 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
   const [colourPct, setColourPct] = useState(String(provider.product_fee_colour_pct ?? ''))
 
   function updateTier(idx: number, field: keyof CommissionTier, value: string) {
-    setTiers(prev => prev.map((t, i) => i === idx ? { ...t, [field]: parseFloat(value) || 0 } : t))
+    setTiers(prev => prev.map((tier, i) => i === idx ? { ...tier, [field]: parseFloat(value) || 0 } : tier))
   }
 
   function addTier() {
@@ -455,30 +459,30 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
 
   return (
     <div className="max-w-2xl space-y-1">
-      {sectionTitle('Pay Structure')}
-      {fieldRow('Pay type', (
+      {sectionTitle(t('staff.section_pay'))}
+      {fieldRow(t('staff.pay_type'), (
         <select
           value={payType}
           onChange={e => setPayType(e.target.value)}
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
         >
-          <option value="">— Not set —</option>
-          <option value="hourly">Hourly</option>
-          <option value="salary">Salary</option>
-          <option value="commission">Commission (with hourly floor)</option>
+          <option value="">{t('staff.pay_not_set')}</option>
+          <option value="hourly">{t('staff.pay_hourly')}</option>
+          <option value="salary">{t('staff.pay_salary')}</option>
+          <option value="commission">{t('staff.pay_commission')}</option>
         </select>
       ))}
 
-      {payType === 'hourly' && fieldRow('Hourly rate ($)', (
+      {payType === 'hourly' && fieldRow(t('staff.hourly_rate'), (
         <Input type="number" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-32" />
       ))}
 
-      {payType === 'salary' && fieldRow('Annual salary ($)', (
+      {payType === 'salary' && fieldRow(t('staff.annual_salary'), (
         <div className="space-y-1">
           <Input type="number" step="0.01" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-40" />
           {payAmount && !isNaN(parseFloat(payAmount)) && (
             <p className="text-xs text-muted-foreground">
-              Monthly: {(parseFloat(payAmount) / 12).toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 })}
+              {t('staff.monthly_equivalent', { amount: (parseFloat(payAmount) / 12).toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 }) })}
             </p>
           )}
         </div>
@@ -486,23 +490,23 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
 
       {payType === 'commission' && (
         <>
-          {fieldRow('Hourly floor ($)', (
+          {fieldRow(t('staff.hourly_floor'), (
             <div className="space-y-1">
               <Input type="number" step="0.01" value={hourlyMin} onChange={e => setHourlyMin(e.target.value)} className="w-32" />
-              <p className="text-xs text-muted-foreground">Minimum guaranteed rate; commission pays if higher</p>
+              <p className="text-xs text-muted-foreground">{t('staff.floor_help')}</p>
             </div>
           ))}
 
-          {sectionTitle('Commission Brackets')}
+          {sectionTitle(t('staff.commission_brackets'))}
           <p className="text-xs text-muted-foreground mb-3">
-            Based on annualized monthly net service revenue. The highest bracket the provider's revenue meets applies.
+            {t('staff.brackets_help')}
           </p>
           <div className="border rounded-md overflow-hidden mb-2">
             <table className="w-full text-sm">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Monthly threshold ($)</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Commission rate (%)</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">{t('staff.monthly_threshold')}</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">{t('staff.commission_rate')}</th>
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -530,7 +534,7 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
                         onClick={() => removeTier(idx)}
                         className="text-muted-foreground hover:text-destructive text-xs px-1"
                       >
-                        ×
+                        {t('staff.delete_bracket')}
                       </button>
                     </td>
                   </tr>
@@ -539,20 +543,20 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
             </table>
           </div>
           <Button variant="ghost" size="sm" onClick={addTier}>
-            <Plus size={14} className="mr-1" /> Add bracket
+            <Plus size={14} className="mr-1" /> {t('staff.add_bracket')}
           </Button>
 
-          {sectionTitle('Product Fees')}
+          {sectionTitle(t('staff.product_fees'))}
           <p className="text-xs text-muted-foreground mb-3">
-            Deducted from service revenue before applying the commission rate.
+            {t('staff.fees_help')}
           </p>
-          {fieldRow('Styling fee ($ flat)', (
+          {fieldRow(t('staff.styling_fee'), (
             <div className="space-y-1">
               <Input type="number" step="0.01" value={stylingFee} onChange={e => setStylingFee(e.target.value)} className="w-32" placeholder="e.g. 5.00" />
               <p className="text-xs text-muted-foreground">Per styling service appointment</p>
             </div>
           ))}
-          {fieldRow('Colour fee (% of revenue)', (
+          {fieldRow(t('staff.colour_fee'), (
             <div className="space-y-1">
               <Input type="number" step="0.1" value={colourPct} onChange={e => setColourPct(e.target.value)} className="w-32" placeholder="e.g. 10" />
               <p className="text-xs text-muted-foreground">% of pre-tax colour service revenue</p>
@@ -562,13 +566,13 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
       )}
 
       {sectionTitle('Other')}
-      {fieldRow('Vacation pay (%)', (
+      {fieldRow(t('staff.vacation_pay'), (
         <div className="space-y-1">
           <Input type="number" step="0.1" value={vacationPct} onChange={e => setVacationPct(e.target.value)} className="w-24" />
-          <p className="text-xs text-muted-foreground">Added each pay period (e.g. 4% per Ontario ESA minimum)</p>
+          <p className="text-xs text-muted-foreground">{t('staff.vacation_help')}</p>
         </div>
       ))}
-      {fieldRow('Retail commission (%)', (
+      {fieldRow(t('staff.retail_commission'), (
         <div className="space-y-1">
           <Input type="number" step="0.1" value={retailPct} onChange={e => setRetailPct(e.target.value)} className="w-24" />
           <p className="text-xs text-muted-foreground">% of retail product revenue (pre-tax)</p>
@@ -577,9 +581,9 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
 
       <div className="pt-4">
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? 'Saving…' : 'Save Compensation'}
+          {mutation.isPending ? t('common.saving') : t('staff.save_compensation')}
         </Button>
-        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">Saved</span>}
+        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">{t('common.saved')}</span>}
       </div>
     </div>
   )
@@ -588,6 +592,7 @@ function CompensationTab({ provider }: { provider: ProviderDetail }) {
 // ── HR & Banking Tab ──────────────────────────────────────────────────────────
 
 function HRBankingTab({ provider }: { provider: ProviderDetail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [form, setForm] = useState({
     hire_date: provider.hire_date ?? '',
@@ -632,15 +637,15 @@ function HRBankingTab({ provider }: { provider: ProviderDetail }) {
 
   return (
     <div className="max-w-2xl space-y-1">
-      {sectionTitle('Employment')}
-      {fieldRow('Hire date', <Input type="date" value={form.hire_date} onChange={e => set('hire_date', e.target.value)} />)}
-      {fieldRow('First day worked', <Input type="date" value={form.first_day_worked} onChange={e => set('first_day_worked', e.target.value)} />)}
-      {fieldRow('Certification', (
+      {sectionTitle(t('staff.section_employment'))}
+      {fieldRow(t('staff.hire_date'), <Input type="date" value={form.hire_date} onChange={e => set('hire_date', e.target.value)} />)}
+      {fieldRow(t('staff.first_day'), <Input type="date" value={form.first_day_worked} onChange={e => set('first_day_worked', e.target.value)} />)}
+      {fieldRow(t('staff.certification'), (
         <div className="space-y-1">
-          <Input value={form.certification} onChange={e => set('certification', e.target.value)} placeholder="e.g. Ontario College of Trades" />
+          <Input value={form.certification} onChange={e => set('certification', e.target.value)} placeholder={t('staff.certification_placeholder')} />
         </div>
       ))}
-      {fieldRow('SIN', (
+      {fieldRow(t('staff.sin_label'), (
         <div className="space-y-1">
           <Input
             type="password"
@@ -653,10 +658,10 @@ function HRBankingTab({ provider }: { provider: ProviderDetail }) {
         </div>
       ))}
 
-      {sectionTitle('Banking (Direct Deposit)')}
-      {fieldRow('Institution # (3 digits)', <Input value={form.bank_institution_no} onChange={e => set('bank_institution_no', e.target.value)} maxLength={3} className="w-24" />)}
-      {fieldRow('Transit # (5 digits)', <Input value={form.bank_transit_no} onChange={e => set('bank_transit_no', e.target.value)} maxLength={5} className="w-28" />)}
-      {fieldRow('Account number', (
+      {sectionTitle(t('staff.section_banking'))}
+      {fieldRow(t('staff.institution_label'), <Input value={form.bank_institution_no} onChange={e => set('bank_institution_no', e.target.value)} maxLength={3} className="w-24" />)}
+      {fieldRow(t('staff.transit_label'), <Input value={form.bank_transit_no} onChange={e => set('bank_transit_no', e.target.value)} maxLength={5} className="w-28" />)}
+      {fieldRow(t('staff.account_label'), (
         <div className="space-y-1">
           <Input
             type="password"
@@ -669,50 +674,50 @@ function HRBankingTab({ provider }: { provider: ProviderDetail }) {
         </div>
       ))}
 
-      {sectionTitle('Tax (Paytrak)')}
-      {fieldRow('Province of taxation', (
+      {sectionTitle(t('staff.section_tax'))}
+      {fieldRow(t('staff.province_tax'), (
         <Input value={form.province_of_taxation} onChange={e => set('province_of_taxation', e.target.value)} maxLength={2} placeholder="ON" className="w-20" />
       ))}
-      {fieldRow('CPP exempt', (
+      {fieldRow(t('staff.cpp_exempt'), (
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input type="checkbox" checked={form.cpp_exempt} onChange={e => set('cpp_exempt', e.target.checked)} className="accent-primary" />
-          Yes
+          {t('common.yes')}
         </label>
       ))}
-      {fieldRow('EI exempt', (
+      {fieldRow(t('staff.ei_exempt'), (
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input type="checkbox" checked={form.ei_exempt} onChange={e => set('ei_exempt', e.target.checked)} className="accent-primary" />
-          Yes
+          {t('common.yes')}
         </label>
       ))}
-      {fieldRow('EI rate type', (
+      {fieldRow(t('staff.ei_rate'), (
         <select
           value={form.ei_rate_type}
           onChange={e => set('ei_rate_type', e.target.value)}
           className="border border-input rounded-md px-3 py-2 text-sm bg-background"
         >
-          <option value="normal">Normal</option>
-          <option value="reduced">Reduced</option>
+          <option value="normal">{t('staff.ei_normal')}</option>
+          <option value="reduced">{t('staff.ei_reduced')}</option>
         </select>
       ))}
-      {fieldRow('WCB / CSST exempt', (
+      {fieldRow(t('staff.wcb_exempt'), (
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input type="checkbox" checked={form.wcb_csst_exempt} onChange={e => set('wcb_csst_exempt', e.target.checked)} className="accent-primary" />
-          Yes
+          {t('common.yes')}
         </label>
       ))}
-      {fieldRow('TD1 federal credit ($)', (
+      {fieldRow(t('staff.td1_federal'), (
         <Input type="number" step="0.01" value={form.td1_federal_credit} onChange={e => set('td1_federal_credit', e.target.value)} className="w-36" />
       ))}
-      {fieldRow('TD1 provincial credit ($)', (
+      {fieldRow(t('staff.td1_provincial'), (
         <Input type="number" step="0.01" value={form.td1_provincial_credit} onChange={e => set('td1_provincial_credit', e.target.value)} className="w-36" />
       ))}
 
       <div className="pt-4">
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? 'Saving…' : 'Save HR & Banking'}
+          {mutation.isPending ? t('common.saving') : t('staff.save_hr')}
         </Button>
-        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">Saved</span>}
+        {mutation.isSuccess && <span className="ml-3 text-sm text-emerald-600">{t('common.saved')}</span>}
       </div>
     </div>
   )
@@ -754,6 +759,7 @@ function fmt(n: number) {
 }
 
 function PaystubPanel({ provider }: { provider: ProviderDetail }) {
+  const { t } = useTranslation()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -767,7 +773,7 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
   if (!provider.pay_type) {
     return (
       <div className="text-sm text-muted-foreground">
-        Pay type not configured. Set it in the Compensation tab first.
+        {t('staff.pay_type_not_configured')}
       </div>
     )
   }
@@ -811,7 +817,7 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
         <span className="text-xs text-muted-foreground">Pay period: {MONTH_NAMES[month-1]} {year}</span>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Calculating…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">{t('reports.calculating')}</p>}
       {isError && (
         <p className="text-sm text-destructive">
           {(error as Error)?.message ?? 'Could not load payroll data'}
@@ -823,11 +829,11 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
           <div className="bg-muted/30 px-4 py-3 border-b flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">{data.display_name} — {MONTH_NAMES[data.month - 1]} {data.year}</p>
-              <p className="text-xs text-muted-foreground capitalize">{data.pay_type} pay</p>
+              <p className="text-xs text-muted-foreground capitalize">{t('staff.payroll_pay_type', { pay_type: data.pay_type })}</p>
             </div>
             <div className="text-right">
               <p className="text-lg font-semibold">{fmt(data.gross_pay)}</p>
-              <p className="text-xs text-muted-foreground">Gross incl. vacation</p>
+              <p className="text-xs text-muted-foreground">{t('staff.payroll_gross_incl')}</p>
             </div>
           </div>
 
@@ -835,35 +841,35 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
             <tbody className="px-4">
               <tr><td className="w-4" /><td /></tr>
 
-              {section('Hours')}
-              {row('Scheduled hours', `${data.scheduled_hours} h`)}
-              {data.hourly_minimum && row(`Hourly floor (${data.scheduled_hours} h × ${fmt(data.hourly_minimum)})`, fmt(data.hourly_floor_amount))}
+              {section(t('staff.section_hours'))}
+              {row(t('staff.scheduled_hours'), `${data.scheduled_hours} h`)}
+              {data.hourly_minimum && row(`${t('staff.hourly_floor_label')} (${data.scheduled_hours} h × ${fmt(data.hourly_minimum)})`, fmt(data.hourly_floor_amount))}
 
               {data.pay_type === 'commission' && (
                 <>
-                  {section('Service Revenue')}
-                  {row(`Styling / other (${data.styling_item_count} items)`, fmt(data.styling_revenue))}
-                  {row(`Colour (${data.colour_item_count} items)`, fmt(data.colour_revenue))}
-                  {row('Gross service revenue', fmt(data.gross_service_revenue), true)}
+                  {section(t('staff.section_service_revenue'))}
+                  {row(`${t('staff.styling_label')} (${data.styling_item_count} items)`, fmt(data.styling_revenue))}
+                  {row(`${t('staff.colour_label')} (${data.colour_item_count} items)`, fmt(data.colour_revenue))}
+                  {row(t('staff.gross_service'), fmt(data.gross_service_revenue), true)}
 
-                  {section('Product Fees')}
+                  {section(t('staff.section_product_fees'))}
                   {data.styling_product_fee > 0 && row(`Styling (${data.styling_item_count} × flat fee)`, `(${fmt(data.styling_product_fee)})`)}
                   {data.colour_product_fee > 0 && row(`Colour (${data.commission_tier_applied?.rate_pct ?? 0}% of colour revenue)`, `(${fmt(data.colour_product_fee)})`)}
-                  {row('Net service revenue', fmt(data.net_service_revenue), true)}
+                  {row(t('staff.net_service'), fmt(data.net_service_revenue), true)}
 
-                  {section('Commission')}
+                  {section(t('staff.section_commission'))}
                   {data.commission_tier_applied
-                    ? row(`Rate: ${data.commission_tier_applied.rate_pct}% (threshold ${fmt(data.commission_tier_applied.monthly_threshold)}/mo)`, fmt(data.commission_on_services))
+                    ? row(t('staff.commission_rate_format', { percent: data.commission_tier_applied.rate_pct, amount: fmt(data.commission_tier_applied.monthly_threshold) }), fmt(data.commission_on_services))
                     : row('Commission on services (no tier matched)', fmt(data.commission_on_services))
                   }
-                  {row(`Retail (${fmt(data.retail_revenue)} × ${data.commission_tier_applied ? '' : ''}${provider.retail_commission_pct ?? 10}%)`, fmt(data.retail_commission))}
-                  {row('Total commission pay', fmt(data.total_commission_pay), true)}
+                  {row(`${t('staff.section_retail')} (${fmt(data.retail_revenue)} × ${data.commission_tier_applied ? '' : ''}${provider.retail_commission_pct ?? 10}%)`, fmt(data.retail_commission))}
+                  {row(t('staff.total_commission'), fmt(data.total_commission_pay), true)}
 
-                  {section('Pay Basis')}
+                  {section(t('staff.section_pay_basis'))}
                   {row(
                     data.pay_basis === 'commission'
-                      ? 'Commission exceeds hourly floor — commission applies'
-                      : 'Hourly floor exceeds commission — floor applies',
+                      ? t('staff.commission_exceeds')
+                      : t('staff.floor_exceeds'),
                     fmt(data.gross_before_vacation),
                     true,
                   )}
@@ -873,22 +879,22 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
               {data.pay_type === 'hourly' && (
                 <>
                   {section('Pay')}
-                  {row('Hourly pay', fmt(data.hourly_floor_amount), true)}
+                  {row(t('staff.hourly_pay'), fmt(data.hourly_floor_amount), true)}
                 </>
               )}
 
               {data.pay_type === 'salary' && (
                 <>
                   {section('Pay')}
-                  {row('Annual salary ÷ 12', fmt(data.gross_before_vacation), true)}
+                  {row(t('staff.salary_calc'), fmt(data.gross_before_vacation), true)}
                 </>
               )}
 
-              {section('Vacation Pay')}
+              {section(t('staff.vacation_pay_label'))}
               {row(`${data.vacation_pct}% of ${fmt(data.gross_before_vacation)}`, fmt(data.vacation_pay))}
 
               <tr className="border-t-2 border-foreground/20">
-                <td className="py-3 text-sm font-semibold">Gross pay</td>
+                <td className="py-3 text-sm font-semibold">{t('staff.gross_pay')}</td>
                 <td className="py-3 text-sm font-semibold text-right">{fmt(data.gross_pay)}</td>
               </tr>
             </tbody>
@@ -896,9 +902,7 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
 
           <div className="bg-muted/20 px-4 py-2 border-t">
             <p className="text-[10px] text-muted-foreground">
-              Hours from scheduled calendar. Service revenue from completed sales in this period.
-              Retail attributed to sales containing this provider's service items.
-              Gross pay is before statutory deductions (CPP, EI, income tax).
+              {t('staff.payroll_help')}
             </p>
           </div>
         </div>
@@ -910,6 +914,7 @@ function PaystubPanel({ provider }: { provider: ProviderDetail }) {
 // ── Add Provider Dialog ───────────────────────────────────────────────────────
 
 function AddProviderDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [form, setForm] = useState({
     first_name: '',
@@ -952,50 +957,50 @@ function AddProviderDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Staff Member</DialogTitle>
+          <DialogTitle>{t('staff.add_staff_title')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>First name *</Label>
+              <Label>{t('auth.first_name')} *</Label>
               <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Last name</Label>
+              <Label>{t('auth.last_name')}</Label>
               <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Display name *</Label>
+            <Label>{t('staff.display_name_label')} *</Label>
             <Input value={form.display_name} onChange={e => set('display_name', e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label>Job title</Label>
-            <Input value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder="e.g. Senior Stylist" />
+            <Label>{t('staff.job_title_label')}</Label>
+            <Input value={form.job_title} onChange={e => set('job_title', e.target.value)} placeholder={t('staff.job_title_placeholder')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Type *</Label>
+              <Label>{t('staff.type_label')} *</Label>
               <select
                 value={form.provider_type}
                 onChange={e => set('provider_type', e.target.value)}
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
               >
-                <option value="stylist">Stylist</option>
-                <option value="colourist">Colourist</option>
-                <option value="dualist">Dualist</option>
+                <option value="stylist">{t('staff.type_stylist')}</option>
+                <option value="colourist">{t('staff.type_colourist')}</option>
+                <option value="dualist">{t('staff.type_dualist')}</option>
               </select>
             </div>
             <div className="space-y-1">
-              <Label>Booking order</Label>
+              <Label>{t('staff.booking_order')}</Label>
               <Input type="number" value={form.booking_order} onChange={e => set('booking_order', e.target.value)} />
             </div>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
           <Button onClick={() => mutation.mutate()} disabled={!valid || mutation.isPending}>
-            {mutation.isPending ? 'Creating…' : 'Create'}
+            {mutation.isPending ? t('staff.creating') : t('common.create')}
           </Button>
         </div>
       </DialogContent>
@@ -1006,6 +1011,7 @@ function AddProviderDialog({ onClose, onCreated }: { onClose: () => void; onCrea
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function StaffManagementPage() {
+  const { t } = useTranslation()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('profile')
   const [showAdd, setShowAdd] = useState(false)
@@ -1038,10 +1044,10 @@ export default function StaffManagementPage() {
   })
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'profile', label: 'Profile' },
-    { key: 'hr', label: 'HR & Banking' },
-    { key: 'schedule', label: 'Schedule' },
-    { key: 'payroll', label: 'Payroll' },
+    { key: 'profile', label: t('staff.tab_profile') },
+    { key: 'hr', label: t('staff.tab_hr_banking') },
+    { key: 'schedule', label: t('staff.tab_schedule') },
+    { key: 'payroll', label: t('staff.tab_payroll') },
   ]
 
   return (
@@ -1049,13 +1055,13 @@ export default function StaffManagementPage() {
       {/* Provider List */}
       <div className="w-64 flex-shrink-0 bg-white border-r flex flex-col">
         <div className="px-4 py-3 border-b flex items-center justify-between">
-          <h1 className="font-semibold text-sm">Staff</h1>
+          <h1 className="font-semibold text-sm">{t('staff.page_title')}</h1>
           <Button size="sm" variant="ghost" onClick={() => setShowAdd(true)}>
             <Plus size={15} />
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto py-2">
-          {isLoading && <p className="px-4 py-2 text-xs text-muted-foreground">Loading…</p>}
+          {isLoading && <p className="px-4 py-2 text-xs text-muted-foreground">{t('common.loading')}</p>}
           {providers.map(p => (
             <button
               key={p.id}
@@ -1096,7 +1102,7 @@ export default function StaffManagementPage() {
                   <h2 className="font-semibold text-base">{selected.display_name}</h2>
                   {typeBadge(selected.provider_type)}
                   {selected.is_owner && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Owner</span>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('staff.owner')}</span>
                   )}
                 </div>
                 {selected.job_title && <p className="text-xs text-muted-foreground">{selected.job_title}</p>}
@@ -1109,7 +1115,7 @@ export default function StaffManagementPage() {
                 className="text-muted-foreground hover:text-destructive"
                 onClick={() => setConfirmDeactivate(true)}
               >
-                Deactivate
+                {t('staff.deactivate')}
               </Button>
             ) : (
               <Button
@@ -1119,7 +1125,7 @@ export default function StaffManagementPage() {
                 onClick={() => reactivateMutation.mutate()}
                 disabled={reactivateMutation.isPending}
               >
-                {reactivateMutation.isPending ? 'Reactivating…' : 'Reactivate'}
+                {reactivateMutation.isPending ? t('staff.reactivating') : t('staff.reactivate')}
               </Button>
             )}
           </div>
@@ -1127,17 +1133,17 @@ export default function StaffManagementPage() {
           {/* Tabs */}
           <div className="bg-white border-b px-6">
             <div className="flex gap-0">
-              {TABS.map(t => (
+              {TABS.map(tabItem => (
                 <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
+                  key={tabItem.key}
+                  onClick={() => setTab(tabItem.key)}
                   className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
-                    tab === t.key
+                    tab === tabItem.key
                       ? 'border-foreground text-foreground font-medium'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {t.label}
+                  {tabItem.label}
                 </button>
               ))}
             </div>
@@ -1153,7 +1159,7 @@ export default function StaffManagementPage() {
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Select a staff member
+          {t('staff.select_staff')}
         </div>
       )}
 
@@ -1169,20 +1175,20 @@ export default function StaffManagementPage() {
         <Dialog open onOpenChange={open => { if (!open) setConfirmDeactivate(false) }}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Deactivate {selected.display_name}?</DialogTitle>
+              <DialogTitle>{t('staff.confirm_deactivate', { name: selected.display_name })}</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground py-2">
-              They will be hidden from booking and scheduling. This cannot be done if they have upcoming confirmed appointments.
+              {t('staff.confirm_deactivate_text')}
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setConfirmDeactivate(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setConfirmDeactivate(false)}>{t('common.cancel')}</Button>
               <Button
                 variant="ghost"
                 className="text-destructive hover:text-destructive"
                 onClick={() => deactivateMutation.mutate()}
                 disabled={deactivateMutation.isPending}
               >
-                {deactivateMutation.isPending ? 'Deactivating…' : 'Deactivate'}
+                {deactivateMutation.isPending ? 'Deactivating…' : t('staff.deactivate')}
               </Button>
             </div>
           </DialogContent>

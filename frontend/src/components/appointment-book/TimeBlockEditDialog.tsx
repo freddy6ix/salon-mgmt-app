@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createTimeBlock, updateTimeBlock, deleteTimeBlock, type TimeBlock } from '@/api/timeBlocks'
 import type { Provider } from '@/api/providers'
@@ -26,6 +27,7 @@ function timeFromIso(iso: string): string {
 }
 
 export default function TimeBlockEditDialog({ block, creating, date, providers, onClose }: Props) {
+  const { t } = useTranslation()
   const open = block !== null || creating !== null
   const isEdit = block !== null
   const qc = useQueryClient()
@@ -83,9 +85,9 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
   })
 
   function submit() {
-    if (!providerId) { setError('Pick a provider'); return }
+    if (!providerId) { setError(t('appt.time_block_pick_provider')); return }
     const dur = parseInt(duration, 10)
-    if (!dur || dur < 5) { setError('Duration must be at least 5 minutes'); return }
+    if (!dur || dur < 5) { setError(t('appt.time_block_min_duration')); return }
     setError(null)
     saveMut.mutate()
   }
@@ -94,18 +96,18 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit time block' : 'New time block'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('appt.time_block_edit_title') : t('appt.time_block_new_title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label>Provider</Label>
+            <Label>{t('appt.provider_label')}</Label>
             <select
               value={providerId}
               onChange={e => setProviderId(e.target.value)}
               className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
             >
-              <option value="">Select…</option>
+              <option value="">{t('services.select_placeholder')}</option>
               {providers.map(p => (
                 <option key={p.id} value={p.id}>{p.display_name}</option>
               ))}
@@ -114,7 +116,7 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Start time</Label>
+              <Label>{t('appt.start_time')}</Label>
               <input
                 type="time"
                 value={time}
@@ -123,7 +125,7 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
               />
             </div>
             <div>
-              <Label>Duration (min)</Label>
+              <Label>{t('appt.time_block_duration')}</Label>
               <input
                 type="number" min={5}
                 value={duration}
@@ -134,12 +136,12 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
           </div>
 
           <div>
-            <Label>Note <span className="text-muted-foreground font-normal">— shown on the grid</span></Label>
+            <Label>{t('appt.time_block_note')}</Label>
             <textarea
               rows={2}
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Lunch, training, sick…"
+              placeholder={t('appt.time_block_placeholder')}
               className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background resize-none"
             />
           </div>
@@ -148,7 +150,7 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
 
           <div className="flex gap-2 pt-2 border-t">
             <Button onClick={submit} disabled={saveMut.isPending} className="flex-1">
-              {saveMut.isPending ? 'Saving…' : isEdit ? 'Save' : 'Create block'}
+              {saveMut.isPending ? t('common.saving') : isEdit ? t('common.save') : t('appt.time_block_create')}
             </Button>
             {isEdit && (
               <Button
@@ -156,10 +158,10 @@ export default function TimeBlockEditDialog({ block, creating, date, providers, 
                 onClick={() => deleteMut.mutate()}
                 disabled={deleteMut.isPending}
               >
-                Delete
+                {t('common.delete')}
               </Button>
             )}
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
           </div>
         </div>
       </DialogContent>

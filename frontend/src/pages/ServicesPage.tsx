@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   listServicesFull,
   createService,
@@ -30,6 +31,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export default function ServicesPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['services-full'],
@@ -77,13 +79,13 @@ export default function ServicesPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Services</h1>
+            <h1 className="text-xl font-semibold">{t('services.page_title')}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              The catalog of services this salon offers. Each service can be assigned to one or more providers, optionally with a price or duration override.
+              {t('services.page_description')}
             </p>
           </div>
           <Button size="sm" onClick={() => setCreating(true)} disabled={categories.length === 0}>
-            <Plus size={14} className="mr-1.5" /> New service
+            <Plus size={14} className="mr-1.5" /> {t('services.new_service')}
           </Button>
         </div>
 
@@ -95,7 +97,7 @@ export default function ServicesPage() {
           >
             <span className="flex items-center gap-2">
               {showCategories ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              Categories ({categories.length})
+              {t('services.categories_section', { count: categories.length })}
             </span>
           </button>
           {showCategories && <CategoryManager categories={categories} onChanged={refresh} />}
@@ -103,13 +105,13 @@ export default function ServicesPage() {
 
         {/* Services list */}
         {servicesLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : services.length === 0 ? (
           <div className="border rounded-lg p-8 bg-white text-center">
             <p className="text-sm text-muted-foreground">
               {categories.length === 0
-                ? 'Create a category first, then add services.'
-                : 'No services yet. Click "New service" to add one.'}
+                ? t('services.create_category_first')
+                : t('services.no_services')}
             </p>
           </div>
         ) : (
@@ -131,7 +133,7 @@ export default function ServicesPage() {
                   {!isCollapsed && (
                     <div className="divide-y">
                       {rows.length === 0 && (
-                        <p className="px-5 py-3 text-sm text-muted-foreground italic">No services in this category</p>
+                        <p className="px-5 py-3 text-sm text-muted-foreground italic">{t('services.no_services_in_category')}</p>
                       )}
                       {rows.map(svc => (
                         <button
@@ -145,7 +147,7 @@ export default function ServicesPage() {
                           </span>
                           <span className="col-span-2 text-sm text-muted-foreground">{svc.duration_minutes} min</span>
                           <span className={`col-span-2 text-xs ${svc.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            {svc.is_active ? '● Active' : '○ Inactive'}
+                            {svc.is_active ? t('services.status_active') : t('services.status_inactive')}
                           </span>
                         </button>
                       ))}
@@ -183,6 +185,7 @@ function groupByCategory(services: ServiceDetail[], categories: ServiceCategory[
 // ── Category manager ─────────────────────────────────────────────────────────
 
 function CategoryManager({ categories, onChanged }: { categories: ServiceCategory[]; onChanged: () => void }) {
+  const { t } = useTranslation()
   const [newName, setNewName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -201,11 +204,11 @@ function CategoryManager({ categories, onChanged }: { categories: ServiceCategor
         <input
           value={newName}
           onChange={e => setNewName(e.target.value)}
-          placeholder="New category name"
+          placeholder={t('services.new_category_name')}
           className="flex-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
         />
         <Button size="sm" onClick={() => createMut.mutate()} disabled={!newName.trim() || createMut.isPending}>
-          {createMut.isPending ? '…' : 'Add'}
+          {createMut.isPending ? '…' : t('common.add')}
         </Button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -214,6 +217,7 @@ function CategoryManager({ categories, onChanged }: { categories: ServiceCategor
 }
 
 function CategoryRow({ category, onSaved }: { category: ServiceCategory; onSaved: () => void }) {
+  const { t } = useTranslation()
   const [name, setName] = useState(category.name)
   const [isActive, setIsActive] = useState(category.is_active)
   const dirty = name !== category.name || isActive !== category.is_active
@@ -237,10 +241,10 @@ function CategoryRow({ category, onSaved }: { category: ServiceCategory; onSaved
           onChange={e => setIsActive(e.target.checked)}
           className="h-3.5 w-3.5"
         />
-        Active
+        {t('common.active')}
       </label>
       <Button size="sm" variant="outline" disabled={!dirty || mut.isPending} onClick={() => mut.mutate()}>
-        {mut.isPending ? '…' : 'Save'}
+        {mut.isPending ? '…' : t('common.save')}
       </Button>
     </div>
   )
@@ -256,6 +260,7 @@ interface EditDialogProps {
 }
 
 function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDialogProps) {
+  const { t } = useTranslation()
   const isCreate = serviceId === null
   // The list endpoint already returns full ServiceDetail, so we read from the
   // react-query cache rather than re-fetching by id.
@@ -279,20 +284,20 @@ function ServiceEditDialog({ serviceId, categories, onClose, onSaved }: EditDial
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>{isCreate ? 'New service' : initial?.name ?? 'Service'}</DialogTitle>
+          <DialogTitle>{isCreate ? t('services.new_service_title') : initial?.name ?? 'Service'}</DialogTitle>
         </DialogHeader>
 
         <div className="flex border-b -mx-6 px-6">
-          {(['details', 'providers'] as const).map(t => (
+          {(['details', 'providers'] as const).map(tabKey => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              disabled={t === 'providers' && isCreate}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
+              disabled={tabKey === 'providers' && isCreate}
               className={`px-4 py-2 text-sm border-b-2 -mb-px capitalize transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                tab === t ? 'border-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
+                tab === tabKey ? 'border-foreground font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t}
+              {tabKey === 'details' ? t('services.tab_details') : t('services.tab_providers')}
             </button>
           ))}
         </div>
@@ -331,6 +336,7 @@ function DetailsForm({
   onSaved: (svc: ServiceDetail | null) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState({
     name: initial?.name ?? '',
     service_code: initial?.service_code ?? '',
@@ -395,7 +401,7 @@ function DetailsForm({
     <div className="py-4 space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <Label>Name</Label>
+          <Label>{t('common.name')}</Label>
           <input
             value={form.name}
             onChange={e => set('name', e.target.value)}
@@ -404,29 +410,29 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Category</Label>
+          <Label>{t('services.category_label')}</Label>
           <select
             value={form.category_id}
             onChange={e => set('category_id', e.target.value)}
             className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
           >
-            <option value="">Select…</option>
+            <option value="">{t('services.select_placeholder')}</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <Label>Code <span className="text-muted-foreground font-normal">(auto from name)</span></Label>
+          <Label>{t('services.code_label')}</Label>
           <input
             value={form.service_code}
             onChange={e => set('service_code', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
             className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background font-mono"
-            placeholder="auto"
+            placeholder={t('services.code_default')}
           />
         </div>
         <div className="col-span-2">
-          <Label>Description</Label>
+          <Label>{t('services.description_label')}</Label>
           <textarea
             rows={2}
             value={form.description}
@@ -435,7 +441,7 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Default price ($)</Label>
+          <Label>{t('services.default_price')}</Label>
           <input
             type="text" inputMode="decimal"
             value={form.default_price}
@@ -445,7 +451,7 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Default cost ($) <span className="text-muted-foreground font-normal">— optional</span></Label>
+          <Label>{t('services.default_cost')}</Label>
           <input
             type="text" inputMode="decimal"
             value={form.default_cost}
@@ -455,7 +461,7 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Duration (min)</Label>
+          <Label>{t('services.duration_label')}</Label>
           <input
             type="number" min={5}
             value={form.duration_minutes}
@@ -464,18 +470,18 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Pricing type</Label>
+          <Label>{t('services.pricing_type')}</Label>
           <select
             value={form.pricing_type}
             onChange={e => set('pricing_type', e.target.value as PricingType)}
             className="w-full mt-1 border border-input rounded-md px-2 py-1.5 text-sm bg-background"
           >
-            <option value="fixed">Fixed</option>
-            <option value="hourly">Hourly</option>
+            <option value="fixed">{t('services.pricing_fixed')}</option>
+            <option value="hourly">{t('services.pricing_hourly')}</option>
           </select>
         </div>
         <div>
-          <Label>Processing offset (min) <span className="text-muted-foreground font-normal">— when processing begins</span></Label>
+          <Label>{t('services.processing_offset')}</Label>
           <input
             type="number" min={0}
             value={form.processing_offset_minutes}
@@ -484,7 +490,7 @@ function DetailsForm({
           />
         </div>
         <div>
-          <Label>Processing duration (min) <span className="text-muted-foreground font-normal">— gap, free for other clients</span></Label>
+          <Label>{t('services.processing_duration')}</Label>
           <input
             type="number" min={0}
             value={form.processing_duration_minutes}
@@ -495,15 +501,15 @@ function DetailsForm({
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-2 border-t">
-        <Toggle label="Active" value={form.is_active} onChange={v => set('is_active', v)} />
-        <Toggle label="Requires consultation" value={form.requires_prior_consultation} onChange={v => set('requires_prior_consultation', v)} />
+        <Toggle label={t('services.active_checkbox')} value={form.is_active} onChange={v => set('is_active', v)} />
+        <Toggle label={t('services.consultation_checkbox')} value={form.requires_prior_consultation} onChange={v => set('requires_prior_consultation', v)} />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-2 pt-2 border-t">
         <Button onClick={submit} disabled={saveMut.isPending} className="flex-1">
-          {saveMut.isPending ? 'Saving…' : isCreate ? 'Create service' : 'Save changes'}
+          {saveMut.isPending ? t('common.saving') : isCreate ? t('services.create_service') : t('services.save_changes')}
         </Button>
         {!isCreate && initial?.is_active && (
           <Button
@@ -511,10 +517,10 @@ function DetailsForm({
             onClick={() => deactivateMut.mutate()}
             disabled={deactivateMut.isPending}
           >
-            Deactivate
+            {t('services.deactivate')}
           </Button>
         )}
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
       </div>
     </div>
   )
@@ -537,6 +543,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 // ── Providers tab ────────────────────────────────────────────────────────────
 
 function ProvidersMatrix({ service }: { service: ServiceDetail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: providers = [] } = useQuery({
     queryKey: ['providers'],
@@ -552,7 +559,7 @@ function ProvidersMatrix({ service }: { service: ServiceDetail }) {
   return (
     <div className="py-4 space-y-2">
       <p className="text-xs text-muted-foreground">
-        Check the providers who offer this service. Override the price or duration if it differs from the default
+        {t('services.providers_subtitle')}
         (${service.default_price ? parseFloat(service.default_price).toFixed(2) : '—'} / {service.duration_minutes} min).
       </p>
       {providers.map(p => {
@@ -568,7 +575,7 @@ function ProvidersMatrix({ service }: { service: ServiceDetail }) {
         )
       })}
       {providers.length === 0 && (
-        <p className="text-sm text-muted-foreground italic">No providers yet.</p>
+        <p className="text-sm text-muted-foreground italic">{t('services.no_providers')}</p>
       )}
     </div>
   )
@@ -582,6 +589,7 @@ function ProviderMatrixRow({
   existing: ProviderServicePrice | null
   onChanged: () => void
 }) {
+  const { t } = useTranslation()
   const [enabled, setEnabled] = useState(!!existing)
   const [price, setPrice] = useState(existing?.price ?? service.default_price ?? '')
   // Empty string = use service default. Number string = override.
@@ -664,7 +672,7 @@ function ProviderMatrixRow({
       </label>
       {enabled && (
         <>
-          <Field label="$" title="Price (overrides service default)">
+          <Field label="$" title={t('services.price_override')}>
             <input
               type="text" inputMode="decimal"
               value={price}
@@ -672,7 +680,7 @@ function ProviderMatrixRow({
               className={`w-20 border rounded px-2 py-1 text-sm bg-background ${!priceValid && price !== '' ? 'border-destructive' : 'border-input'}`}
             />
           </Field>
-          <Field label="min" title="Duration override (blank = use service default)" trailing>
+          <Field label="min" title={t('services.duration_override')} trailing>
             <input
               type="number" min={5}
               value={duration}
@@ -701,7 +709,7 @@ function ProviderMatrixRow({
           </Field>
           {dirty && (
             <Button size="sm" variant="outline" onClick={() => updateMut.mutate()} disabled={updateMut.isPending}>
-              {updateMut.isPending ? '…' : 'Save'}
+              {updateMut.isPending ? '…' : t('common.save')}
             </Button>
           )}
         </>

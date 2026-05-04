@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { format, addDays } from 'date-fns'
 import { Send, Printer, ClipboardCopy, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getPayrollReport, sendPayrollEmail, type ProviderPayrollLine } from '@/api/providers'
 import { getPayrollConfig } from '@/api/admin'
 import { Button } from '@/components/ui/button'
@@ -128,18 +129,19 @@ function ReviewTable({
   editable: EditableLine[]
   onChange: (id: string, patch: Partial<EditableLine>) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="overflow-auto border rounded-lg">
       <table className="w-full text-sm">
         <thead className="bg-muted/30 border-b">
           <tr>
-            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">Name</th>
-            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">Basis</th>
-            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Hours</th>
-            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Svc Commission ($)</th>
-            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Retail Commission ($)</th>
-            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Vac %</th>
-            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Gross Pay ($)</th>
+            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_name')}</th>
+            <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_basis')}</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_hours')}</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_svc_commission')}</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_retail_commission')}</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_vac')}</th>
+            <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">{t('reports.col_gross_pay')}</th>
           </tr>
         </thead>
         <tbody>
@@ -155,7 +157,7 @@ function ReviewTable({
                 <td className="px-4 py-2">
                   <span className="font-medium">{el.first_name} {el.last_name}</span>
                   {el.is_owner && (
-                    <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Owner</span>
+                    <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{t('reports.col_owner')}</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-muted-foreground capitalize text-xs">{el.pay_basis}</td>
@@ -214,6 +216,7 @@ function ReviewTable({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function PayrollReportPage() {
+  const { t } = useTranslation()
   const defaults = defaultPeriod()
   const [periodStart, setPeriodStart] = useState(defaults.start)
   const [periodEnd, setPeriodEnd] = useState(defaults.end)
@@ -310,7 +313,7 @@ export default function PayrollReportPage() {
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="bg-white border-b px-6 py-3 flex items-center gap-4">
-        <h1 className="font-semibold text-base">Payroll Report</h1>
+        <h1 className="font-semibold text-base">{t('reports.payroll_title')}</h1>
         <span className="text-sm text-muted-foreground">Paytrak</span>
       </header>
 
@@ -320,36 +323,36 @@ export default function PayrollReportPage() {
         <div className="space-y-5">
           {/* Period controls */}
           <div className="bg-white border rounded-lg p-4 space-y-4">
-            <h2 className="text-sm font-semibold">Pay Period</h2>
+            <h2 className="text-sm font-semibold">{t('reports.pay_period')}</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Period start</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.period_start')}</Label>
                 <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Period end</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.period_end')}</Label>
                 <Input type="date" value={periodEnd} onChange={e => {
                   setPeriodEnd(e.target.value)
                   setPaymentDate(defaultPaymentDate(e.target.value))
                 }} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Payment date</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.payment_date')}</Label>
                 <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
               </div>
               <div className="flex items-end">
                 <Button onClick={handleCalculate} disabled={isLoading} className="w-full gap-2">
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-                  {isLoading ? 'Calculating…' : 'Calculate'}
+                  {isLoading ? t('reports.calculating') : t('reports.calculate')}
                 </Button>
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Stat holiday / notes (added after opening paragraph)</Label>
+              <Label className="text-xs text-muted-foreground">{t('reports.stat_holiday')}</Label>
               <Input
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. Please add a statutory holiday (Good Friday) for everyone but Jong Joung."
+                placeholder={t('reports.stat_holiday_placeholder')}
               />
             </div>
           </div>
@@ -358,19 +361,19 @@ export default function PayrollReportPage() {
           {editableLines.length > 0 && (
             <div className="bg-white border rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Review — adjust amounts if needed</h2>
-                <span className="text-xs text-muted-foreground">Changes update the email preview automatically</span>
+                <h2 className="text-sm font-semibold">{t('reports.review_section')}</h2>
+                <span className="text-xs text-muted-foreground">{t('reports.review_subtitle')}</span>
               </div>
 
               {owners.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Owner</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('reports.col_owner')}</p>
                   <ReviewTable editable={owners} onChange={updateLine} />
                 </div>
               )}
               {staff.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Staff</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('reports.col_staff')}</p>
                   <ReviewTable editable={staff} onChange={updateLine} />
                 </div>
               )}
@@ -381,33 +384,33 @@ export default function PayrollReportPage() {
         {/* ── Right: Email composer ── */}
         <div className="space-y-5">
           <div className="bg-white border rounded-lg p-4 space-y-4">
-            <h2 className="text-sm font-semibold">Email</h2>
+            <h2 className="text-sm font-semibold">{t('reports.email_section')}</h2>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">To</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.to_label')}</Label>
                 <Input value={toEmail} onChange={e => setToEmail(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Paytrak client ID</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.paytrak_id')}</Label>
                 <Input value={clientId} onChange={e => setClientId(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Subject</Label>
+              <Label className="text-xs text-muted-foreground">{t('reports.subject_label')}</Label>
               <Input value={subject} readOnly className="bg-muted/30 text-muted-foreground" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Signature name</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.signature_label')}</Label>
                 <Input value={signature} onChange={e => setSignature(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Footer (after --)</Label>
+              <Label className="text-xs text-muted-foreground">{t('reports.footer_label')}</Label>
               <textarea
                 value={footer}
                 onChange={e => setFooter(e.target.value)}
@@ -418,10 +421,10 @@ export default function PayrollReportPage() {
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Email body — review and edit before sending</Label>
+                <Label className="text-xs text-muted-foreground">{t('reports.email_body')}</Label>
                 <button onClick={handleCopy} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
                   <ClipboardCopy size={12} />
-                  {copied ? 'Copied!' : 'Copy'}
+                  {copied ? t('common.copied') : t('common.copy')}
                 </button>
               </div>
               <textarea
@@ -440,11 +443,11 @@ export default function PayrollReportPage() {
                 className="gap-2"
               >
                 <Send size={14} />
-                {sendMutation.isPending ? 'Sending…' : 'Send to Paytrak'}
+                {sendMutation.isPending ? t('common.sending') : t('reports.send_paytrak')}
               </Button>
               <Button variant="ghost" onClick={handlePrint} className="gap-2">
                 <Printer size={14} />
-                Print / Save PDF
+                {t('reports.print_pdf')}
               </Button>
             </div>
 

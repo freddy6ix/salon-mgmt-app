@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { resetPassword } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 
@@ -8,6 +9,7 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate()
   const token = params.get('token') ?? ''
 
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -22,11 +24,11 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError(null)
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('auth.password_too_short'))
       return
     }
     if (password !== confirm) {
-      setError('Passwords do not match')
+      setError(t('auth.passwords_no_match'))
       return
     }
     setLoading(true)
@@ -76,60 +78,60 @@ export default function ResetPasswordPage() {
           {!token ? (
             <div className="text-center space-y-3">
               <h1 className="text-3xl font-light" style={{ fontFamily: 'var(--font-display)' }}>
-                Invalid reset link
+                {t('auth.reset_invalid_link')}
               </h1>
-              <p className="text-sm text-muted-foreground">This link is missing or malformed.</p>
-              <Button variant="outline" onClick={() => navigate('/login')}>Go to login</Button>
+              <p className="text-sm text-muted-foreground">{t('auth.reset_link_malformed')}</p>
+              <Button variant="outline" onClick={() => navigate('/login')}>{t('auth.go_to_login')}</Button>
             </div>
           ) : done ? (
             <div className="text-center space-y-4">
-              <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">All set</p>
+              <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">{t('auth.reset_all_set')}</p>
               <h1 className="text-3xl font-light" style={{ fontFamily: 'var(--font-display)' }}>
-                Password set
+                {t('auth.reset_password_set')}
               </h1>
-              <p className="text-sm text-muted-foreground">You can now sign in with your new password.</p>
+              <p className="text-sm text-muted-foreground">{t('auth.reset_can_sign_in')}</p>
               <Button onClick={() => navigate('/login')} className="h-12 rounded-sm tracking-widest uppercase text-xs">
-                Go to sign in
+                {t('auth.go_to_sign_in')}
               </Button>
             </div>
           ) : (
             <>
               <div className="space-y-2 text-center lg:text-left">
-                <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">Almost there</p>
+                <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">{t('auth.reset_almost_there')}</p>
                 <h1 className="text-3xl font-light" style={{ fontFamily: 'var(--font-display)' }}>
-                  Set your password
+                  {t('auth.reset_set_password')}
                 </h1>
-                <p className="text-sm text-muted-foreground">Choose a password to activate your account.</p>
+                <p className="text-sm text-muted-foreground">{t('auth.reset_choose_password')}</p>
               </div>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="space-y-1">
-                  <label htmlFor="password" className={labelClass}>New password</label>
+                  <label htmlFor="password" className={labelClass}>{t('auth.new_password')}</label>
                   <input
                     id="password"
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder={t('auth.password_placeholder')}
                     required
                     className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="confirm" className={labelClass}>Confirm password</label>
+                  <label htmlFor="confirm" className={labelClass}>{t('auth.confirm_password')}</label>
                   <input
                     id="confirm"
                     type="password"
                     value={confirm}
                     onChange={e => setConfirm(e.target.value)}
-                    placeholder="Repeat password"
+                    placeholder={t('auth.confirm_placeholder')}
                     required
                     className={fieldClass}
                   />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button type="submit" disabled={loading} className="mt-2 h-12 rounded-sm tracking-widest uppercase text-xs">
-                  {loading ? 'Saving…' : 'Set password'}
+                  {loading ? t('common.saving') : t('auth.set_password')}
                 </Button>
               </form>
             </>

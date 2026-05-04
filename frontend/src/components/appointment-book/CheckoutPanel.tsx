@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Appointment } from '@/api/appointments'
 import { listAppointments } from '@/api/appointments'
@@ -52,6 +53,7 @@ function fmt(n: number): string {
 }
 
 export default function CheckoutPanel({ appointment, date, onClose, onCompleted }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   const { data: methods = [], isLoading: methodsLoading } = useQuery({
@@ -296,7 +298,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
         <div>
-          <h2 className="text-base font-semibold">Checkout</h2>
+          <h2 className="text-base font-semibold">{t('checkout.title')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             {appointment.client.first_name} {appointment.client.last_name}
           </p>
@@ -310,11 +312,11 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
         {/* Group checkout — extra appointments */}
         {(extraAppointments.length > 0 || addableAppointments.length > 0) && (
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Appointments</Label>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">{t('checkout.tab_appointments')}</Label>
             <div className="rounded-md border divide-y text-sm">
               <div className="px-3 py-2 flex justify-between items-center bg-muted/20">
                 <span>{appointment.client.first_name} {appointment.client.last_name}</span>
-                <span className="text-xs text-muted-foreground">primary</span>
+                <span className="text-xs text-muted-foreground">{t('checkout.role_primary')}</span>
               </div>
               {extraAppointments.map(a => (
                 <div key={a.id} className="px-3 py-2 flex justify-between items-center">
@@ -322,7 +324,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                   <button
                     onClick={() => removeExtraAppointment(a.id)}
                     className="text-xs text-muted-foreground hover:text-destructive"
-                  >remove</button>
+                  >{t('checkout.remove')}</button>
                 </div>
               ))}
             </div>
@@ -335,7 +337,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                   if (a) addAppointment(a)
                 }}
               >
-                <option value="">+ Add appointment to this sale</option>
+                <option value="">{t('checkout.add_appointment')}</option>
                 {addableAppointments.map(a => (
                   <option key={a.id} value={a.id}>
                     {a.client.first_name} {a.client.last_name} — {a.items.map(i => i.service.name).join(', ')}
@@ -349,7 +351,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
         {/* Items */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Items</Label>
+            <Label>{t('checkout.items_section')}</Label>
             {retailCatalog.length > 0 && (
               <select
                 className="text-xs border border-input rounded-md px-2 py-1 bg-background"
@@ -359,7 +361,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                   if (ri) addRetailItem(ri)
                 }}
               >
-                <option value="">+ Add retail item</option>
+                <option value="">{t('checkout.add_retail')}</option>
                 {retailCatalog.map(r => (
                   <option key={r.id} value={r.id}>{r.name} (${parseFloat(r.default_price).toFixed(2)})</option>
                 ))}
@@ -389,7 +391,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                 </div>
                 {promotions.length > 0 && (
                   <div>
-                    <label className="text-xs text-muted-foreground">Promotion</label>
+                    <label className="text-xs text-muted-foreground">{t('checkout.promotion_label')}</label>
                     <select
                       value={it.promotionId ?? ''}
                       onChange={e => {
@@ -398,7 +400,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                       }}
                       className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                     >
-                      <option value="">— none —</option>
+                      <option value="">{t('checkout.none_option')}</option>
                       {promotions.map(p => (
                         <option key={p.id} value={p.id}>
                           {p.label} ({p.kind === 'percent' ? `${p.value}%` : `$${p.value}`} off)
@@ -410,7 +412,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                 <div className={`grid gap-2 ${it.kind === 'retail' ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {it.kind === 'retail' && (
                     <div>
-                      <label className="text-xs text-muted-foreground">Qty</label>
+                      <label className="text-xs text-muted-foreground">{t('checkout.qty')}</label>
                       <input
                         type="number"
                         min={1}
@@ -421,7 +423,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                     </div>
                   )}
                   <div>
-                    <label className="text-xs text-muted-foreground">Price ($)</label>
+                    <label className="text-xs text-muted-foreground">{t('checkout.price_col')}</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -431,7 +433,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Discount ($)</label>
+                    <label className="text-xs text-muted-foreground">{t('checkout.discount_col')}</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -443,7 +445,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Line</label>
+                    <label className="text-xs text-muted-foreground">{t('checkout.line_col')}</label>
                     <div className="px-2 py-1.5 text-sm mt-0.5 font-medium">${fmt(lineTotal)}</div>
                   </div>
                 </div>
@@ -454,37 +456,37 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
 
         {/* Totals */}
         <div className="rounded-md bg-muted/40 p-3 space-y-1 text-sm">
-          <div className="flex justify-between"><span>Subtotal</span><span>${fmt(totals.subtotal)}</span></div>
+          <div className="flex justify-between"><span>{t('checkout.subtotal')}</span><span>${fmt(totals.subtotal)}</span></div>
           {totals.discountTotal > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>Discount</span><span>−${fmt(totals.discountTotal)}</span>
+              <span>{t('checkout.discount')}</span><span>−${fmt(totals.discountTotal)}</span>
             </div>
           )}
-          <div className="flex justify-between"><span>GST (5%)</span><span>${fmt(totals.gst)}</span></div>
-          <div className="flex justify-between"><span>PST (8%)</span><span>${fmt(totals.pst)}</span></div>
+          <div className="flex justify-between"><span>{t('checkout.gst')}</span><span>${fmt(totals.gst)}</span></div>
+          <div className="flex justify-between"><span>{t('checkout.pst')}</span><span>${fmt(totals.pst)}</span></div>
           <div className="flex justify-between font-semibold border-t pt-1 mt-1">
-            <span>Total</span><span>${fmt(totals.total)}</span>
+            <span>{t('checkout.total')}</span><span>${fmt(totals.total)}</span>
           </div>
         </div>
 
         {/* Payments */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Payment</Label>
+            <Label>{t('checkout.payment_section')}</Label>
             <button
               type="button"
               onClick={addPaymentRow}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
-              + Split
+              {t('checkout.split_payment')}
             </button>
           </div>
           {methodsLoading && payments.length === 0 && (
-            <p className="text-xs text-muted-foreground">Loading payment methods…</p>
+            <p className="text-xs text-muted-foreground">{t('checkout.loading_methods')}</p>
           )}
           {!methodsLoading && methods.length === 0 && (
             <p className="text-xs text-destructive">
-              No active payment methods configured. An admin must add at least one in Settings → Payment methods.
+              {t('checkout.no_payment_methods')}
             </p>
           )}
           {payments.map((p, idx) => {
@@ -523,7 +525,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                   )}
                 </div>
                 <div className="flex gap-2 items-center pl-2 border-l-2 border-muted-foreground/20">
-                  <label className="text-xs text-muted-foreground w-20">Cashback</label>
+                  <label className="text-xs text-muted-foreground w-20">{t('checkout.cashback_label')}</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -535,7 +537,7 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
                     }`}
                   />
                   <span className="text-xs text-muted-foreground">
-                    Applies to bill:{' '}
+                    {t('checkout.applies_to')}{' '}
                     <span className="text-foreground font-medium">${fmt(applied)}</span>
                   </span>
                 </div>
@@ -544,22 +546,22 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
           })}
           <p className={`text-xs ${totals.remaining === 0 ? 'text-green-600' : 'text-destructive'}`}>
             {totals.remaining === 0
-              ? 'Bill balanced'
+              ? t('checkout.bill_balanced')
               : totals.remaining > 0
-                ? `Bill short by $${fmt(totals.remaining)}`
-                : `Bill over by $${fmt(-totals.remaining)} — increase cashback or reduce a payment`}
+                ? t('checkout.bill_short', { amount: fmt(totals.remaining) })
+                : t('checkout.bill_over', { amount: fmt(-totals.remaining) })}
           </p>
         </div>
 
         {/* Notes */}
         <div className="space-y-1.5">
-          <Label htmlFor="notes">Notes</Label>
+          <Label htmlFor="notes">{t('checkout.notes_section')}</Label>
           <textarea
             id="notes"
             value={notes}
             onChange={e => setNotes(e.target.value)}
             rows={2}
-            placeholder="Optional…"
+            placeholder={t('checkout.notes_placeholder')}
             className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
           />
         </div>
@@ -569,13 +571,13 @@ export default function CheckoutPanel({ appointment, date, onClose, onCompleted 
 
       {/* Footer */}
       <div className="border-t px-5 py-4 flex gap-2 flex-shrink-0">
-        <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+        <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
         <Button
           onClick={handleSubmit}
           disabled={mutation.isPending || totals.remaining !== 0 || payments.length === 0}
           className="flex-1"
         >
-          {mutation.isPending ? 'Processing…' : `Complete checkout · $${fmt(totals.total)}`}
+          {mutation.isPending ? t('checkout.processing') : t('checkout.complete_checkout', { total: fmt(totals.total) })}
         </Button>
       </div>
     </div>
@@ -595,6 +597,7 @@ function ReceiptPanel({
   methods: PaymentMethod[]
   onDone: () => void
 }) {
+  const { t } = useTranslation()
   const methodsById = Object.fromEntries(methods.map(m => [m.id, m]))
   const [emailTo, setEmailTo] = useState(clientEmail ?? '')
   const [emailSent, setEmailSent] = useState(false)
@@ -644,7 +647,7 @@ function ReceiptPanel({
     <div className="fixed inset-y-0 right-0 z-50 w-[440px] bg-white shadow-2xl flex flex-col border-l">
       <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
         <div>
-          <h2 className="text-base font-semibold">Receipt</h2>
+          <h2 className="text-base font-semibold">{t('checkout.receipt_title')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">{clientName} · ${parseFloat(sale.total).toFixed(2)}</p>
         </div>
       </div>
@@ -678,18 +681,18 @@ function ReceiptPanel({
 
         {/* Print */}
         <Button variant="outline" className="w-full" onClick={handlePrint}>
-          Print receipt
+          {t('checkout.print_receipt')}
         </Button>
 
         {/* Email */}
         <div className="space-y-2">
-          <Label>Email receipt</Label>
+          <Label>{t('checkout.email_receipt')}</Label>
           <div className="flex gap-2">
             <input
               type="email"
               value={emailTo}
               onChange={e => setEmailTo(e.target.value)}
-              placeholder="client@example.com"
+              placeholder={t('checkout.email_placeholder')}
               className="flex-1 border border-input rounded-md px-3 py-1.5 text-sm bg-background"
             />
             <Button
@@ -697,7 +700,7 @@ function ReceiptPanel({
               onClick={() => emailMutation.mutate()}
               disabled={!emailTo.trim() || emailMutation.isPending || emailSent}
             >
-              {emailMutation.isPending ? 'Sending…' : emailSent ? 'Sent ✓' : 'Send'}
+              {emailMutation.isPending ? t('common.sending') : emailSent ? t('common.sent') + ' ✓' : t('common.send')}
             </Button>
           </div>
           {emailError && <p className="text-xs text-destructive">{emailError}</p>}
@@ -705,7 +708,7 @@ function ReceiptPanel({
       </div>
 
       <div className="border-t px-5 py-4 flex-shrink-0">
-        <Button className="w-full" onClick={onDone}>Done</Button>
+        <Button className="w-full" onClick={onDone}>{t('common.done')}</Button>
       </div>
     </div>
   )

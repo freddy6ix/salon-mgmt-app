@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, isToday } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getClient, getClientHistory, updateClient, updateClientNotes, listColourNotes, createColourNote } from '@/api/clients'
 import { updateAppointmentStatus } from '@/api/appointments'
 import { Button } from '@/components/ui/button'
@@ -34,6 +35,7 @@ const VISIT_STATUS_COLOR: Record<string, string> = {
 }
 
 export default function ClientCard({ clientId, onClose }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('profile')
   const [notesValue, setNotesValue] = useState<string | null>(null)
@@ -165,17 +167,17 @@ export default function ClientCard({ clientId, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b flex-shrink-0 px-5">
-          {(['profile', 'appointments', 'colour', 'notes'] as Tab[]).map(t => (
+          {(['profile', 'appointments', 'colour', 'notes'] as Tab[]).map(tabId => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabId}
+              onClick={() => setTab(tabId)}
               className={`px-3 py-2 text-sm capitalize border-b-2 -mb-px transition-colors ${
-                tab === t
+                tab === tabId
                   ? 'border-foreground font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'profile' ? 'Profile' : t === 'appointments' ? 'Appointments' : t === 'colour' ? 'Colour' : 'Notes'}
+              {tabId === 'profile' ? t('clients.tab_profile') : tabId === 'appointments' ? t('clients.tab_appointments') : tabId === 'colour' ? t('clients.tab_colour') : t('clients.tab_notes')}
             </button>
           ))}
         </div>
@@ -198,21 +200,21 @@ export default function ClientCard({ clientId, onClose }: Props) {
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-xs">First name</Label>
+                          <Label className="text-xs">{t('auth.first_name')}</Label>
                           <Input value={editFirst} onChange={e => setEditFirst(e.target.value)} />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">Last name</Label>
+                          <Label className="text-xs">{t('auth.last_name')}</Label>
                           <Input value={editLast} onChange={e => setEditLast(e.target.value)} />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Email</Label>
-                        <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="optional" />
+                        <Label className="text-xs">{t('common.email')}</Label>
+                        <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder={t('common.optional')} />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Phone</Label>
-                        <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="optional" />
+                        <Label className="text-xs">{t('common.phone')}</Label>
+                        <Input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder={t('common.optional')} />
                       </div>
                       {editError && <p className="text-xs text-destructive">{editError}</p>}
                       <div className="flex gap-2">
@@ -222,10 +224,10 @@ export default function ClientCard({ clientId, onClose }: Props) {
                           disabled={updateMutation.isPending || !editFirst.trim() || !editLast.trim()}
                           onClick={() => updateMutation.mutate()}
                         >
-                          {updateMutation.isPending ? 'Saving…' : 'Save'}
+                          {updateMutation.isPending ? t('common.saving') : t('common.save')}
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
-                          Cancel
+                          {t('common.cancel')}
                         </Button>
                       </div>
                     </div>
@@ -234,7 +236,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                       <div className="space-y-2">
                         {client.email && (
                           <div className="flex items-center gap-3 text-sm">
-                            <span className="text-muted-foreground w-16 shrink-0">Email</span>
+                            <span className="text-muted-foreground w-16 shrink-0">{t('common.email')}</span>
                             <a href={`mailto:${client.email}`} className="hover:underline truncate">
                               {client.email}
                             </a>
@@ -242,18 +244,18 @@ export default function ClientCard({ clientId, onClose }: Props) {
                         )}
                         {client.cell_phone && (
                           <div className="flex items-center gap-3 text-sm">
-                            <span className="text-muted-foreground w-16 shrink-0">Phone</span>
+                            <span className="text-muted-foreground w-16 shrink-0">{t('common.phone')}</span>
                             <a href={`tel:${client.cell_phone}`} className="hover:underline">
                               {client.cell_phone}
                             </a>
                           </div>
                         )}
                         {!client.email && !client.cell_phone && (
-                          <p className="text-sm text-muted-foreground">No contact info on file.</p>
+                          <p className="text-sm text-muted-foreground">{t('clients.no_contact')}</p>
                         )}
                       </div>
                       <Button size="sm" variant="outline" onClick={startEdit}>
-                        Edit profile
+                        {t('clients.edit_profile')}
                       </Button>
                     </>
                   )}
@@ -264,13 +266,13 @@ export default function ClientCard({ clientId, onClose }: Props) {
                       <div className="space-y-1.5">
                         {client.no_show_count > 0 && (
                           <div className="flex items-center gap-3 text-sm">
-                            <span className="text-muted-foreground w-32 shrink-0">No-shows</span>
+                            <span className="text-muted-foreground w-32 shrink-0">{t('clients.no_shows_label')}</span>
                             <span className="font-medium text-orange-600">{client.no_show_count}</span>
                           </div>
                         )}
                         {client.late_cancellation_count > 0 && (
                           <div className="flex items-center gap-3 text-sm">
-                            <span className="text-muted-foreground w-32 shrink-0">Late cancellations</span>
+                            <span className="text-muted-foreground w-32 shrink-0">{t('clients.late_cancellations')}</span>
                             <span className="font-medium text-orange-600">{client.late_cancellation_count}</span>
                           </div>
                         )}
@@ -295,13 +297,13 @@ export default function ClientCard({ clientId, onClose }: Props) {
           {tab === 'appointments' && (
             <div className="p-5 space-y-5">
               {historyLoading ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t('common.loading')}</p>
               ) : (
                 <>
                   {upcoming.length > 0 && (
                     <div className="space-y-2">
                       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Upcoming
+                        {t('clients.upcoming')}
                       </h3>
                       {upcoming.map(visit => (
                         <VisitRow key={visit.appointment_id} visit={visit} onCancel={(id, date) => cancelAppt.mutate({ id, date })} onClose={onClose} />
@@ -314,7 +316,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                   {past.length > 0 && (
                     <div className="space-y-2">
                       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        History
+                        {t('clients.history')}
                       </h3>
                       {past.map(visit => (
                         <VisitRow key={visit.appointment_id} visit={visit} onClose={onClose} />
@@ -323,7 +325,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                   )}
 
                   {upcoming.length === 0 && past.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-8">No appointments on record</p>
+                    <p className="text-sm text-muted-foreground text-center py-8">{t('clients.no_appointments')}</p>
                   )}
                 </>
               )}
@@ -335,7 +337,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
             <div className="p-5 space-y-4">
               {/* Add new note */}
               <div className="rounded-md border p-3 space-y-2 bg-muted/20">
-                <p className="text-xs font-medium text-muted-foreground">New formula / service note</p>
+                <p className="text-xs font-medium text-muted-foreground">{t('clients.new_formula')}</p>
                 <div className="flex gap-2">
                   <input
                     type="date"
@@ -348,7 +350,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                   rows={4}
                   value={newNoteText}
                   onChange={e => setNewNoteText(e.target.value)}
-                  placeholder="e.g. 7N + 20vol, foils, 35min..."
+                  placeholder={t('clients.formula_placeholder')}
                   className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
                 />
                 {addColourNote.isError && (
@@ -360,15 +362,15 @@ export default function ClientCard({ clientId, onClose }: Props) {
                   disabled={!newNoteText.trim() || addColourNote.isPending}
                   onClick={() => addColourNote.mutate()}
                 >
-                  {addColourNote.isPending ? 'Saving…' : 'Save formula'}
+                  {addColourNote.isPending ? t('common.saving') : t('clients.save_formula')}
                 </Button>
               </div>
 
               {/* Existing notes */}
               {colourLoading ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Loading…</p>
+                <p className="text-sm text-muted-foreground text-center py-4">{t('common.loading')}</p>
               ) : colourNotes.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No colour notes yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4">{t('clients.no_colour_notes')}</p>
               ) : (
                 <div className="space-y-3">
                   {colourNotes.map(note => (
@@ -388,7 +390,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
           {tab === 'notes' && (
             <div className="p-5 space-y-3">
               <p className="text-xs text-muted-foreground">
-                Shown as an alert whenever this client has an appointment.
+                {t('clients.notes_tooltip')}
               </p>
               {clientLoading ? (
                 <div className="h-24 bg-muted animate-pulse rounded" />
@@ -398,7 +400,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                     rows={6}
                     value={currentNotes}
                     onChange={e => setNotesValue(e.target.value)}
-                    placeholder="Allergies, preferences, standing instructions…"
+                    placeholder={t('clients.notes_placeholder')}
                     className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
                   />
                   {notesMutation.isError && (
@@ -409,7 +411,7 @@ export default function ClientCard({ clientId, onClose }: Props) {
                     disabled={notesMutation.isPending || currentNotes === (client?.special_instructions ?? '')}
                     onClick={() => notesMutation.mutate(currentNotes || null)}
                   >
-                    {notesMutation.isPending ? 'Saving…' : 'Save notes'}
+                    {notesMutation.isPending ? t('common.saving') : t('clients.save_notes')}
                   </Button>
                 </>
               )}

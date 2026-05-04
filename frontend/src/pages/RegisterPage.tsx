@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { register } from '@/api/auth'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button'
 export default function RegisterPage() {
   const navigate = useNavigate()
   const { setUser } = useAuth()
+  const { t } = useTranslation()
 
   const [form, setForm] = useState({
     first_name: '',
@@ -28,11 +30,11 @@ export default function RegisterPage() {
     setError(null)
 
     if (form.password !== form.confirm_password) {
-      setError('Passwords do not match')
+      setError(t('auth.passwords_no_match'))
       return
     }
     if (form.password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('auth.password_too_short'))
       return
     }
 
@@ -86,57 +88,57 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2 text-center lg:text-left">
-            <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">New here</p>
+            <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">{t('auth.new_here')}</p>
             <h1
               className="text-3xl font-light"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Request your first visit
+              {t('auth.register_heading')}
             </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label htmlFor="first_name" className={labelClass}>First name</label>
+                <label htmlFor="first_name" className={labelClass}>{t('auth.first_name')}</label>
                 <input id="first_name" name="first_name" value={form.first_name} onChange={handleChange} required autoComplete="given-name" className={fieldClass} />
               </div>
               <div className="space-y-1">
-                <label htmlFor="last_name" className={labelClass}>Last name</label>
+                <label htmlFor="last_name" className={labelClass}>{t('auth.last_name')}</label>
                 <input id="last_name" name="last_name" value={form.last_name} onChange={handleChange} required autoComplete="family-name" className={fieldClass} />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="email" className={labelClass}>Email</label>
+              <label htmlFor="email" className={labelClass}>{t('auth.email_label')}</label>
               <input id="email" name="email" type="email" value={form.email} onChange={handleChange} required autoComplete="email" className={fieldClass} />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="phone" className={labelClass}>Phone</label>
+              <label htmlFor="phone" className={labelClass}>{t('auth.cell_phone')}</label>
               <input id="phone" name="phone" type="tel" value={form.phone} onChange={handleChange} required autoComplete="tel" placeholder="416-555-0100" className={fieldClass} />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="password" className={labelClass}>Password</label>
+              <label htmlFor="password" className={labelClass}>{t('auth.password_label')}</label>
               <input id="password" name="password" type="password" value={form.password} onChange={handleChange} required autoComplete="new-password" className={fieldClass} />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="confirm_password" className={labelClass}>Confirm password</label>
+              <label htmlFor="confirm_password" className={labelClass}>{t('auth.confirm_password')}</label>
               <input id="confirm_password" name="confirm_password" type="password" value={form.confirm_password} onChange={handleChange} required autoComplete="new-password" className={fieldClass} />
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" disabled={loading} className="mt-2 h-12 rounded-sm tracking-widest uppercase text-xs">
-              {loading ? 'Creating account…' : 'Create account'}
+              {loading ? t('auth.creating_account') : t('auth.create_account')}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground pt-2">
-              Already have an account?{' '}
+              {t('auth.already_have_account')}{' '}
               <Link to="/login" className="text-foreground underline-offset-4 hover:underline">
-                Sign in
+                {t('auth.sign_in_link')}
               </Link>
             </p>
           </form>

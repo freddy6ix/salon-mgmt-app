@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/store/auth'
 import { useLanguage } from '@/store/language'
 import {
@@ -12,8 +13,10 @@ import {
 import { format } from 'date-fns'
 import { listAllRequests } from '@/api/appointmentRequests'
 import { getBranding } from '@/api/settings'
+import { updateLanguagePreference } from '@/api/auth'
 import { applyBranding } from '@/lib/branding'
 import MiniCalendar from '@/components/MiniCalendar'
+import i18n from '@/lib/i18n'
 
 const NAV_LINK = `flex items-center gap-3 px-4 py-2.5 text-sm transition-colors rounded-none`
 const ACTIVE   = `bg-muted text-foreground font-medium`
@@ -48,6 +51,7 @@ function SubNavLabel({ label }: { label: string }) {
 }
 
 export default function AppShell() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
   const location = useLocation()
@@ -96,6 +100,12 @@ export default function AppShell() {
     if (branding) applyBranding(branding)
   }, [branding])
 
+  // Sync i18n to stored user preference on mount / user change
+  useEffect(() => {
+    const lang = user?.language_preference ?? 'en'
+    if (!sessionLanguage) i18n.changeLanguage(lang)
+  }, [user?.language_preference])
+
   // Invalidate all queries when session language changes so they refetch in the new language
   useEffect(() => {
     qc.invalidateQueries()
@@ -105,14 +115,16 @@ export default function AppShell() {
   const effectiveLang = sessionLanguage ?? user?.language_preference ?? 'en'
 
   function toggleLanguage(lang: string) {
-    setSessionLanguage(lang === effectiveLang && lang === (user?.language_preference ?? 'en') ? null : lang)
+    i18n.changeLanguage(lang)
+    setSessionLanguage(lang)
+    updateLanguagePreference(lang).catch(() => {})
   }
 
   const TOP_NAV = [
-    { to: '/dashboard',    icon: Home,          label: 'Home',             badge: 0 },
-    { to: '/appointments', icon: CalendarDays,  label: 'Appointment Book', badge: 0 },
-    { to: '/clients',      icon: Users,         label: 'Clients',          badge: 0 },
-    { to: '/requests',     icon: ClipboardList, label: 'Requests',         badge: pendingCount },
+    { to: '/dashboard',    icon: Home,          label: t('nav.home'),             badge: 0 },
+    { to: '/appointments', icon: CalendarDays,  label: t('nav.appointment_book'), badge: 0 },
+    { to: '/clients',      icon: Users,         label: t('nav.clients'),          badge: 0 },
+    { to: '/requests',     icon: ClipboardList, label: t('nav.requests'),         badge: pendingCount },
   ]
 
   // Mini calendar date — read from URL if on appointment book, else today
@@ -182,24 +194,24 @@ export default function AppShell() {
                   </button>
                   {adminOpen && (
                     <>
-                      <SubNavLabel label="Catalog" />
-                      <SubNavLink to="/services" icon={Scissors}    label="Services" />
-                      <SubNavLink to="/retail"   icon={ShoppingBag} label="Retail"   />
+                      <SubNavLabel label={t('nav.catalog')} />
+                      <SubNavLink to="/services" icon={Scissors}    label={t('nav.services')} />
+                      <SubNavLink to="/retail"   icon={ShoppingBag} label={t('nav.retail')}   />
 
-                      <SubNavLabel label="Staff" />
-                      <SubNavLink to="/staff"     icon={UserCog}    label="Staff"     />
-                      <SubNavLink to="/users"     icon={User}       label="Users"     />
-                      <SubNavLink to="/login-log" icon={ScrollText} label="Login Log" />
+                      <SubNavLabel label={t('nav.staff')} />
+                      <SubNavLink to="/staff"     icon={UserCog}    label={t('nav.staff')}      />
+                      <SubNavLink to="/users"     icon={User}       label={t('nav.users')}      />
+                      <SubNavLink to="/login-log" icon={ScrollText} label={t('nav.login_log')}  />
 
-                      <SubNavLabel label="Finance" />
-                      <SubNavLink to="/till"               icon={Vault}      label="Till"       />
-                      <SubNavLink to="/reports/sales"      icon={Receipt}    label="Sales"      />
-                      <SubNavLink to="/reports/payroll"    icon={DollarSign} label="Payroll"    />
-                      <SubNavLink to="/reports/petty-cash" icon={Coins}      label="Petty Cash" />
+                      <SubNavLabel label={t('nav.finance')} />
+                      <SubNavLink to="/till"               icon={Vault}      label={t('nav.till')}       />
+                      <SubNavLink to="/reports/sales"      icon={Receipt}    label={t('nav.sales')}      />
+                      <SubNavLink to="/reports/payroll"    icon={DollarSign} label={t('nav.payroll')}    />
+                      <SubNavLink to="/reports/petty-cash" icon={Coins}      label={t('nav.petty_cash')} />
 
-                      <SubNavLabel label="Settings" />
-                      <SubNavLink to="/settings" icon={Settings} label="Settings" />
-                      <SubNavLink to="/import"   icon={Upload}   label="Import"   />
+                      <SubNavLabel label={t('nav.settings')} />
+                      <SubNavLink to="/settings" icon={Settings} label={t('nav.settings')} />
+                      <SubNavLink to="/import"   icon={Upload}   label={t('nav.import')}   />
                     </>
                   )}
                 </>
@@ -209,7 +221,7 @@ export default function AppShell() {
               {!isAdmin && (
                 <NavLink to="/settings" className={navClass}>
                   <Settings size={16} className="flex-shrink-0" />
-                  <span className="flex-1">Settings</span>
+                  <span className="flex-1">{t('nav.settings')}</span>
                 </NavLink>
               )}
             </>
@@ -273,7 +285,7 @@ export default function AppShell() {
           <button
             onClick={toggleSidebar}
             className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={sidebarOpen ? t('nav.collapse_sidebar') : t('nav.expand_sidebar')}
           >
             {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </button>
@@ -317,13 +329,13 @@ export default function AppShell() {
               className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
             >
               <LogOut size={15} />
-              Sign out
+              {t('nav.sign_out')}
             </button>
           ) : (
             <button
               onClick={logout}
               className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              title="Sign out"
+              title={t('nav.sign_out')}
             >
               <LogOut size={15} />
             </button>

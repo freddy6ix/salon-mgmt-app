@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSchedule, setWorkingStatus } from '@/api/schedules'
 import { buttonVariants } from '@/components/ui/button'
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function WhoIsWorking({ date }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   const { data: statuses = [] } = useQuery({
@@ -32,10 +34,10 @@ export default function WhoIsWorking({ date }: Props) {
   return (
     <Popover>
       <PopoverTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-        Staff ({workingCount}/{statuses.length})
+        {t('appt.who_is_working', { current: workingCount, total: statuses.length })}
       </PopoverTrigger>
       <PopoverContent className="w-52 p-2" align="end">
-        <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Who's working today</p>
+        <p className="text-xs font-medium text-muted-foreground mb-2 px-1">{t('appt.who_is_working_title')}</p>
         <div className="space-y-1">
           {statuses.map((s) => (
             <button
@@ -48,7 +50,7 @@ export default function WhoIsWorking({ date }: Props) {
               }`}
             >
               <span>{s.display_name}</span>
-              <span className="text-xs opacity-70">{s.is_working ? 'In' : 'Off'}</span>
+              <span className="text-xs opacity-70">{s.is_working ? t('appt.status_in') : t('appt.status_off')}</span>
             </button>
           ))}
         </div>

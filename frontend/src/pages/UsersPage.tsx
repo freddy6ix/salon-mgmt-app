@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MailIcon, PlusIcon, ShieldCheckIcon, Trash2Icon, UserIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   type AdminUser,
   createUser,
@@ -27,13 +28,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: 'Super Admin',
-  tenant_admin: 'Admin',
-  staff: 'Staff',
-  guest: 'Guest',
-}
-
 const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   super_admin: 'default',
   tenant_admin: 'default',
@@ -42,6 +36,13 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
 }
 
 function RoleBadge({ role }: { role: string }) {
+  const { t } = useTranslation()
+  const ROLE_LABEL: Record<string, string> = {
+    super_admin: t('users.role_super_admin'),
+    tenant_admin: t('users.role_admin_label'),
+    staff: t('users.role_staff_label'),
+    guest: t('users.role_guest'),
+  }
   return (
     <Badge variant={ROLE_VARIANT[role] ?? 'outline'}>
       {ROLE_LABEL[role] ?? role}
@@ -52,6 +53,7 @@ function RoleBadge({ role }: { role: string }) {
 // ── New user dialog ───────────────────────────────────────────────────────────
 
 function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('staff')
@@ -77,7 +79,7 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
       onClose()
     },
     onError: (err: unknown) => {
-      setError((err as Error).message ?? 'Something went wrong')
+      setError((err as Error).message ?? t('common.error_generic'))
     },
   })
 
@@ -91,12 +93,12 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add user</DialogTitle>
+          <DialogTitle>{t('users.add_user_title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="first-name">First name</Label>
+              <Label htmlFor="first-name">{t('auth.first_name')}</Label>
               <Input
                 id="first-name"
                 value={firstName}
@@ -105,7 +107,7 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="last-name">Last name</Label>
+              <Label htmlFor="last-name">{t('auth.last_name')}</Label>
               <Input
                 id="last-name"
                 value={lastName}
@@ -115,7 +117,7 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('common.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -126,25 +128,25 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">{t('common.type')}</Label>
             <Select value={role} onValueChange={v => { if (v) setRole(v) }}>
               <SelectTrigger id="role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="staff">Staff</SelectItem>
-                <SelectItem value="tenant_admin">Admin</SelectItem>
+                <SelectItem value="staff">{t('users.role_staff')}</SelectItem>
+                <SelectItem value="tenant_admin">{t('users.role_admin')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <p className="text-xs text-muted-foreground">
-            A welcome email with a password setup link will be sent automatically.
+            {t('users.welcome_email_help')}
           </p>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Sending…' : 'Create & send welcome email'}
+              {mutation.isPending ? t('common.sending') : t('users.create_send_welcome')}
             </Button>
           </div>
         </form>
@@ -162,6 +164,7 @@ function EditUserDialog({
   user: AdminUser
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [role, setRole] = useState(user.role)
   const [firstName, setFirstName] = useState(user.first_name ?? '')
@@ -179,7 +182,7 @@ function EditUserDialog({
       onClose()
     },
     onError: (err: unknown) => {
-      setError((err as Error).message ?? 'Something went wrong')
+      setError((err as Error).message ?? t('common.error_generic'))
     },
   })
 
@@ -191,37 +194,37 @@ function EditUserDialog({
     <Dialog open onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit user</DialogTitle>
+          <DialogTitle>{t('users.edit_user_title')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <p className="text-xs text-muted-foreground">{user.email}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>First name</Label>
+              <Label>{t('auth.first_name')}</Label>
               <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Optional" />
             </div>
             <div className="space-y-1.5">
-              <Label>Last name</Label>
+              <Label>{t('auth.last_name')}</Label>
               <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Optional" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Role</Label>
+            <Label>{t('common.type')}</Label>
             <Select value={role} onValueChange={v => { if (v) setRole(v as AdminUser['role']) }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="staff">Staff</SelectItem>
-                <SelectItem value="tenant_admin">Admin</SelectItem>
+                <SelectItem value="staff">{t('users.role_staff')}</SelectItem>
+                <SelectItem value="tenant_admin">{t('users.role_admin')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
             <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !isDirty}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -233,6 +236,7 @@ function EditUserDialog({
 // ── User row ──────────────────────────────────────────────────────────────────
 
 function UserRow({ user }: { user: AdminUser }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
@@ -252,7 +256,7 @@ function UserRow({ user }: { user: AdminUser }) {
       setConfirmDeactivate(false)
     },
     onError: (err: unknown) => {
-      setActionError((err as Error).message ?? 'Something went wrong')
+      setActionError((err as Error).message ?? t('common.error_generic'))
     },
   })
 
@@ -292,7 +296,7 @@ function UserRow({ user }: { user: AdminUser }) {
         </td>
         <td className="px-4 py-3">
           <span className={`text-xs font-medium ${user.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
-            {user.is_active ? 'Active' : 'Inactive'}
+            {user.is_active ? t('users.status_active') : t('users.status_inactive')}
           </span>
         </td>
         <td className="px-4 py-3 text-right">
@@ -307,7 +311,7 @@ function UserRow({ user }: { user: AdminUser }) {
                 className="text-xs h-7"
                 onClick={() => setEditOpen(true)}
               >
-                Edit
+                {t('users.action_edit')}
               </Button>
             )}
             {!isGuest && (
@@ -320,7 +324,7 @@ function UserRow({ user }: { user: AdminUser }) {
                 title="Send welcome / password reset email"
               >
                 <MailIcon size={13} className="mr-1" />
-                {welcomeMutation.isPending ? 'Sending…' : welcomeMutation.isSuccess ? 'Sent!' : 'Send welcome'}
+                {welcomeMutation.isPending ? t('common.sending') : welcomeMutation.isSuccess ? t('users.sent_confirm') : t('users.send_welcome')}
               </Button>
             )}
             {!isGuest && !confirmDeactivate && (
@@ -330,12 +334,12 @@ function UserRow({ user }: { user: AdminUser }) {
                 className="text-xs h-7 text-muted-foreground"
                 onClick={() => setConfirmDeactivate(true)}
               >
-                {user.is_active ? 'Deactivate' : 'Reactivate'}
+                {user.is_active ? t('users.action_deactivate') : t('users.action_reactivate')}
               </Button>
             )}
             {confirmDeactivate && (
               <span className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">Sure?</span>
+                <span className="text-xs text-muted-foreground">{t('common.sure')}</span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -343,7 +347,7 @@ function UserRow({ user }: { user: AdminUser }) {
                   disabled={toggleMutation.isPending}
                   onClick={() => toggleMutation.mutate()}
                 >
-                  Yes
+                  {t('common.yes')}
                 </Button>
                 <Button
                   size="sm"
@@ -351,7 +355,7 @@ function UserRow({ user }: { user: AdminUser }) {
                   className="text-xs h-7"
                   onClick={() => setConfirmDeactivate(false)}
                 >
-                  No
+                  {t('common.no')}
                 </Button>
               </span>
             )}
@@ -369,7 +373,7 @@ function UserRow({ user }: { user: AdminUser }) {
             {confirmDelete && (
               <span className="flex items-center gap-1 flex-wrap justify-end">
                 <span className="text-xs text-muted-foreground">
-                  Permanently delete?
+                  {t('users.confirm_delete')}
                 </span>
                 <Button
                   size="sm"
@@ -378,7 +382,7 @@ function UserRow({ user }: { user: AdminUser }) {
                   disabled={deleteMutation.isPending}
                   onClick={() => deleteMutation.mutate()}
                 >
-                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+                  {deleteMutation.isPending ? t('users.deleting') : t('users.action_delete')}
                 </Button>
                 <Button
                   size="sm"
@@ -386,7 +390,7 @@ function UserRow({ user }: { user: AdminUser }) {
                   className="text-xs h-7"
                   onClick={() => setConfirmDelete(false)}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </span>
             )}
@@ -401,6 +405,7 @@ function UserRow({ user }: { user: AdminUser }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
+  const { t } = useTranslation()
   const [newOpen, setNewOpen] = useState(false)
 
   const { data: users = [], isLoading } = useQuery({
@@ -417,36 +422,36 @@ export default function UsersPage() {
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Users</h1>
+            <h1 className="text-2xl font-semibold">{t('users.page_title')}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              Manage staff and admin accounts.
+              {t('users.page_subtitle')}
             </p>
           </div>
           <Button onClick={() => setNewOpen(true)}>
             <PlusIcon size={14} className="mr-1.5" />
-            Add user
+            {t('users.add_user')}
           </Button>
         </div>
 
         {isLoading ? (
           <div className="bg-white border rounded-lg p-8 text-center text-sm text-muted-foreground">
-            Loading…
+            {t('common.loading')}
           </div>
         ) : (
           <>
             <div className="bg-white border rounded-lg overflow-hidden">
               <div className="px-4 py-3 border-b">
-                <h2 className="text-sm font-medium">Staff & Admins</h2>
+                <h2 className="text-sm font-medium">{t('users.staff_admins_section')}</h2>
               </div>
               {staffAndAdmin.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-4 py-6 text-center">No staff users yet.</p>
+                <p className="text-sm text-muted-foreground px-4 py-6 text-center">{t('users.no_users')}</p>
               ) : (
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">User</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Role</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Status</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_user')}</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_role')}</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_status')}</th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
@@ -460,17 +465,17 @@ export default function UsersPage() {
             {guests.length > 0 && (
               <div className="bg-white border rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b">
-                  <h2 className="text-sm font-medium">Guest accounts</h2>
+                  <h2 className="text-sm font-medium">{t('users.guest_section')}</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Self-registered clients — created when a client books online.
+                    {t('users.guest_help')}
                   </p>
                 </div>
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">User</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Role</th>
-                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Status</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_user')}</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_role')}</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">{t('users.col_status')}</th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>

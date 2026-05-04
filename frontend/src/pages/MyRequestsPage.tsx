@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusCircle, LogOut } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/store/auth'
 import {
   type AppointmentRequest,
@@ -31,13 +32,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const STATUS_LABELS: Record<AppointmentRequest['status'], string> = {
-  new: 'Pending review',
-  reviewed: 'Under review',
-  converted: 'Confirmed',
-  declined: 'Declined',
-}
-
 const STATUS_VARIANT: Record<
   AppointmentRequest['status'],
   'default' | 'secondary' | 'outline' | 'destructive'
@@ -64,6 +58,7 @@ function RequestForm({
   onClose: () => void
   onSubmit: (data: AppointmentRequestIn) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: listServices })
   const { data: providers = [] } = useQuery({ queryKey: ['providers'], queryFn: listProviders })
 
@@ -127,15 +122,15 @@ function RequestForm({
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose() }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Request an appointment</DialogTitle>
+          <DialogTitle>{t('requests.request_form_title')}</DialogTitle>
           <DialogDescription>
-            We'll review your request and confirm a time with you.
+            {t('requests.request_form_intro')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="desired_date">Preferred date</Label>
+            <Label htmlFor="desired_date">{t('requests.preferred_date')}</Label>
             <Input
               id="desired_date"
               type="date"
@@ -147,40 +142,40 @@ function RequestForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="time_note">Preferred time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Label htmlFor="time_note">{t('requests.preferred_time')}</Label>
             <Input
               id="time_note"
-              placeholder="e.g. morning, after 2pm"
+              placeholder={t('requests.preferred_time_placeholder')}
               value={timeNote}
               onChange={e => setTimeNote(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Services requested</Label>
+            <Label>{t('requests.services_requested')}</Label>
             {items.map((item, idx) => (
               <div key={idx} className="border rounded-md p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Service {idx + 1}</span>
+                  <span className="text-sm font-medium text-muted-foreground">{t('requests.service_number', { number: idx + 1 })}</span>
                   {items.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeItem(idx)}
                       className="text-xs text-destructive hover:underline"
                     >
-                      Remove
+                      {t('common.remove')}
                     </button>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor={`service-${idx}`}>Service</Label>
+                  <Label htmlFor={`service-${idx}`}>{t('appt.service_label')}</Label>
                   <Select
                     value={item.service_name}
                     onValueChange={v => updateItem(idx, 'service_name', v ?? '')}
                   >
                     <SelectTrigger id={`service-${idx}`}>
-                      <SelectValue placeholder="Select service…" />
+                      <SelectValue placeholder={t('appt.select_service')} />
                     </SelectTrigger>
                     <SelectContent>
                       {services.map((s: Service) => (
@@ -191,7 +186,7 @@ function RequestForm({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor={`provider-${idx}`}>Preferred stylist / colourist</Label>
+                  <Label htmlFor={`provider-${idx}`}>{t('requests.preferred_provider')}</Label>
                   <Select
                     value={item.preferred_provider_name}
                     onValueChange={v => updateItem(idx, 'preferred_provider_name', v ?? '')}
@@ -200,7 +195,7 @@ function RequestForm({
                       <SelectValue placeholder="Select preference…" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="No preference">No preference</SelectItem>
+                      <SelectItem value="No preference">{t('requests.no_preference')}</SelectItem>
                       {providers.map((p: Provider) => (
                         <SelectItem key={p.id} value={p.display_name}>{p.display_name}</SelectItem>
                       ))}
@@ -211,16 +206,16 @@ function RequestForm({
             ))}
 
             <Button type="button" variant="outline" size="sm" onClick={addItem} className="w-full">
-              + Add another service
+              {t('requests.add_service')}
             </Button>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="special_note">Special notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Label htmlFor="special_note">{t('requests.special_notes')}</Label>
             <textarea
               id="special_note"
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 min-h-[80px] resize-none"
-              placeholder="Allergies, special instructions…"
+              placeholder={t('requests.special_notes_placeholder')}
               value={specialNote}
               onChange={e => setSpecialNote(e.target.value)}
             />
@@ -230,10 +225,10 @@ function RequestForm({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Submit request'}
+              {submitting ? t('common.sending') : t('requests.submit_request')}
             </Button>
           </DialogFooter>
         </form>
@@ -245,9 +240,17 @@ function RequestForm({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function MyRequestsPage() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const qc = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
+
+  const STATUS_LABELS: Record<AppointmentRequest['status'], string> = {
+    new: 'Pending review',
+    reviewed: t('requests.filter_under_review'),
+    converted: t('requests.filter_confirmed'),
+    declined: t('requests.filter_declined'),
+  }
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['my-requests'],
@@ -272,7 +275,7 @@ export default function MyRequestsPage() {
           <span className="text-sm text-muted-foreground">{user?.email}</span>
           <Button variant="ghost" size="sm" onClick={logout}>
             <LogOut className="h-4 w-4 mr-1.5" />
-            Sign out
+            {t('nav.sign_out')}
           </Button>
         </div>
       </header>
@@ -280,24 +283,24 @@ export default function MyRequestsPage() {
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">My appointment requests</h1>
+            <h1 className="text-2xl font-semibold">{t('requests.my_requests_title')}</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              We'll reach out to confirm your appointment time.
+              {t('requests.my_requests_subtitle')}
             </p>
           </div>
           <Button onClick={() => setFormOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-1.5" />
-            New request
+            {t('requests.new_request')}
           </Button>
         </div>
 
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">{t('common.loading')}</p>
         ) : requests.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              <p className="mb-4">No requests yet.</p>
-              <Button onClick={() => setFormOpen(true)}>Request your first appointment</Button>
+              <p className="mb-4">{t('requests.no_requests_yet')}</p>
+              <Button onClick={() => setFormOpen(true)}>{t('requests.first_request_cta')}</Button>
             </CardContent>
           </Card>
         ) : (

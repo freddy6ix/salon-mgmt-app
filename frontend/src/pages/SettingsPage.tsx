@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   getBranding,
   updateBranding,
@@ -32,6 +33,7 @@ import { Label } from '@/components/ui/label'
 import { applyBranding } from '@/lib/branding'
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'tenant_admin' || user?.role === 'super_admin'
@@ -94,38 +96,38 @@ export default function SettingsPage() {
 
   const [tab, setTab] = useState<'branding' | 'scheduling' | 'payment-methods' | 'promotions' | 'email' | 'payroll'>('branding')
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t('common.loading')}</div>
 
   const tabs = [
-    { id: 'branding', label: 'Branding' },
-    { id: 'scheduling', label: 'Scheduling' },
-    ...(isAdmin ? [{ id: 'payment-methods', label: 'Payment methods' }] : []),
-    ...(isAdmin ? [{ id: 'promotions', label: 'Promotions' }] : []),
-    ...(isAdmin ? [{ id: 'email', label: 'Email' }] : []),
-    ...(isAdmin ? [{ id: 'payroll', label: 'Payroll' }] : []),
+    { id: 'branding', label: t('settings.tab_branding') },
+    { id: 'scheduling', label: t('settings.tab_scheduling') },
+    ...(isAdmin ? [{ id: 'payment-methods', label: t('settings.tab_payment_methods') }] : []),
+    ...(isAdmin ? [{ id: 'promotions', label: t('settings.tab_promotions') }] : []),
+    ...(isAdmin ? [{ id: 'email', label: t('settings.tab_email') }] : []),
+    ...(isAdmin ? [{ id: 'payroll', label: t('settings.tab_payroll') }] : []),
   ] as const
 
   return (
     <div className="h-full overflow-auto bg-muted/30">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         <div>
-          <h1 className="text-xl font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your salon configuration.</p>
+          <h1 className="text-xl font-semibold">{t('settings.page_title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('settings.page_subtitle')}</p>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b">
-          {tabs.map(t => (
+          {tabs.map(tabItem => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id as typeof tab)}
+              key={tabItem.id}
+              onClick={() => setTab(tabItem.id as typeof tab)}
               className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors ${
-                tab === t.id
+                tab === tabItem.id
                   ? 'border-foreground font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t.label}
+              {tabItem.label}
             </button>
           ))}
         </div>
@@ -134,7 +136,7 @@ export default function SettingsPage() {
         {tab === 'branding' && (
           <section className="border rounded-lg p-5 space-y-5 bg-white">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Salon name</label>
+              <label className="text-sm font-medium">{t('settings.salon_name')}</label>
               <input
                 type="text"
                 value={salonName}
@@ -144,16 +146,16 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Logo URL</label>
+              <label className="text-sm font-medium">{t('settings.logo_url')}</label>
               <input
                 type="url"
                 value={logoUrl}
                 onChange={e => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png"
+                placeholder={t('settings.logo_url_placeholder')}
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
               />
               <p className="text-xs text-muted-foreground">
-                Paste a publicly accessible image URL. Recommended: square PNG or SVG, transparent background.
+                {t('settings.logo_help')}
               </p>
               {logoUrl && (
                 <div className="flex items-center gap-4 pt-1">
@@ -163,13 +165,13 @@ export default function SettingsPage() {
                     className="h-12 w-auto object-contain border rounded p-1 bg-muted/30"
                     onError={e => (e.currentTarget.style.display = 'none')}
                   />
-                  <span className="text-xs text-muted-foreground">Preview</span>
+                  <span className="text-xs text-muted-foreground">{t('settings.preview_button')}</span>
                 </div>
               )}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Brand colour</label>
+              <label className="text-sm font-medium">{t('settings.brand_colour')}</label>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
@@ -194,31 +196,31 @@ export default function SettingsPage() {
                   <span style={{ color: colorIsDark(brandColor) ? '#fff' : '#000' }}>Button</span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Applied to buttons and accents throughout the app.</p>
+              <p className="text-xs text-muted-foreground">{t('settings.brand_colour_help')}</p>
             </div>
 
             <div className="space-y-3 border-t pt-5">
               <div>
-                <h2 className="text-sm font-medium">Contact</h2>
+                <h2 className="text-sm font-medium">{t('settings.contact_section')}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Shown on the public landing page and in outbound email footers.
+                  {t('settings.contact_help')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">Address</label>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">{t('settings.address_label')}</label>
                 <input
                   type="text"
                   value={contact.address_line1 ?? ''}
                   onChange={e => setContactField('address_line1', e.target.value)}
-                  placeholder="Street address"
+                  placeholder={t('settings.street_placeholder')}
                   className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
                 />
                 <input
                   type="text"
                   value={contact.address_line2 ?? ''}
                   onChange={e => setContactField('address_line2', e.target.value)}
-                  placeholder="Suite, floor (optional)"
+                  placeholder={t('settings.suite_label')}
                   className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
                 />
                 <div className="grid grid-cols-3 gap-2">
@@ -226,21 +228,21 @@ export default function SettingsPage() {
                     type="text"
                     value={contact.city ?? ''}
                     onChange={e => setContactField('city', e.target.value)}
-                    placeholder="City"
+                    placeholder={t('settings.city_label')}
                     className="border border-input rounded-md px-3 py-2 text-sm bg-background"
                   />
                   <input
                     type="text"
                     value={contact.region ?? ''}
                     onChange={e => setContactField('region', e.target.value)}
-                    placeholder="Province / state"
+                    placeholder={t('settings.province_label')}
                     className="border border-input rounded-md px-3 py-2 text-sm bg-background"
                   />
                   <input
                     type="text"
                     value={contact.postal_code ?? ''}
                     onChange={e => setContactField('postal_code', e.target.value)}
-                    placeholder="Postal code"
+                    placeholder={t('settings.postal_label')}
                     className="border border-input rounded-md px-3 py-2 text-sm bg-background"
                   />
                 </div>
@@ -248,7 +250,7 @@ export default function SettingsPage() {
                   type="text"
                   value={contact.country ?? ''}
                   onChange={e => setContactField('country', e.target.value.toUpperCase().slice(0, 2))}
-                  placeholder="Country (2-letter)"
+                  placeholder={t('settings.country_label')}
                   maxLength={2}
                   className="w-24 border border-input rounded-md px-3 py-2 text-sm bg-background uppercase"
                 />
@@ -256,7 +258,7 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Phone</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">{t('settings.phone_label')}</label>
                   <input
                     type="tel"
                     value={contact.phone ?? ''}
@@ -266,12 +268,12 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Hours summary</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">{t('settings.hours_summary')}</label>
                   <input
                     type="text"
                     value={contact.hours_summary ?? ''}
                     onChange={e => setContactField('hours_summary', e.target.value)}
-                    placeholder="Tue–Sat · 9–6"
+                    placeholder={t('settings.hours_format')}
                     className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
                   />
                 </div>
@@ -286,7 +288,7 @@ export default function SettingsPage() {
 
             <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
               <Save size={14} className="mr-1.5" />
-              {brandingMutation.isPending ? 'Saving…' : 'Save'}
+              {brandingMutation.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </section>
         )}
@@ -297,7 +299,7 @@ export default function SettingsPage() {
             <OperatingHoursSection isAdmin={isAdmin} />
             <section className="border rounded-lg p-5 space-y-5 bg-white">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Appointment book granularity</label>
+                <label className="text-sm font-medium">{t('settings.granularity_label')}</label>
                 <div className="flex gap-2">
                   {SLOT_OPTIONS.map(opt => (
                     <button
@@ -310,17 +312,17 @@ export default function SettingsPage() {
                           : 'border-input bg-background hover:bg-muted/50'
                       }`}
                     >
-                      {opt} min
+                      {t('settings.granularity_format', { minutes: opt })}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Controls the time slot grid resolution and snaps new appointment start times to these intervals.
+                  {t('settings.granularity_help')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Time format</label>
+                <label className="text-sm font-medium">{t('settings.time_format_label')}</label>
                 <div className="flex gap-2">
                   {(['12h', '24h'] as TimeFormat[]).map(opt => (
                     <button
@@ -333,12 +335,12 @@ export default function SettingsPage() {
                           : 'border-input bg-background hover:bg-muted/50'
                       }`}
                     >
-                      {opt === '12h' ? '12-hour (9:00 AM)' : '24-hour (09:00)'}
+                      {opt === '12h' ? t('settings.time_format_12') : t('settings.time_format_24')}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Affects how times are displayed throughout the app.
+                  {t('settings.time_format_help')}
                 </p>
               </div>
 
@@ -350,7 +352,7 @@ export default function SettingsPage() {
 
               <Button onClick={() => brandingMutation.mutate()} disabled={brandingMutation.isPending}>
                 <Save size={14} className="mr-1.5" />
-                {brandingMutation.isPending ? 'Saving…' : 'Save'}
+                {brandingMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
             </section>
           </>
@@ -378,9 +380,17 @@ export default function SettingsPage() {
   )
 }
 
-const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
 function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
+  const { t } = useTranslation()
+  const DAY_LABELS = [
+    t('settings.day_monday'),
+    t('settings.day_tuesday'),
+    t('settings.day_wednesday'),
+    t('settings.day_thursday'),
+    t('settings.day_friday'),
+    t('settings.day_saturday'),
+    t('settings.day_sunday'),
+  ]
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['operating-hours'],
@@ -427,10 +437,9 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
   return (
     <section className="border rounded-lg p-5 space-y-4 bg-white">
       <div>
-        <h2 className="text-base font-medium">Operating hours</h2>
+        <h2 className="text-base font-medium">{t('settings.operating_hours')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Days the salon is open and the hours within which providers can be scheduled.
-          {!isAdmin && ' Read-only — only admins can edit.'}
+          {t('settings.operating_hours_help')}
         </p>
       </div>
 
@@ -466,7 +475,7 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
                 />
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">Closed</span>
+              <span className="text-xs text-muted-foreground">{t('settings.day_closed')}</span>
             )}
           </div>
         ))}
@@ -477,7 +486,7 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
           <Save size={14} className="mr-1.5" />
-          {mutation.isPending ? 'Saving…' : 'Save'}
+          {mutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
       )}
     </section>
@@ -485,6 +494,7 @@ function OperatingHoursSection({ isAdmin }: { isAdmin: boolean }) {
 }
 
 function PaymentMethodsSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data: methods = [], isLoading } = useQuery({
     queryKey: ['payment-methods'],
@@ -493,20 +503,20 @@ function PaymentMethodsSection() {
 
   const [showNew, setShowNew] = useState(false)
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (isLoading) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
 
   return (
     <section className="border rounded-lg p-5 space-y-4 bg-white">
       <div>
-        <h2 className="text-base font-medium">Payment methods</h2>
+        <h2 className="text-base font-medium">{t('settings.payment_methods_section')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Configure the payment options shown at checkout. Inactive methods stay on past sales but won't appear in the picker.
+          {t('settings.payment_methods_help')}
         </p>
       </div>
 
       <div className="space-y-2">
         {methods.length === 0 && (
-          <p className="text-sm text-muted-foreground italic">No payment methods yet.</p>
+          <p className="text-sm text-muted-foreground italic">{t('settings.no_payment_methods')}</p>
         )}
         {methods.map(m => (
           <PaymentMethodRow key={m.id} method={m} onSaved={() => qc.invalidateQueries({ queryKey: ['payment-methods'] })} />
@@ -520,7 +530,7 @@ function PaymentMethodsSection() {
         />
       ) : (
         <Button variant="outline" size="sm" onClick={() => setShowNew(true)}>
-          + Add payment method
+          {t('settings.add_method')}
         </Button>
       )}
     </section>
@@ -528,6 +538,7 @@ function PaymentMethodsSection() {
 }
 
 function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved: () => void }) {
+  const { t } = useTranslation()
   const [label, setLabel] = useState(method.label)
   const [code, setCode] = useState(method.code)
   const [kind, setKind] = useState<PaymentMethodKind>(method.kind)
@@ -557,13 +568,13 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
         value={label}
         onChange={e => setLabel(e.target.value)}
         className="col-span-4 border border-input rounded px-2 py-1 text-sm bg-background"
-        placeholder="Label"
+        placeholder={t('settings.col_label')}
       />
       <input
         value={code}
         onChange={e => setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
         className="col-span-2 border border-input rounded px-2 py-1 text-sm bg-background font-mono"
-        placeholder="code"
+        placeholder={t('settings.col_code')}
       />
       <select
         value={kind}
@@ -581,7 +592,7 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
           onChange={e => setIsActive(e.target.checked)}
           className="h-3.5 w-3.5"
         />
-        Active
+        {t('settings.col_active')}
       </label>
       <Button
         size="sm"
@@ -590,7 +601,7 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
         disabled={!dirty || mutation.isPending}
         onClick={() => mutation.mutate()}
       >
-        {mutation.isPending ? 'Saving…' : 'Save'}
+        {mutation.isPending ? t('common.saving') : t('common.save')}
       </Button>
       {error && <p className="col-span-12 text-xs text-destructive">{error}</p>}
     </div>
@@ -598,6 +609,7 @@ function PaymentMethodRow({ method, onSaved }: { method: PaymentMethod; onSaved:
 }
 
 function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+  const { t } = useTranslation()
   const [label, setLabel] = useState('')
   const [code, setCode] = useState('')
   const [kind, setKind] = useState<PaymentMethodKind>('card')
@@ -618,7 +630,7 @@ function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onS
 
   return (
     <div className="border border-dashed rounded-md px-3 py-3 space-y-2 bg-muted/20">
-      <p className="text-xs font-medium text-muted-foreground">New payment method</p>
+      <p className="text-xs font-medium text-muted-foreground">{t('settings.new_method_title')}</p>
       <div className="grid grid-cols-12 gap-2 items-center">
         <input
           value={label}
@@ -626,13 +638,13 @@ function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onS
             setLabel(e.target.value)
             if (!code) setCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_'))
           }}
-          placeholder="Label (e.g. Apple Pay)"
+          placeholder={t('settings.method_label_placeholder')}
           className="col-span-4 border border-input rounded px-2 py-1 text-sm bg-background"
         />
         <input
           value={code}
           onChange={e => setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-          placeholder="code"
+          placeholder={t('settings.col_code')}
           className="col-span-3 border border-input rounded px-2 py-1 text-sm bg-background font-mono"
         />
         <select
@@ -645,10 +657,10 @@ function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onS
           ))}
         </select>
         <Button size="sm" className="col-span-1" onClick={submit} disabled={mutation.isPending}>
-          {mutation.isPending ? '…' : 'Add'}
+          {mutation.isPending ? '…' : t('common.add')}
         </Button>
         <Button size="sm" variant="ghost" className="col-span-1" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -657,6 +669,7 @@ function NewPaymentMethodForm({ onCancel, onSaved }: { onCancel: () => void; onS
 }
 
 function PromotionsSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [newCode, setNewCode] = useState('')
@@ -702,16 +715,16 @@ function PromotionsSection() {
   return (
     <section className="border rounded-lg bg-white overflow-hidden">
       <div className="px-5 py-3 border-b bg-muted/30 flex items-center justify-between">
-        <h2 className="text-sm font-medium">Promotions</h2>
+        <h2 className="text-sm font-medium">{t('settings.promotions_section')}</h2>
         {!adding && (
-          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>+ Add</Button>
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>{t('settings.add_promotion')}</Button>
         )}
       </div>
       <div className="p-5 space-y-4">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : promos.length === 0 && !adding ? (
-          <p className="text-sm text-muted-foreground">No promotions yet.</p>
+          <p className="text-sm text-muted-foreground">{t('settings.no_promotions')}</p>
         ) : (
           <ul className="space-y-2">
             {promos.map(p => (
@@ -726,7 +739,7 @@ function PromotionsSection() {
                   onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {p.is_active ? 'Deactivate' : 'Activate'}
+                  {p.is_active ? t('settings.deactivate') : t('settings.activate')}
                 </button>
               </li>
             ))}
@@ -737,28 +750,28 @@ function PromotionsSection() {
           <form onSubmit={handleAdd} className="space-y-3 border rounded-md p-3 bg-muted/20">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Label</Label>
-                <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Senior Tuesday" />
+                <Label className="text-xs">{t('settings.promotion_label')}</Label>
+                <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder={t('settings.promotion_label_placeholder')} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Code</Label>
-                <Input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="SENIOR_TUE" />
+                <Label className="text-xs">{t('common.code')}</Label>
+                <Input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder={t('settings.promotion_code_placeholder')} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Type</Label>
+                <Label className="text-xs">{t('settings.promotion_type')}</Label>
                 <select
                   value={newKind}
                   onChange={e => setNewKind(e.target.value as PromotionKind)}
                   className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background"
                 >
-                  <option value="percent">Percent (%)</option>
-                  <option value="amount">Fixed amount ($)</option>
+                  <option value="percent">{t('settings.type_percent')}</option>
+                  <option value="amount">{t('settings.type_fixed')}</option>
                 </select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Value</Label>
+                <Label className="text-xs">{t('settings.promotion_value')}</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -771,10 +784,10 @@ function PromotionsSection() {
             {formError && <p className="text-xs text-destructive">{formError}</p>}
             <div className="flex gap-2">
               <Button type="submit" size="sm" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Saving…' : 'Save'}
+                {createMutation.isPending ? t('common.saving') : t('common.save')}
               </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => { setAdding(false); setFormError(null) }}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>
@@ -785,6 +798,7 @@ function PromotionsSection() {
 }
 
 function EmailSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   const { data: cfg, isLoading } = useQuery({
@@ -844,7 +858,7 @@ function EmailSection() {
       qc.setQueryData(['email-config'], updated)
       setResendApiKey('')
       setPassword('')
-      setSaveMsg('Saved.')
+      setSaveMsg(t('settings.status_saved'))
       setTimeout(() => setSaveMsg(null), 3000)
     },
     onError: (err: unknown) => setSaveMsg((err as Error).message),
@@ -853,7 +867,7 @@ function EmailSection() {
   const testMutation = useMutation({
     mutationFn: () => testEmailConfig(testTo),
     onSuccess: () => {
-      setTestMsg(`Test email sent to ${testTo}`)
+      setTestMsg(t('settings.test_sent', { email: testTo }))
       setTimeout(() => setTestMsg(null), 5000)
     },
     onError: (err: unknown) => setTestMsg((err as Error).message),
@@ -864,15 +878,15 @@ function EmailSection() {
   return (
     <section className="border rounded-lg p-5 space-y-5 bg-white">
       <div>
-        <h2 className="text-base font-medium">Email</h2>
+        <h2 className="text-base font-medium">{t('settings.email_section')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Used for confirmation emails, receipts, welcome emails, and password resets.
+          {t('settings.email_help')}
         </p>
       </div>
 
       {cfg?.is_configured && (
         <div className="text-xs bg-green-50 border border-green-200 text-green-800 rounded-md px-3 py-2">
-          Configured — sending from <strong>{cfg.from_address}</strong>
+          {t('settings.email_configured', { email: cfg.from_address })}
         </div>
       )}
 
@@ -888,7 +902,7 @@ function EmailSection() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {mode === 'resend_api' ? 'Resend API' : 'SMTP'}
+            {mode === 'resend_api' ? t('settings.option_resend') : t('settings.option_smtp')}
           </button>
         ))}
       </div>
@@ -897,7 +911,7 @@ function EmailSection() {
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="resend-api-key">
-              API key
+              {t('settings.api_key_label')}
               {cfg?.resend_api_key_set && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">(leave blank to keep current)</span>
               )}
@@ -907,11 +921,11 @@ function EmailSection() {
               type="password"
               value={resendApiKey}
               onChange={e => setResendApiKey(e.target.value)}
-              placeholder={cfg?.resend_api_key_set ? '••••••••' : 're_…'}
+              placeholder={cfg?.resend_api_key_set ? '••••••••' : t('settings.api_key_placeholder')}
               autoComplete="new-password"
             />
             <p className="text-xs text-muted-foreground">
-              Get your API key from <strong>resend.com</strong> → API Keys. Make sure your sending domain is verified there.
+              {t('settings.api_key_help')}
             </p>
           </div>
         </div>
@@ -919,16 +933,16 @@ function EmailSection() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5 col-span-2 sm:col-span-1">
-              <Label htmlFor="smtp-host">SMTP host</Label>
+              <Label htmlFor="smtp-host">{t('settings.smtp_host')}</Label>
               <Input
                 id="smtp-host"
                 value={host}
                 onChange={e => setHost(e.target.value)}
-                placeholder="smtp.gmail.com"
+                placeholder={t('settings.smtp_host_placeholder')}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="smtp-port">Port</Label>
+              <Label htmlFor="smtp-port">{t('settings.port_label')}</Label>
               <Input
                 id="smtp-port"
                 type="number"
@@ -940,19 +954,19 @@ function EmailSection() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="smtp-username">Username</Label>
+            <Label htmlFor="smtp-username">{t('settings.username_label')}</Label>
             <Input
               id="smtp-username"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="noreply@yourdomain.com"
+              placeholder={t('settings.username_placeholder')}
               autoComplete="off"
             />
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="smtp-password">
-              Password / App password
+              {t('settings.password_label')}
               {cfg?.smtp_password_set && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">(leave blank to keep current)</span>
               )}
@@ -962,11 +976,11 @@ function EmailSection() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={cfg?.smtp_password_set ? '••••••••' : 'Required'}
+              placeholder={cfg?.smtp_password_set ? '••••••••' : t('common.required')}
               autoComplete="new-password"
             />
             <p className="text-xs text-muted-foreground">
-              For Google Workspace: use an <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords).
+              {t('settings.password_help')}
             </p>
           </div>
 
@@ -979,36 +993,35 @@ function EmailSection() {
               className="h-4 w-4 rounded border-gray-300"
             />
             <Label htmlFor="use-tls" className="font-normal cursor-pointer">
-              Use STARTTLS (recommended for port 587)
+              {t('settings.starttls_label')}
             </Label>
           </div>
         </div>
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="from-address">Client communications — From address</Label>
+        <Label htmlFor="from-address">{t('settings.client_from_label')}</Label>
         <Input
           id="from-address"
           value={fromAddress}
           onChange={e => setFromAddress(e.target.value)}
-          placeholder="Salon Name <info@yourdomain.com>"
+          placeholder={t('settings.client_from_placeholder')}
         />
         <p className="text-xs text-muted-foreground">
-          Used for appointment confirmations, receipts, and welcome emails.
-          Format: <code className="bg-muted px-1 rounded">Name &lt;email@domain.com&gt;</code>
+          {t('settings.client_from_help')}
         </p>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="accounting-from-address">Accounting / payroll — From address</Label>
+        <Label htmlFor="accounting-from-address">{t('settings.accounting_from_label')}</Label>
         <Input
           id="accounting-from-address"
           value={accountingFromAddress}
           onChange={e => setAccountingFromAddress(e.target.value)}
-          placeholder="Salon Name Accounting <accounting@yourdomain.com>"
+          placeholder={t('settings.accounting_from_placeholder')}
         />
         <p className="text-xs text-muted-foreground">
-          Used when sending payroll reports to your payroll provider. Falls back to the client address above if blank.
+          {t('settings.accounting_from_help')}
         </p>
       </div>
 
@@ -1018,10 +1031,10 @@ function EmailSection() {
           disabled={saveMutation.isPending}
         >
           <Save size={14} className="mr-1.5" />
-          {saveMutation.isPending ? 'Saving…' : 'Save'}
+          {saveMutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
         {saveMsg && (
-          <span className={`text-sm ${saveMsg === 'Saved.' ? 'text-green-600' : 'text-destructive'}`}>
+          <span className={`text-sm ${saveMsg === t('settings.status_saved') ? 'text-green-600' : 'text-destructive'}`}>
             {saveMsg}
           </span>
         )}
@@ -1029,7 +1042,7 @@ function EmailSection() {
 
       {cfg?.is_configured && (
         <div className="border-t pt-4 space-y-3">
-          <h3 className="text-sm font-medium">Send test email</h3>
+          <h3 className="text-sm font-medium">{t('settings.test_email_button')}</h3>
           <div className="flex gap-2 items-center flex-wrap">
             <Input
               className="max-w-xs"
@@ -1043,7 +1056,7 @@ function EmailSection() {
               onClick={() => { setTestMsg(null); testMutation.mutate() }}
               disabled={testMutation.isPending || !testTo}
             >
-              {testMutation.isPending ? 'Sending…' : 'Send test'}
+              {testMutation.isPending ? t('common.sending') : t('settings.send_test')}
             </Button>
           </div>
           {testMsg && (
@@ -1068,6 +1081,7 @@ function colorIsDark(hex: string): boolean {
 const LEAD_HOUR_OPTIONS = [2, 4, 12, 24, 48, 72]
 
 function RemindersSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['request-notifications'],
@@ -1094,7 +1108,7 @@ function RemindersSection() {
       qc.setQueryData(['request-notifications'], updated)
       setDirty(false)
       setError(null)
-      setSavedMsg('Saved.')
+      setSavedMsg(t('settings.status_saved'))
       setTimeout(() => setSavedMsg(null), 3000)
     },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
@@ -1105,9 +1119,9 @@ function RemindersSection() {
   return (
     <section className="border rounded-lg p-5 space-y-4 bg-white">
       <div>
-        <h2 className="text-base font-medium">Appointment reminders</h2>
+        <h2 className="text-base font-medium">{t('settings.reminders_section')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Send clients an email reminder before their appointment. Uses the same outbound email credentials.
+          {t('settings.reminders_help')}
         </p>
       </div>
 
@@ -1118,12 +1132,12 @@ function RemindersSection() {
           onChange={e => { setEnabled(e.target.checked); setDirty(true) }}
           className="h-4 w-4"
         />
-        <span className="text-sm">Send reminder emails to clients</span>
+        <span className="text-sm">{t('settings.reminders_checkbox')}</span>
       </label>
 
       {enabled && (
         <div className="space-y-1.5">
-          <Label>Send reminder</Label>
+          <Label>{t('settings.send_reminder')}</Label>
           <select
             value={leadHours}
             onChange={e => { setLeadHours(Number(e.target.value)); setDirty(true) }}
@@ -1136,7 +1150,7 @@ function RemindersSection() {
             ))}
           </select>
           <p className="text-xs text-muted-foreground">
-            Reminders are only sent to clients who have an email address on file.
+            {t('settings.reminders_note')}
           </p>
         </div>
       )}
@@ -1146,7 +1160,7 @@ function RemindersSection() {
       <div className="flex items-center gap-3">
         <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
           <Save size={14} className="mr-1.5" />
-          {mutation.isPending ? 'Saving…' : 'Save'}
+          {mutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
         {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
       </div>
@@ -1155,6 +1169,7 @@ function RemindersSection() {
 }
 
 function RequestNotificationsSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['request-notifications'],
@@ -1188,7 +1203,7 @@ function RequestNotificationsSection() {
       setRecipientsText(updated.recipients.join('\n'))
       setDirty(false)
       setError(null)
-      setSavedMsg('Saved.')
+      setSavedMsg(t('settings.status_saved'))
       setTimeout(() => setSavedMsg(null), 3000)
     },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Save failed'),
@@ -1199,10 +1214,9 @@ function RequestNotificationsSection() {
   return (
     <section className="border rounded-lg p-5 space-y-4 bg-white">
       <div>
-        <h2 className="text-base font-medium">Booking-request notifications</h2>
+        <h2 className="text-base font-medium">{t('settings.notifications_section')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Email the salon when a guest submits a booking request through the public form.
-          Independent of the SMTP configuration above — uses the same outbound credentials.
+          {t('settings.notifications_help')}
         </p>
       </div>
 
@@ -1213,21 +1227,21 @@ function RequestNotificationsSection() {
           onChange={e => { setEnabled(e.target.checked); setDirty(true) }}
           className="h-4 w-4"
         />
-        <span className="text-sm">Send notifications when a new request is submitted</span>
+        <span className="text-sm">{t('settings.notifications_checkbox')}</span>
       </label>
 
       <div className="space-y-1.5">
-        <Label htmlFor="recipients">Recipient emails</Label>
+        <Label htmlFor="recipients">{t('settings.recipients_label')}</Label>
         <textarea
           id="recipients"
           value={recipientsText}
           onChange={e => { setRecipientsText(e.target.value); setDirty(true) }}
           rows={3}
-          placeholder="bookings@yourdomain.com&#10;manager@yourdomain.com"
+          placeholder={t('settings.recipients_placeholder')}
           className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none font-mono"
         />
         <p className="text-xs text-muted-foreground">
-          One per line (or comma-separated). Leave blank to disable notifications even when the toggle is on.
+          {t('settings.recipients_help')}
         </p>
       </div>
 
@@ -1236,7 +1250,7 @@ function RequestNotificationsSection() {
       <div className="flex items-center gap-3">
         <Button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}>
           <Save size={14} className="mr-1.5" />
-          {mutation.isPending ? 'Saving…' : 'Save'}
+          {mutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
         {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
       </div>
@@ -1247,6 +1261,7 @@ function RequestNotificationsSection() {
 // ── Payroll Section ───────────────────────────────────────────────────────────
 
 function PayrollSection() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['payroll-config'],
@@ -1298,33 +1313,33 @@ function PayrollSection() {
   return (
     <section className="border rounded-lg p-5 space-y-5 bg-white">
       <div>
-        <h2 className="text-sm font-semibold">Payroll Provider</h2>
+        <h2 className="text-sm font-semibold">{t('settings.payroll_provider_section')}</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          These details pre-fill the Payroll Report page each month.
+          {t('settings.payroll_provider_help')}
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>Provider name</Label>
-          <Input value={form.provider_name} onChange={e => setField('provider_name', e.target.value)} placeholder="e.g. Paytrak" />
+          <Label>{t('settings.provider_name_label')}</Label>
+          <Input value={form.provider_name} onChange={e => setField('provider_name', e.target.value)} placeholder={t('settings.provider_name_placeholder')} />
         </div>
         <div className="space-y-1.5">
-          <Label>Provider email</Label>
-          <Input type="email" value={form.provider_email} onChange={e => setField('provider_email', e.target.value)} placeholder="e.g. Team1@paytrak.ca" />
+          <Label>{t('settings.provider_email_label')}</Label>
+          <Input type="email" value={form.provider_email} onChange={e => setField('provider_email', e.target.value)} placeholder={t('settings.provider_email_placeholder')} />
         </div>
         <div className="space-y-1.5">
-          <Label>Client ID</Label>
-          <Input value={form.client_id} onChange={e => setField('client_id', e.target.value)} placeholder="e.g. 998-XU1" />
+          <Label>{t('settings.client_id_label')}</Label>
+          <Input value={form.client_id} onChange={e => setField('client_id', e.target.value)} placeholder={t('settings.client_id_placeholder')} />
         </div>
         <div className="space-y-1.5">
-          <Label>Signature name</Label>
-          <Input value={form.signature} onChange={e => setField('signature', e.target.value)} placeholder="e.g. JJ" />
+          <Label>{t('settings.signature_name_label')}</Label>
+          <Input value={form.signature} onChange={e => setField('signature', e.target.value)} placeholder={t('settings.signature_name_placeholder')} />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label>Email footer</Label>
+        <Label>{t('settings.footer_label')}</Label>
         <textarea
           value={form.footer}
           onChange={e => setField('footer', e.target.value)}
@@ -1337,9 +1352,9 @@ function PayrollSection() {
       <div className="flex items-center gap-3">
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           <Save size={14} className="mr-1.5" />
-          {mutation.isPending ? 'Saving…' : 'Save'}
+          {mutation.isPending ? t('common.saving') : t('common.save')}
         </Button>
-        {pSaved && <span className="text-sm text-green-600">Saved.</span>}
+        {pSaved && <span className="text-sm text-green-600">{t('settings.status_saved')}</span>}
       </div>
     </section>
   )

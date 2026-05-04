@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, addMonths, subMonths, endOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getMonthlyReport } from '@/api/reports'
 import { getPayrollReport } from '@/api/providers'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ function Row({
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation()
   const now = new Date()
   const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
 
@@ -81,7 +83,7 @@ export default function ReportsPage() {
 
         {/* Header + month nav */}
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Sales report</h1>
+          <h1 className="text-xl font-semibold">{t('reports.sales_title')}</h1>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setCursor(subMonths(cursor, 1))}>
               <ChevronLeft size={16} />
@@ -110,13 +112,13 @@ export default function ReportsPage() {
           <>
             {/* Summary cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SummaryCard label="Revenue" value={fmt(report.total)} />
+              <SummaryCard label={t('reports.revenue_card')} value={fmt(report.total)} />
               <div className="bg-white border rounded-lg px-4 py-3 space-y-0.5">
-                <p className="text-xs text-muted-foreground">Sales</p>
+                <p className="text-xs text-muted-foreground">{t('reports.sales_card')}</p>
                 <p className="text-xl font-semibold tabular-nums">{report.sale_count}</p>
               </div>
-              <SummaryCard label="Tax collected" value={fmt(String(parseFloat(report.gst_amount) + parseFloat(report.pst_amount)))} sub="GST + PST" />
-              <SummaryCard label="Avg. sale" value={fmt(String(parseFloat(report.total) / report.sale_count))} />
+              <SummaryCard label={t('reports.tax_card')} value={fmt(String(parseFloat(report.gst_amount) + parseFloat(report.pst_amount)))} sub={t('reports.tax_subtitle')} />
+              <SummaryCard label={t('reports.avg_sale_card')} value={fmt(String(parseFloat(report.total) / report.sale_count))} />
             </div>
 
             {/* Payroll % of net sales — primary KPI */}
@@ -138,26 +140,26 @@ export default function ReportsPage() {
             )}
 
             {/* Revenue */}
-            <Section title="Revenue">
-              <Row label="Service sales" value={fmt(report.service_gross)} />
+            <Section title={t('reports.revenue_section')}>
+              <Row label={t('reports.service_sales')} value={fmt(report.service_gross)} />
               {parseFloat(report.service_discount) > 0 && (
-                <Row label="Less discounts" value={fmt(report.service_discount)} indent negative />
+                <Row label={t('reports.less_discounts')} value={fmt(report.service_discount)} indent negative />
               )}
-              <Row label="Total service sales" value={fmt(report.service_total)} />
-              <Row label="Retail sales" value={fmt(report.retail_gross)} />
+              <Row label={t('reports.total_service')} value={fmt(report.service_total)} />
+              <Row label={t('reports.retail_sales')} value={fmt(report.retail_gross)} />
               {parseFloat(report.retail_discount) > 0 && (
-                <Row label="Less discounts" value={fmt(report.retail_discount)} indent negative />
+                <Row label={t('reports.less_discounts')} value={fmt(report.retail_discount)} indent negative />
               )}
-              <Row label="Total retail sales" value={fmt(report.retail_total)} />
-              <Row label="Total before tax" value={fmt(report.subtotal)} bold />
-              <Row label="GST (5%)" value={fmt(report.gst_amount)} />
-              <Row label="PST (8%)" value={fmt(report.pst_amount)} />
-              <Row label="Grand total" value={fmt(report.total)} bold />
+              <Row label={t('reports.total_retail')} value={fmt(report.retail_total)} />
+              <Row label={t('reports.before_tax')} value={fmt(report.subtotal)} bold />
+              <Row label={t('reports.gst')} value={fmt(report.gst_amount)} />
+              <Row label={t('reports.pst')} value={fmt(report.pst_amount)} />
+              <Row label={t('reports.grand_total')} value={fmt(report.total)} bold />
             </Section>
 
             {/* By provider */}
             {report.by_provider.length > 0 && (
-              <Section title="By provider (services)">
+              <Section title={t('reports.by_provider')}>
                 {report.by_provider.map(r => (
                   <Row
                     key={r.provider_name}
@@ -171,7 +173,7 @@ export default function ReportsPage() {
 
             {/* Payment reconciliation */}
             {report.by_payment_method.length > 0 && (
-              <Section title="Payment reconciliation">
+              <Section title={t('reports.payment_section')}>
                 {report.by_payment_method.map(r => {
                   const hasCashback = parseFloat(r.cashback) > 0
                   return (
@@ -195,14 +197,14 @@ export default function ReportsPage() {
             )}
 
             {/* Daily breakdown */}
-            <Section title="Daily totals">
+            <Section title={t('reports.daily_section')}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground">
-                      <th className="px-4 py-2 text-left font-medium">Date</th>
-                      <th className="px-4 py-2 text-right font-medium">Sales</th>
-                      <th className="px-4 py-2 text-right font-medium">Revenue</th>
+                      <th className="px-4 py-2 text-left font-medium">{t('reports.col_date')}</th>
+                      <th className="px-4 py-2 text-right font-medium">{t('reports.col_sales')}</th>
+                      <th className="px-4 py-2 text-right font-medium">{t('reports.col_revenue')}</th>
                     </tr>
                   </thead>
                   <tbody>

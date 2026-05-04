@@ -1,19 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, getISODay } from 'date-fns'
+import { useTranslation } from 'react-i18next'
 import { useTimeFormat } from '@/lib/timeFormat'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'
 import { type AppointmentRequest, listAllRequests } from '@/api/appointmentRequests'
 import { listTimeEntries, checkIn, checkOut, type TimeEntry } from '@/api/time_entries'
+import { getOperatingHours } from '@/api/settings'
 import { Button } from '@/components/ui/button'
 import { CalendarDays, ClipboardList, ArrowRight, Clock, LogIn, LogOut } from 'lucide-react'
-
-function greeting() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
-}
 
 const APPT_STATUS_DOT: Record<Appointment['status'], string> = {
   confirmed:   'bg-blue-400',
@@ -28,6 +23,7 @@ const APPT_STATUS_DOT: Record<Appointment['status'], string> = {
 function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
   const navigate = useNavigate()
   const { formatTime: ft } = useTimeFormat()
+  const { t } = useTranslation()
 
   const active = appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
 
@@ -41,7 +37,7 @@ function TodaySchedule({ appointments }: { appointments: Appointment[] }) {
     .sort((a, b) => new Date(a.item.start_time).getTime() - new Date(b.item.start_time).getTime())
 
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4 text-center">No appointments today.</p>
+    return <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.no_appointments')}</p>
   }
 
   return (
@@ -90,6 +86,7 @@ interface StaffClockWidgetProps {
 
 function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) {
   const qc = useQueryClient()
+  const { t } = useTranslation()
 
   const checkInMut = useMutation({
     mutationFn: (provider_id: string) => checkIn(provider_id),
@@ -102,7 +99,7 @@ function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) 
   })
 
   if (providers.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4 text-center">No providers scheduled today.</p>
+    return <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.no_providers_scheduled')}</p>
   }
 
   return (
@@ -131,7 +128,7 @@ function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) 
                 onClick={() => checkInMut.mutate(p.id)}
                 disabled={checkInMut.isPending}
               >
-                <LogIn size={12} className="mr-1" /> Clock in
+                <LogIn size={12} className="mr-1" /> {t('dashboard.clock_in')}
               </Button>
             )}
             {entry && (
@@ -142,11 +139,11 @@ function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) 
                 onClick={() => checkOutMut.mutate(entry.id)}
                 disabled={checkOutMut.isPending}
               >
-                <LogOut size={12} className="mr-1" /> Clock out
+                <LogOut size={12} className="mr-1" /> {t('dashboard.clock_out')}
               </Button>
             )}
             {!entry && checkedOut && (
-              <span className="text-xs text-muted-foreground">Done</span>
+              <span className="text-xs text-muted-foreground">{t('dashboard.status_done')}</span>
             )}
           </li>
         )
@@ -159,9 +156,10 @@ function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) 
 
 function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   if (requests.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4 text-center">No pending requests.</p>
+    return <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.no_pending_requests')}</p>
   }
 
   return (
@@ -196,6 +194,7 @@ function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const { data: appointments = [] } = useQuery({
@@ -215,6 +214,16 @@ export default function DashboardPage() {
     queryFn: () => listTimeEntries(today),
     refetchInterval: 60_000,
   })
+
+  const { data: operatingHours = [] } = useQuery({
+    queryKey: ['operating-hours'],
+    queryFn: getOperatingHours,
+  })
+
+  // getISODay: 1=Mon…7=Sun → subtract 1 → 0=Mon…6=Sun (matches backend)
+  const todayDow = getISODay(new Date()) - 1
+  const todayHours = operatingHours.find(h => h.day_of_week === todayDow)
+  const salonClosedToday = todayHours !== undefined && !todayHours.is_open
 
   const activeAppts = appointments.filter(a => a.status !== 'cancelled' && a.status !== 'no_show')
   const serviceCount = activeAppts.reduce(
@@ -236,11 +245,19 @@ export default function DashboardPage() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold">{greeting()}</h1>
+          <h1 className="text-2xl font-semibold">
+            {(() => { const h = new Date().getHours(); return h < 12 ? t('dashboard.good_morning') : h < 17 ? t('dashboard.good_afternoon') : t('dashboard.good_evening') })()}
+          </h1>
           <p className="text-muted-foreground mt-0.5">
             {format(new Date(), 'EEEE, MMMM d, yyyy')}
           </p>
         </div>
+
+        {salonClosedToday && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {t('dashboard.salon_closed')}
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="grid grid-cols-3 gap-4">
@@ -250,11 +267,11 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
               <CalendarDays size={14} />
-              Services today
+              {t('dashboard.services_today')}
             </div>
             <p className="text-3xl font-semibold">{serviceCount}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              across {activeAppts.length} {activeAppts.length === 1 ? 'visit' : 'visits'}
+              {t('dashboard.across_visits', { count: activeAppts.length })}
             </p>
           </button>
 
@@ -265,10 +282,10 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
               <ClipboardList size={14} />
-              Pending requests
+              {t('dashboard.pending_requests')}
             </div>
             <p className="text-3xl font-semibold">{pendingRequests.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">awaiting review</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('dashboard.awaiting_review')}</p>
           </button>
 
           <button
@@ -277,10 +294,10 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
               <CalendarDays size={14} />
-              Providers working
+              {t('dashboard.providers_working')}
             </div>
             <p className="text-3xl font-semibold">{providerSet.size}</p>
-            <p className="text-xs text-muted-foreground mt-1">scheduled today</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('dashboard.scheduled_today')}</p>
           </button>
         </div>
 
@@ -290,12 +307,12 @@ export default function DashboardPage() {
           {/* Today's schedule (wider) */}
           <div className="col-span-3 bg-white border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-sm font-medium">Today's schedule</h2>
+              <h2 className="text-sm font-medium">{t('dashboard.todays_schedule')}</h2>
               <button
                 onClick={() => navigate('/appointments')}
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                Open book <ArrowRight size={12} />
+                {t('dashboard.open_book')} <ArrowRight size={12} />
               </button>
             </div>
             <TodaySchedule appointments={appointments} />
@@ -304,13 +321,13 @@ export default function DashboardPage() {
           {/* Pending requests */}
           <div className="col-span-2 bg-white border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-sm font-medium">Pending requests</h2>
+              <h2 className="text-sm font-medium">{t('dashboard.section_pending_requests')}</h2>
               {pendingRequests.length > 0 && (
                 <button
                   onClick={() => navigate('/requests')}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                 >
-                  Review all <ArrowRight size={12} />
+                  {t('dashboard.review_all')} <ArrowRight size={12} />
                 </button>
               )}
             </div>
@@ -322,7 +339,7 @@ export default function DashboardPage() {
         {pendingRequests.length > 0 && (
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => navigate('/requests')}>
-              Review {pendingRequests.length} {pendingRequests.length === 1 ? 'request' : 'requests'}
+              {t('dashboard.review_requests', { count: pendingRequests.length })}
             </Button>
           </div>
         )}
@@ -331,7 +348,7 @@ export default function DashboardPage() {
         <div className="bg-white border rounded-lg overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b">
             <Clock size={14} className="text-muted-foreground" />
-            <h2 className="text-sm font-medium">Staff attendance</h2>
+            <h2 className="text-sm font-medium">{t('dashboard.staff_attendance')}</h2>
           </div>
           <StaffClockWidget providers={scheduledProviders} entries={timeEntries} today={today} />
         </div>

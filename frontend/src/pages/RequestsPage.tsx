@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   type AppointmentRequest,
   listAllRequests,
@@ -25,13 +26,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const STATUS_LABELS: Record<AppointmentRequest['status'], string> = {
-  new: 'New',
-  reviewed: 'Under review',
-  converted: 'Confirmed',
-  declined: 'Declined',
-}
-
 const STATUS_VARIANT: Record<
   AppointmentRequest['status'],
   'default' | 'secondary' | 'outline' | 'destructive'
@@ -55,6 +49,7 @@ function ReviewDialog({
   onSave: (id: string, status: AppointmentRequest['status'], notes: string) => Promise<void>
   onConvert: () => void
 }) {
+  const { t } = useTranslation()
   const [newStatus, setNewStatus] = useState<AppointmentRequest['status']>('reviewed')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -78,7 +73,7 @@ function ReviewDialog({
     <Dialog open={!!request} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Review request</DialogTitle>
+          <DialogTitle>{t('requests.review_title')}</DialogTitle>
         </DialogHeader>
 
         {request && (
@@ -105,7 +100,7 @@ function ReviewDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Update status</Label>
+              <Label>{t('requests.update_status')}</Label>
               <Select
                 value={newStatus}
                 onValueChange={v => v && setNewStatus(v as AppointmentRequest['status'])}
@@ -114,20 +109,20 @@ function ReviewDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="reviewed">Under review</SelectItem>
-                  <SelectItem value="declined">Declined</SelectItem>
+                  <SelectItem value="reviewed">{t('requests.status_under_review')}</SelectItem>
+                  <SelectItem value="declined">{t('requests.status_declined')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-notes">
-                Staff notes <span className="text-muted-foreground text-xs">(shown to client if declined)</span>
+                {t('requests.staff_notes')}
               </Label>
               <textarea
                 id="staff-notes"
                 className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[80px] resize-none"
-                placeholder="Optional notes…"
+                placeholder={t('requests.notes_placeholder')}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
               />
@@ -138,12 +133,12 @@ function ReviewDialog({
         )}
 
         <DialogFooter className="flex-wrap gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
           <Button variant="outline" onClick={() => { onClose(); onConvert() }} disabled={saving}>
-            Convert to appointment
+            {t('requests.action_convert')}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('common.saving') : t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -153,19 +148,27 @@ function ReviewDialog({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const FILTER_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'new', label: 'New' },
-  { value: 'reviewed', label: 'Under review' },
-  { value: 'converted', label: 'Confirmed' },
-  { value: 'declined', label: 'Declined' },
-]
-
 export default function RequestsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
   const [reviewing, setReviewing] = useState<AppointmentRequest | null>(null)
+
+  const STATUS_LABELS: Record<AppointmentRequest['status'], string> = {
+    new: t('requests.filter_new'),
+    reviewed: t('requests.filter_under_review'),
+    converted: t('requests.filter_confirmed'),
+    declined: t('requests.filter_declined'),
+  }
+
+  const FILTER_OPTIONS = [
+    { value: '', label: t('requests.filter_all') },
+    { value: 'new', label: t('requests.filter_new') },
+    { value: 'reviewed', label: t('requests.filter_under_review') },
+    { value: 'converted', label: t('requests.filter_confirmed') },
+    { value: 'declined', label: t('requests.filter_declined') },
+  ]
 
   function openConvert(req: AppointmentRequest) {
     const date = req.desired_date.slice(0, 10)
@@ -193,7 +196,7 @@ export default function RequestsPage() {
   return (
     <div className="h-full overflow-auto bg-muted/30">
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-xl font-semibold">Appointment Requests</h1>
+        <h1 className="text-xl font-semibold">{t('requests.page_title')}</h1>
         <div className="flex items-center gap-2">
           {FILTER_OPTIONS.map(opt => (
             <Button
@@ -208,9 +211,9 @@ export default function RequestsPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">{t('common.loading')}</p>
         ) : requests.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-8 text-center">No requests found.</p>
+          <p className="text-muted-foreground text-sm py-8 text-center">{t('requests.no_requests')}</p>
         ) : (
           <div className="space-y-3">
             {requests.map(req => (
@@ -247,14 +250,14 @@ export default function RequestsPage() {
                           size="sm"
                           onClick={() => openConvert(req)}
                         >
-                          Convert to appointment
+                          {t('requests.action_convert')}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setReviewing(req)}
                         >
-                          Review
+                          {t('requests.action_review')}
                         </Button>
                       </>
                     )}

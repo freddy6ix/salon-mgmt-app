@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { searchClients, createClient, checkDuplicateClients, type Client } from '@/api/clients'
 import { listServices } from '@/api/services'
 import { listProviders } from '@/api/providers'
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function ConvertRequestDialog({ request, onClose, onConverted }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   const [clientMode, setClientMode] = useState<'new' | 'existing'>('new')
@@ -275,7 +277,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
     <Dialog open={!!request} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Convert to appointment</DialogTitle>
+          <DialogTitle>{t('convert.title')}</DialogTitle>
         </DialogHeader>
 
         {request && (
@@ -305,14 +307,14 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                   variant={clientMode === 'new' ? 'default' : 'outline'}
                   onClick={() => setClientMode('new')}
                 >
-                  Create new
+                  {t('convert.tab_create_new')}
                 </Button>
                 <Button
                   size="sm"
                   variant={clientMode === 'existing' ? 'default' : 'outline'}
                   onClick={() => setClientMode('existing')}
                 >
-                  Link existing
+                  {t('convert.tab_link_existing')}
                 </Button>
               </div>
 
@@ -364,13 +366,13 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                         onClick={() => setSelectedClient(null)}
                         className="text-xs text-muted-foreground hover:text-foreground ml-3 shrink-0"
                       >
-                        change
+                        {t('appt.change_client')}
                       </button>
                     </div>
                   ) : (
                     <>
                       <input
-                        placeholder="Search by name, phone, or email…"
+                        placeholder={t('convert.search_placeholder')}
                         value={clientQuery}
                         onChange={e => setClientQuery(e.target.value)}
                         className="w-full border border-input rounded-md px-3 py-1.5 text-sm bg-background"
@@ -378,7 +380,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                       {debouncedQuery.length >= 1 && (
                         <ul className="border rounded-md divide-y max-h-40 overflow-auto">
                           {clientResults.length === 0 ? (
-                            <li className="px-3 py-2 text-sm text-muted-foreground">No clients found</li>
+                            <li className="px-3 py-2 text-sm text-muted-foreground">{t('convert.no_clients')}</li>
                           ) : (
                             clientResults.map(c => (
                               <li key={c.id}>
@@ -407,7 +409,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
             {/* Appointment date */}
             <div className="space-y-1.5">
-              <Label>Appointment date</Label>
+              <Label>{t('convert.appt_date')}</Label>
               <input
                 type="date"
                 value={appointmentDate}
@@ -418,15 +420,13 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
             {/* Service items */}
             <div className="space-y-3">
-              <Label>Services</Label>
+              <Label>{t('convert.services_label')}</Label>
               {items.map((item, idx) => {
                 const reqItem = request.items[idx]
                 return (
                   <div key={item.requestItemId} className="rounded-md border p-3 space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      Requested:{' '}
-                      <span className="font-medium text-foreground">{reqItem.service_name}</span>
-                      {' '}—{' '}{reqItem.preferred_provider_name}
+                      {t('convert.requested_service', { service: reqItem.service_name, provider: reqItem.preferred_provider_name })}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -436,7 +436,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                           onChange={e => handleServiceChange(idx, e.target.value)}
                           className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                         >
-                          <option value="">— select —</option>
+                          <option value="">{t('convert.select_service')}</option>
                           {serviceCategories.map(cat => (
                             <optgroup key={cat} label={cat}>
                               {services.filter(s => s.category_name === cat).map(s => (
@@ -455,7 +455,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                           onChange={e => updateItem(idx, { providerId: e.target.value })}
                           className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                         >
-                          <option value="">— select —</option>
+                          <option value="">{t('convert.select_service')}</option>
                           {activeProviders.map(p => (
                             <option key={p.id} value={p.id}>{p.display_name}</option>
                           ))}
@@ -471,7 +471,7 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Duration (min)</label>
+                        <label className="text-xs text-muted-foreground">{t('convert.duration_label')}</label>
                         <input
                           type="number"
                           min="5"
@@ -494,12 +494,12 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Notes</label>
+                        <label className="text-xs text-muted-foreground">{t('common.notes')}</label>
                         <input
                           type="text"
                           value={item.notes}
                           onChange={e => updateItem(idx, { notes: e.target.value })}
-                          placeholder="Optional…"
+                          placeholder={t('convert.notes_placeholder')}
                           className="w-full border border-input rounded-md px-2 py-1.5 text-sm bg-background mt-0.5"
                         />
                       </div>
@@ -511,21 +511,21 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
 
             {/* Appointment notes */}
             <div className="space-y-1.5">
-              <Label htmlFor="appt-notes">Appointment notes</Label>
+              <Label htmlFor="appt-notes">{t('convert.appt_notes')}</Label>
               <textarea
                 id="appt-notes"
                 value={apptNotes}
                 onChange={e => setApptNotes(e.target.value)}
                 rows={2}
-                placeholder="Optional…"
+                placeholder={t('convert.notes_placeholder')}
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none"
               />
             </div>
 
             {duplicates.length > 0 && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 space-y-1">
-                <p className="font-medium">Possible duplicate client</p>
-                <p className="text-xs">A client with the same email or phone already exists:</p>
+                <p className="font-medium">{t('convert.possible_duplicate')}</p>
+                <p className="text-xs">{t('convert.duplicate_text')}</p>
                 {duplicates.map(d => (
                   <p key={d.id} className="text-xs font-medium">
                     {d.first_name} {d.last_name}
@@ -533,15 +533,15 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
                     {d.email && ` · ${d.email}`}
                   </p>
                 ))}
-                <p className="text-xs mt-1">Create a new client anyway? (e.g. family members sharing contact info)</p>
+                <p className="text-xs mt-1">{t('convert.duplicate_confirm')}</p>
               </div>
             )}
 
             {clashWarning && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                <p className="font-medium mb-1">Scheduling conflict</p>
-                {clashWarning.map((c, i) => <p key={i} className="text-xs">{c} overlaps an existing appointment</p>)}
-                <p className="text-xs mt-1">Book anyway?</p>
+                <p className="font-medium mb-1">{t('convert.scheduling_conflict')}</p>
+                {clashWarning.map((c, i) => <p key={i} className="text-xs">{t('convert.conflict_detail', { provider: c.split(' at ')[0], time: c.split(' at ')[1] })}</p>)}
+                <p className="text-xs mt-1">{t('convert.book_anyway')}</p>
               </div>
             )}
 
@@ -550,24 +550,24 @@ export default function ConvertRequestDialog({ request, onClose, onConverted }: 
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>{t('common.cancel')}</Button>
           {duplicates.length > 0 ? (
             <>
-              <Button variant="outline" onClick={() => setDuplicates([])} disabled={isPending}>Back</Button>
+              <Button variant="outline" onClick={() => setDuplicates([])} disabled={isPending}>{t('common.back')}</Button>
               <Button onClick={() => { setBypassDuplicateCheck(true); setDuplicates([]); handleSubmit() }} disabled={isPending}>
-                Create anyway
+                {t('convert.create_anyway')}
               </Button>
             </>
           ) : clashWarning ? (
             <>
-              <Button variant="outline" onClick={() => setClashWarning(null)} disabled={isPending}>Back</Button>
+              <Button variant="outline" onClick={() => setClashWarning(null)} disabled={isPending}>{t('common.back')}</Button>
               <Button onClick={() => handleSubmit(true)} disabled={isPending}>
-                {isPending ? 'Creating…' : 'Book anyway'}
+                {isPending ? t('convert.creating') : t('convert.book_anyway')}
               </Button>
             </>
           ) : (
             <Button onClick={() => handleSubmit()} disabled={!isValid || isPending}>
-              {isPending ? 'Creating…' : 'Create appointment'}
+              {isPending ? t('convert.creating') : t('appt.confirm_appointment')}
             </Button>
           )}
         </DialogFooter>

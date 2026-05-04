@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { login } from '@/api/auth'
 import { useAuth } from '@/store/auth'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { setUser } = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -65,20 +67,20 @@ export default function LoginPage() {
 
           <div className="space-y-2 text-center lg:text-left">
             <p className="text-xs tracking-[0.3em] uppercase text-muted-foreground">
-              Welcome back
+              {t('auth.welcome_back')}
             </p>
             <h1
               className="text-3xl font-light"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Sign in to your account
+              {t('auth.sign_in_heading')}
             </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Email
+                {t('auth.email_label')}
               </label>
               <input
                 id="email"
@@ -91,7 +93,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Password
+                {t('auth.password_label')}
               </label>
               <input
                 id="password"
@@ -108,12 +110,12 @@ export default function LoginPage() {
               disabled={loading}
               className="mt-2 h-12 rounded-sm tracking-widest uppercase text-xs"
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? t('auth.signing_in') : t('auth.sign_in')}
             </Button>
             <p className="text-center text-sm text-muted-foreground pt-2">
-              New client?{' '}
+              {t('auth.new_client_prompt')}{' '}
               <Link to="/register" className="text-foreground underline-offset-4 hover:underline">
-                Create an account
+                {t('auth.create_account_link')}
               </Link>
             </p>
           </form>

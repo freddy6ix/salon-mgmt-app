@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
@@ -32,6 +33,7 @@ export default function ConfirmationDialog({
   recipientEmail,
   onClose,
 }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
@@ -86,30 +88,30 @@ export default function ConfirmationDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Confirmation email</DialogTitle>
+          <DialogTitle>{t('appt.confirmation_email_title')}</DialogTitle>
           <DialogDescription>
             {isSent ? (
-              <>
-                Sent {confirmation?.sent_at && new Date(confirmation.sent_at).toLocaleString()}
-                {recipientEmail && <> to <strong>{recipientEmail}</strong></>}
-              </>
+              t('appt.conf_sent_to', {
+                date: confirmation?.sent_at ? new Date(confirmation.sent_at).toLocaleString() : '',
+                email: recipientEmail ?? '',
+              })
             ) : (
               <>
                 {recipientEmail
-                  ? <>Will be sent to <strong>{recipientEmail}</strong> for the {new Date(appointmentDate).toLocaleDateString()} appointment.</>
-                  : <span className="text-destructive">Client has no email address — cannot send.</span>}
+                  ? t('appt.conf_will_be_sent', { email: recipientEmail, date: new Date(appointmentDate).toLocaleDateString() })
+                  : <span className="text-destructive">{t('appt.conf_no_email')}</span>}
               </>
             )}
           </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
         ) : (
           <>
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">Subject</label>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">{t('appt.conf_subject')}</label>
                 <input
                   type="text"
                   value={subject}
@@ -120,7 +122,7 @@ export default function ConfirmationDialog({
               </div>
               <div className="space-y-1">
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">
-                  {readOnly ? 'Body' : 'Body'}
+                  {t('appt.conf_body')}
                 </label>
                 <RichTextEditor
                   value={body}
@@ -138,7 +140,7 @@ export default function ConfirmationDialog({
                 onClick={onClose}
                 disabled={sendMutation.isPending || saveMutation.isPending || skipMutation.isPending}
               >
-                {readOnly ? 'Close' : 'Cancel'}
+                {readOnly ? t('common.close') : t('common.cancel')}
               </Button>
 
               {!readOnly && (
@@ -147,22 +149,22 @@ export default function ConfirmationDialog({
                     variant="ghost"
                     onClick={() => skipMutation.mutate()}
                     disabled={skipMutation.isPending || sendMutation.isPending || saveMutation.isPending}
-                    title="Mark this confirmation as skipped (you can change your mind later)"
+                    title={t('appt.conf_skip_tooltip')}
                   >
-                    {skipMutation.isPending ? 'Skipping…' : 'Skip'}
+                    {skipMutation.isPending ? t('common.saving') : t('appt.conf_skip')}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => saveMutation.mutate()}
                     disabled={!dirty || saveMutation.isPending || sendMutation.isPending}
                   >
-                    {saveMutation.isPending ? 'Saving…' : 'Save draft'}
+                    {saveMutation.isPending ? t('common.saving') : t('appt.conf_save_draft')}
                   </Button>
                   <Button
                     onClick={() => sendMutation.mutate()}
                     disabled={!recipientEmail || sendMutation.isPending || saveMutation.isPending}
                   >
-                    {sendMutation.isPending ? 'Sending…' : 'Send'}
+                    {sendMutation.isPending ? t('common.sending') : t('common.send')}
                   </Button>
                 </div>
               )}
