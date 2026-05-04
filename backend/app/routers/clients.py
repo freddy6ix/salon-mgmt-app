@@ -9,6 +9,7 @@ from typing import Annotated
 
 from app.database import get_db
 from app.deps import CurrentUser
+from app.i18n import SUPPORTED_LANGUAGES
 from app.models.client import Client, ClientColourNote, ClientHousehold
 from app.models.appointment import Appointment, AppointmentItem, AppointmentStatus
 from app.models.user import User
@@ -30,6 +31,7 @@ class ClientOut(BaseModel):
     no_show_count: int
     late_cancellation_count: int
     is_vip: bool
+    language_preference: str
 
     model_config = {"from_attributes": True}
 
@@ -46,6 +48,7 @@ def _client_out(c: Client) -> "ClientOut":
         no_show_count=c.no_show_count,
         late_cancellation_count=c.late_cancellation_count,
         is_vip=c.is_vip,
+        language_preference=c.language_preference,
     )
 
 
@@ -171,6 +174,7 @@ class ClientUpdate(BaseModel):
     last_name: str | None = None
     email: str | None = None
     cell_phone: str | None = None
+    language_preference: str | None = None
 
 
 @router.patch("/{client_id}", response_model=ClientOut)
@@ -198,6 +202,13 @@ async def update_client(
         row.email = body.email.strip() or None
     if body.cell_phone is not None:
         row.cell_phone = body.cell_phone.strip() or None
+    if body.language_preference is not None:
+        if body.language_preference not in SUPPORTED_LANGUAGES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"language_preference must be one of {SUPPORTED_LANGUAGES}",
+            )
+        row.language_preference = body.language_preference
     await db.commit()
     await db.refresh(row)
     return _client_out(row)

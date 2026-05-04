@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import AdminUser, StaffUser
+from app.i18n import SUPPORTED_LANGUAGES
 from app.models.schedule import TenantOperatingHours
 from app.models.tenant import Tenant
 
@@ -31,6 +32,8 @@ class BrandingOut(BaseModel):
     brand_color: str | None
     slot_minutes: int
     time_format: str
+    default_language: str
+    supported_languages: list[str]
     address_line1: str | None
     address_line2: str | None
     city: str | None
@@ -47,6 +50,7 @@ class BrandingPatch(BaseModel):
     brand_color: str | None = None
     slot_minutes: int | None = None
     time_format: str | None = None
+    default_language: str | None = None
     address_line1: str | None = None
     address_line2: str | None = None
     city: str | None = None
@@ -70,6 +74,8 @@ def _branding_out(tenant: Tenant) -> BrandingOut:
         brand_color=tenant.brand_color,
         slot_minutes=tenant.slot_minutes,
         time_format=tenant.time_format,
+        default_language=tenant.default_language,
+        supported_languages=SUPPORTED_LANGUAGES,
         address_line1=tenant.address_line1,
         address_line2=tenant.address_line2,
         city=tenant.city,
@@ -114,6 +120,11 @@ async def update_branding(
                 raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
                                     detail="time_format must be '12h' or '24h'")
             tenant.time_format = value
+        elif field == 'default_language':
+            if value not in SUPPORTED_LANGUAGES:
+                raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail=f"default_language must be one of {SUPPORTED_LANGUAGES}")
+            tenant.default_language = value
         elif field in CONTACT_FIELDS:
             cleaned = value.strip() if isinstance(value, str) else value
             setattr(tenant, field, cleaned or None)

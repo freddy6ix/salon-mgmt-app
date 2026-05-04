@@ -15,17 +15,23 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import AdminUser, StaffUser
+from app.deps import AdminUser, ResolvedLanguage, StaffUser
+from app.models.i18n import RetailItemTranslation
 from app.models.retail import RetailItem, RetailStockMovement, StockMovementKind
 
 router = APIRouter(prefix="/retail-items", tags=["retail-items"])
 
 
 # ── Response models ───────────────────────────────────────────────────────────
+
+class RetailItemTranslationData(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
 
 class RetailItemOut(BaseModel):
     id: str
@@ -38,6 +44,7 @@ class RetailItemOut(BaseModel):
     is_pst_exempt: bool
     is_active: bool
     on_hand: int
+    translations: dict[str, RetailItemTranslationData] = {}
 
 
 class StockMovementOut(BaseModel):
@@ -64,6 +71,7 @@ class RetailItemCreate(BaseModel):
     default_cost: Decimal | None = None
     is_gst_exempt: bool = False
     is_pst_exempt: bool = False
+    translations: dict[str, RetailItemTranslationData] | None = None
 
 
 class RetailItemUpdate(BaseModel):
@@ -75,6 +83,7 @@ class RetailItemUpdate(BaseModel):
     is_gst_exempt: bool | None = None
     is_pst_exempt: bool | None = None
     is_active: bool | None = None
+    translations: dict[str, RetailItemTranslationData] | None = None
 
 
 class ReceiveIn(BaseModel):
@@ -98,19 +107,65 @@ async def _on_hand(item_id: uuid.UUID, db: AsyncSession) -> int:
     return int(result.scalar() or 0)
 
 
-def _out(r: RetailItem, on_hand: int = 0) -> RetailItemOut:
+def _out(
+    r: RetailItem,
+    on_hand: int = 0,
+    tr: RetailItemTranslation | None = None,
+    all_translations: dict[str, RetailItemTranslationData] | None = None,
+) -> RetailItemOut:
     return RetailItemOut(
         id=str(r.id),
         sku=r.sku,
-        name=r.name,
-        description=r.description,
+        name=tr.name if tr else r.name,
+        description=tr.description if tr else r.description,
         default_price=str(r.default_price),
         default_cost=str(r.default_cost) if r.default_cost is not None else None,
         is_gst_exempt=r.is_gst_exempt,
         is_pst_exempt=r.is_pst_exempt,
         is_active=r.is_active,
         on_hand=on_hand,
+        translations=all_translations or {},
     )
+
+
+async def _load_retail_translations(item_id: uuid.UUID, db: AsyncSession) -> dict[str, RetailItemTranslationData]:
+    rows = (
+        await db.execute(
+            select(RetailItemTranslation).where(RetailItemTranslation.retail_item_id == item_id)
+        )
+    ).scalars().all()
+    return {row.language: RetailItemTranslationData(name=row.name, description=row.description) for row in rows}
+
+
+async def _upsert_retail_translation(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    item_id: uuid.UUID,
+    language: str,
+    data: RetailItemTranslationData,
+    canonical_name: str,
+) -> None:
+    existing = (
+        await db.execute(
+            select(RetailItemTranslation).where(
+                RetailItemTranslation.retail_item_id == item_id,
+                RetailItemTranslation.language == language,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(RetailItemTranslation(
+            tenant_id=tenant_id,
+            retail_item_id=item_id,
+            language=language,
+            name=data.name if data.name is not None else canonical_name,
+            description=data.description,
+        ))
+    else:
+        if data.name is not None:
+            existing.name = data.name
+        if data.description is not None:
+            existing.description = data.description
 
 
 async def _load_item(item_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> RetailItem:
@@ -133,17 +188,28 @@ async def _load_item(item_id: str, tenant_id: uuid.UUID, db: AsyncSession) -> Re
 async def list_retail_items(
     current_user: StaffUser,
     db: Annotated[AsyncSession, Depends(get_db)],
+    language: ResolvedLanguage,
     active_only: bool = Query(False),
 ) -> list[RetailItemOut]:
-    q = select(RetailItem).where(RetailItem.tenant_id == current_user.tenant_id)
+    q = (
+        select(RetailItem, RetailItemTranslation)
+        .outerjoin(RetailItemTranslation, and_(
+            RetailItemTranslation.retail_item_id == RetailItem.id,
+            RetailItemTranslation.language == language,
+        ))
+        .where(RetailItem.tenant_id == current_user.tenant_id)
+    )
     if active_only:
         q = q.where(RetailItem.is_active == True)  # noqa: E712
     q = q.order_by(RetailItem.name)
-    rows = (await db.execute(q)).scalars().all()
+    rows = (await db.execute(q)).all()
+
+    items = [r for r, _ in rows]
+    tr_map = {str(r.id): tr for r, tr in rows}
 
     # Batch-compute on_hand for all items in one query
-    if rows:
-        item_ids = [r.id for r in rows]
+    if items:
+        item_ids = [r.id for r in items]
         counts = (
             await db.execute(
                 select(
@@ -158,7 +224,7 @@ async def list_retail_items(
     else:
         on_hand_map = {}
 
-    return [_out(r, on_hand_map.get(str(r.id), 0)) for r in rows]
+    return [_out(r, on_hand_map.get(str(r.id), 0), tr_map.get(str(r.id))) for r in items]
 
 
 @router.post("", response_model=RetailItemOut, status_code=status.HTTP_201_CREATED)
@@ -167,10 +233,12 @@ async def create_retail_item(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RetailItemOut:
+    tid = current_user.tenant_id
+    canonical_name = body.name.strip()
     item = RetailItem(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tid,
         sku=body.sku.strip() if body.sku else None,
-        name=body.name.strip(),
+        name=canonical_name,
         description=body.description.strip() if body.description else None,
         default_price=body.default_price,
         default_cost=body.default_cost,
@@ -178,9 +246,21 @@ async def create_retail_item(
         is_pst_exempt=body.is_pst_exempt,
     )
     db.add(item)
+    await db.flush()
+
+    en_extra = (body.translations or {}).get("en", RetailItemTranslationData())
+    await _upsert_retail_translation(db, tid, item.id, "en", RetailItemTranslationData(
+        name=en_extra.name or canonical_name,
+        description=en_extra.description or item.description,
+    ), canonical_name)
+    for lang, tr_data in (body.translations or {}).items():
+        if lang != "en":
+            await _upsert_retail_translation(db, tid, item.id, lang, tr_data, canonical_name)
+
     await db.commit()
     await db.refresh(item)
-    return _out(item, 0)
+    all_tr = await _load_retail_translations(item.id, db)
+    return _out(item, 0, all_translations=all_tr)
 
 
 @router.patch("/{item_id}", response_model=RetailItemOut)
@@ -190,13 +270,26 @@ async def update_retail_item(
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RetailItemOut:
-    item = await _load_item(item_id, current_user.tenant_id, db)
-    for field in body.model_fields_set:
+    tid = current_user.tenant_id
+    item = await _load_item(item_id, tid, db)
+    for field in body.model_fields_set - {"translations"}:
         setattr(item, field, getattr(body, field))
+
+    en_sync = RetailItemTranslationData(
+        name=body.name if "name" in body.model_fields_set else None,
+        description=body.description if "description" in body.model_fields_set else None,
+    )
+    if en_sync.name is not None or en_sync.description is not None:
+        await _upsert_retail_translation(db, tid, item.id, "en", en_sync, item.name)
+
+    for lang, tr_data in (body.translations or {}).items():
+        await _upsert_retail_translation(db, tid, item.id, lang, tr_data, item.name)
+
     await db.commit()
     await db.refresh(item)
     on_hand = await _on_hand(item.id, db)
-    return _out(item, on_hand)
+    all_tr = await _load_retail_translations(item.id, db)
+    return _out(item, on_hand, all_translations=all_tr)
 
 
 # ── Stock endpoints ───────────────────────────────────────────────────────────

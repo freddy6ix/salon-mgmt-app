@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import decode_token
 from app.database import get_db
+from app.i18n import resolve_language
+from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 
 bearer_scheme = HTTPBearer()
@@ -48,7 +50,29 @@ def require_role(*roles: UserRole):
     return check
 
 
+async def get_tenant(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Tenant:
+    return (
+        await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))
+    ).scalar_one()
+
+
+async def get_resolved_language(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    tenant: Annotated[Tenant, Depends(get_tenant)],
+) -> str:
+    return resolve_language(
+        request.headers.get("accept-language"),
+        current_user.language_preference,
+        tenant.default_language,
+    )
+
+
 # Convenience aliases
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_role(UserRole.tenant_admin, UserRole.super_admin))]
 StaffUser = Annotated[User, Depends(require_role(UserRole.staff, UserRole.tenant_admin, UserRole.super_admin))]
+ResolvedLanguage = Annotated[str, Depends(get_resolved_language)]
