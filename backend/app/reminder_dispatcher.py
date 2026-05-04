@@ -60,17 +60,19 @@ async def schedule_reminder(
         return
 
     earliest: datetime = items[0].start_time  # naive local datetime
-    # Treat as Toronto local, compute scheduled_at in UTC
-    # start_time is stored naive; subtract lead hours and compare to now UTC
-    scheduled_at = earliest - timedelta(hours=tenant.reminder_lead_hours)
-    # Convert naive local to UTC by assuming America/Toronto offset (~UTC-4/5).
-    # We use a pragmatic approach: store aware UTC for the scheduler check.
-    # For simplicity we use pytz-free arithmetic: just make it UTC-aware with
-    # a fixed offset acceptable for scheduling purposes. The dispatcher uses
-    # datetime.now(timezone.utc) for comparison.
     import zoneinfo
     tz = zoneinfo.ZoneInfo(BUSINESS_TZ)
-    scheduled_at_aware = scheduled_at.replace(tzinfo=tz).astimezone(timezone.utc)
+
+    if tenant.reminder_lead_hours >= 24:
+        # Fixed clock time N days before the appointment date.
+        days_before = tenant.reminder_lead_hours // 24
+        reminder_date = appt.appointment_date.date() - timedelta(days=days_before)
+        h, m = map(int, tenant.reminder_send_time.split(":"))
+        naive_send = datetime(reminder_date.year, reminder_date.month, reminder_date.day, h, m)
+        scheduled_at_aware = naive_send.replace(tzinfo=tz).astimezone(timezone.utc)
+    else:
+        # Sub-day lead: relative to appointment start time.
+        scheduled_at_aware = earliest.replace(tzinfo=tz) - timedelta(hours=tenant.reminder_lead_hours)
 
     if scheduled_at_aware <= datetime.now(timezone.utc):
         # Appointment is too soon — skip

@@ -651,6 +651,7 @@
     "reminders_checkbox": "Send reminder emails to clients",
     "send_reminder": "Send reminder",
     "reminders_note": "Reminders are only sent to clients who have an email address on file.",
+    "reminder_send_time": "Send time (salon's local time)",
     "notifications_section": "Booking-request notifications",
     "notifications_help": "Email the salon when a guest submits a booking request through the public form. Independent of the SMTP configuration above — uses the same outbound credentials.",
     "notifications_checkbox": "Send notifications when a new request is submitted",

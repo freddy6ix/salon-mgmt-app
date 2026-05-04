@@ -1090,6 +1090,7 @@ function RemindersSection() {
 
   const [enabled, setEnabled] = useState(false)
   const [leadHours, setLeadHours] = useState(24)
+  const [sendTime, setSendTime] = useState('09:00')
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
@@ -1098,12 +1099,13 @@ function RemindersSection() {
     if (data) {
       setEnabled(data.reminder_enabled)
       setLeadHours(data.reminder_lead_hours)
+      setSendTime(data.reminder_send_time ?? '09:00')
       setDirty(false)
     }
   }, [data])
 
   const mutation = useMutation({
-    mutationFn: () => updateRequestNotifications({ reminder_enabled: enabled, reminder_lead_hours: leadHours }),
+    mutationFn: () => updateRequestNotifications({ reminder_enabled: enabled, reminder_lead_hours: leadHours, reminder_send_time: sendTime }),
     onSuccess: updated => {
       qc.setQueryData(['request-notifications'], updated)
       setDirty(false)
@@ -1136,19 +1138,32 @@ function RemindersSection() {
       </label>
 
       {enabled && (
-        <div className="space-y-1.5">
-          <Label>{t('settings.send_reminder')}</Label>
-          <select
-            value={leadHours}
-            onChange={e => { setLeadHours(Number(e.target.value)); setDirty(true) }}
-            className="border border-input rounded-md px-2 py-1.5 text-sm bg-background"
-          >
-            {LEAD_HOUR_OPTIONS.map(h => (
-              <option key={h} value={h}>
-                {h < 24 ? `${h} hours` : `${h / 24} day${h / 24 > 1 ? 's' : ''}`} before
-              </option>
-            ))}
-          </select>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>{t('settings.send_reminder')}</Label>
+            <select
+              value={leadHours}
+              onChange={e => { setLeadHours(Number(e.target.value)); setDirty(true) }}
+              className="border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+            >
+              {LEAD_HOUR_OPTIONS.map(h => (
+                <option key={h} value={h}>
+                  {h < 24 ? `${h} hours` : `${h / 24} day${h / 24 > 1 ? 's' : ''}`} before
+                </option>
+              ))}
+            </select>
+          </div>
+          {leadHours >= 24 && (
+            <div className="space-y-1.5">
+              <Label>{t('settings.reminder_send_time')}</Label>
+              <input
+                type="time"
+                value={sendTime}
+                onChange={e => { setSendTime(e.target.value); setDirty(true) }}
+                className="border border-input rounded-md px-2 py-1.5 text-sm bg-background"
+              />
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             {t('settings.reminders_note')}
           </p>

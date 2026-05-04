@@ -651,6 +651,7 @@
     "reminders_checkbox": "Envoyer des rappels par courriel aux clients",
     "send_reminder": "Envoyer un rappel",
     "reminders_note": "Les rappels ne sont envoyés qu'aux clients ayant un courriel enregistré.",
+    "reminder_send_time": "Heure d'envoi (heure locale du salon)",
     "notifications_section": "Notifications de demandes",
     "notifications_help": "Informez le salon par courriel lorsqu'un client soumet une demande via le formulaire public.",
     "notifications_checkbox": "Envoyer des notifications lors d'une nouvelle demande",
