@@ -153,9 +153,10 @@ export default function AppointmentBookPage() {
 
   const activeProviders = providers.filter(p => p.has_appointments)
   const workingProviderIds = new Set(schedules.filter(s => s.is_working).map(s => s.provider_id))
+  const providersWithAppts = new Set(appointments.flatMap(a => a.items.map(i => i.provider.id)))
   const visibleProviders = schedules.length === 0
     ? activeProviders
-    : activeProviders.filter(p => workingProviderIds.has(p.id))
+    : activeProviders.filter(p => workingProviderIds.has(p.id) || providersWithAppts.has(p.id))
   const displayDate = parseISO(date + 'T12:00:00')
 
   const prev  = useCallback(() => setDate(format(subDays(displayDate, 1), 'yyyy-MM-dd')), [displayDate])
