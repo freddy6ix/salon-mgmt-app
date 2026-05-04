@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, getISODay } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import { useTimeFormat } from '@/lib/timeFormat'
+import { useDateLocale } from '@/lib/dateLocale'
 import { useNavigate } from 'react-router-dom'
 import { type Appointment, listAppointments } from '@/api/appointments'
 import { type AppointmentRequest, listAllRequests } from '@/api/appointmentRequests'
@@ -157,6 +158,7 @@ function StaffClockWidget({ providers, entries, today }: StaffClockWidgetProps) 
 function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { bcp47 } = useDateLocale()
 
   if (requests.length === 0) {
     return <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.no_pending_requests')}</p>
@@ -175,7 +177,7 @@ function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
                 {req.first_name} {req.last_name}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {new Date(req.desired_date + 'T00:00:00').toLocaleDateString('en-CA', {
+                {new Date(req.desired_date + 'T00:00:00').toLocaleDateString(bcp47, {
                   weekday: 'short', month: 'short', day: 'numeric',
                 })}
                 {req.desired_time_note && ` · ${req.desired_time_note}`}
@@ -195,6 +197,7 @@ function PendingRequests({ requests }: { requests: AppointmentRequest[] }) {
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { locale } = useDateLocale()
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const { data: appointments = [] } = useQuery({
@@ -249,7 +252,7 @@ export default function DashboardPage() {
             {(() => { const h = new Date().getHours(); return h < 12 ? t('dashboard.good_morning') : h < 17 ? t('dashboard.good_afternoon') : t('dashboard.good_evening') })()}
           </h1>
           <p className="text-muted-foreground mt-0.5">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            {format(new Date(), 'EEEE, MMMM d, yyyy', { locale })}
           </p>
         </div>
 

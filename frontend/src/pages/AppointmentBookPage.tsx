@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { format, addDays, subDays, parseISO } from 'date-fns'
@@ -82,6 +83,7 @@ function ShortcutsPanel({ shortcuts, onClose }: { shortcuts: ShortcutDef[]; onCl
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AppointmentBookPage() {
   const { t } = useTranslation()
+  const { locale } = useDateLocale()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestId = searchParams.get('request')
@@ -285,7 +287,7 @@ export default function AppointmentBookPage() {
           <Button variant="outline" size="sm" onClick={prev}>‹</Button>
           <Button variant="outline" size="sm" onClick={goToday}>{t('appt.today')}</Button>
           <span className="text-sm font-medium w-40 text-center">
-            {format(displayDate, 'EEEE, MMM d, yyyy')}
+            {format(displayDate, 'EEEE, MMM d, yyyy', { locale })}
           </span>
           <Button variant="outline" size="sm" onClick={next}>›</Button>
         </div>

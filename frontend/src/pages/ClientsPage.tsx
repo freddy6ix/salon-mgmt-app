@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import {
   type Visit,
   type ColourNote,
@@ -115,6 +116,7 @@ function ClientList({
 
 function ColourNotes({ clientId }: { clientId: string }) {
   const { t } = useTranslation()
+  const { bcp47 } = useDateLocale()
   const qc = useQueryClient()
   const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [newText, setNewText] = useState('')
@@ -182,7 +184,7 @@ function ColourNotes({ clientId }: { clientId: string }) {
           {notes.map((n: ColourNote) => (
             <li key={n.id} className="rounded-md border p-3 text-sm space-y-1">
               <p className="text-xs text-muted-foreground font-medium">
-                {new Date(n.note_date + 'T00:00:00').toLocaleDateString('en-CA', {
+                {new Date(n.note_date + 'T00:00:00').toLocaleDateString(bcp47, {
                   year: 'numeric', month: 'short', day: 'numeric',
                 })}
               </p>
@@ -208,6 +210,7 @@ const VISIT_STATUS_LABEL: Record<string, string> = {
 function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const { formatTime: ft } = useTimeFormat()
+  const { bcp47 } = useDateLocale()
   const navigate = useNavigate()
   const todayStr = new Date().toISOString().slice(0, 10)
   const isUpcoming = visit.date >= todayStr
@@ -220,7 +223,7 @@ function VisitRow({ visit, onCancel }: { visit: Visit; onCancel?: (id: string) =
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">
-          {new Date(visit.date + 'T00:00:00').toLocaleDateString('en-CA', {
+          {new Date(visit.date + 'T00:00:00').toLocaleDateString(bcp47, {
             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
           })}
         </span>

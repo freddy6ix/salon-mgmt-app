@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { format, addMonths, subMonths, endOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import { getMonthlyReport } from '@/api/reports'
 import { getPayrollReport } from '@/api/providers'
 import { Button } from '@/components/ui/button'
@@ -52,6 +53,7 @@ function Row({
 
 export default function ReportsPage() {
   const { t } = useTranslation()
+  const { locale } = useDateLocale()
   const now = new Date()
   const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
 
@@ -89,7 +91,7 @@ export default function ReportsPage() {
               <ChevronLeft size={16} />
             </Button>
             <span className="text-sm font-medium w-32 text-center">
-              {format(cursor, 'MMMM yyyy')}
+              {format(cursor, 'MMMM yyyy', { locale })}
             </span>
             <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, 1))} disabled={isCurrentMonth}>
               <ChevronRight size={16} />
@@ -107,7 +109,7 @@ export default function ReportsPage() {
             <Skeleton className="h-40 rounded-lg" />
           </div>
         ) : !report ? null : report.sale_count === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-16">No completed sales in {format(cursor, 'MMMM yyyy')}.</p>
+          <p className="text-sm text-muted-foreground text-center py-16">No completed sales in {format(cursor, 'MMMM yyyy', { locale })}.</p>
         ) : (
           <>
             {/* Summary cards */}

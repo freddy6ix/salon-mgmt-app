@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import { getPettyCashReport } from '@/api/reports'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,6 +15,7 @@ function fmt(s: string): string {
 
 export default function PettyCashReportPage() {
   const { t } = useTranslation()
+  const { locale } = useDateLocale()
   const now = new Date()
   const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
 
@@ -37,7 +39,7 @@ export default function PettyCashReportPage() {
               <ChevronLeft size={16} />
             </Button>
             <span className="text-sm font-medium w-32 text-center">
-              {format(cursor, 'MMMM yyyy')}
+              {format(cursor, 'MMMM yyyy', { locale })}
             </span>
             <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, 1))} disabled={isCurrentMonth}>
               <ChevronRight size={16} />
@@ -52,7 +54,7 @@ export default function PettyCashReportPage() {
           </div>
         ) : !report || report.entries.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-16">
-            {t('reports.no_entries', { month_year: format(cursor, 'MMMM yyyy') })}
+            {t('reports.no_entries', { month_year: format(cursor, 'MMMM yyyy', { locale }) })}
           </p>
         ) : (
           <>

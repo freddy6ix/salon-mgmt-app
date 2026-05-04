@@ -6,9 +6,8 @@ import {
   addDays, addMonths, subMonths,
   isSameDay, isSameMonth,
 } from 'date-fns'
+import { useDateLocale } from '@/lib/dateLocale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-
-const DAY_HEADERS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 interface Props {
   selectedDate: string        // 'yyyy-MM-dd'
@@ -16,6 +15,7 @@ interface Props {
 }
 
 export default function MiniCalendar({ selectedDate, onDateChange }: Props) {
+  const { locale } = useDateLocale()
   const selected = parseISO(selectedDate + 'T12:00:00')
   const today = new Date()
 
@@ -36,6 +36,11 @@ export default function MiniCalendar({ selectedDate, onDateChange }: Props) {
     cur = addDays(cur, 1)
   }
 
+  // Day-of-week headers derived from locale so they translate automatically
+  const dayHeaders = Array.from({ length: 7 }, (_, i) =>
+    format(addDays(gridStart, i), 'EEEEE', { locale })
+  )
+
   return (
     <div className="p-3 select-none">
       {/* Month navigation */}
@@ -46,7 +51,7 @@ export default function MiniCalendar({ selectedDate, onDateChange }: Props) {
         >
           <ChevronLeft size={13} />
         </button>
-        <span className="text-xs font-semibold">{format(viewMonth, 'MMMM yyyy')}</span>
+        <span className="text-xs font-semibold">{format(viewMonth, 'MMMM yyyy', { locale })}</span>
         <button
           onClick={() => setViewMonth(m => addMonths(m, 1))}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -57,8 +62,8 @@ export default function MiniCalendar({ selectedDate, onDateChange }: Props) {
 
       {/* Day-of-week headers */}
       <div className="grid grid-cols-7 mb-1">
-        {DAY_HEADERS.map(d => (
-          <div key={d} className="text-center text-[10px] text-muted-foreground/60 font-medium py-0.5">
+        {dayHeaders.map((d, i) => (
+          <div key={i} className="text-center text-[10px] text-muted-foreground/60 font-medium py-0.5">
             {d}
           </div>
         ))}

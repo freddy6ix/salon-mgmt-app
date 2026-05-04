@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusCircle, LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import { useAuth } from '@/store/auth'
 import {
   type AppointmentRequest,
@@ -241,6 +242,7 @@ function RequestForm({
 
 export default function MyRequestsPage() {
   const { t } = useTranslation()
+  const { bcp47 } = useDateLocale()
   const { user, logout } = useAuth()
   const qc = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
@@ -310,7 +312,7 @@ export default function MyRequestsPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">
-                      {new Date(req.desired_date + 'T00:00:00').toLocaleDateString('en-CA', {
+                      {new Date(req.desired_date + 'T00:00:00').toLocaleDateString(bcp47, {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
@@ -327,7 +329,7 @@ export default function MyRequestsPage() {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    Submitted {new Date(req.submitted_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    Submitted {new Date(req.submitted_at).toLocaleDateString(bcp47, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useDateLocale } from '@/lib/dateLocale'
 import {
   type AppointmentRequest,
   listAllRequests,
@@ -50,6 +51,7 @@ function ReviewDialog({
   onConvert: () => void
 }) {
   const { t } = useTranslation()
+  const { bcp47 } = useDateLocale()
   const [newStatus, setNewStatus] = useState<AppointmentRequest['status']>('reviewed')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -82,7 +84,7 @@ function ReviewDialog({
               <p className="font-medium">{request.first_name} {request.last_name}</p>
               <p className="text-muted-foreground">{request.email}</p>
               <p className="mt-1">
-                {new Date(request.desired_date + 'T00:00:00').toLocaleDateString('en-CA', {
+                {new Date(request.desired_date + 'T00:00:00').toLocaleDateString(bcp47, {
                   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
                 })}
                 {request.desired_time_note && ` · ${request.desired_time_note}`}
@@ -150,6 +152,7 @@ function ReviewDialog({
 
 export default function RequestsPage() {
   const { t } = useTranslation()
+  const { bcp47 } = useDateLocale()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
@@ -228,11 +231,11 @@ export default function RequestsPage() {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    {new Date(req.desired_date + 'T00:00:00').toLocaleDateString('en-CA', {
+                    {new Date(req.desired_date + 'T00:00:00').toLocaleDateString(bcp47, {
                       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
                     })}
                     {req.desired_time_note && ` · ${req.desired_time_note}`}
-                    {' · '}submitted {new Date(req.submitted_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    {' · '}submitted {new Date(req.submitted_at).toLocaleDateString(bcp47, { month: 'short', day: 'numeric' })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
